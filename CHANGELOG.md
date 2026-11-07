@@ -1,3 +1,33 @@
+## 1.31.0
+
+- New: regular expression conditions in queries: `field =~ /pattern/flags`
+  (matches) and `field !~ /pattern/flags` (does not match), e.g.
+  `email =~ /@corp\.com$/i`. A value between `/` makes `=~`/`!~` a regexp;
+  any other value is still `IN`/`NOT IN`.
+  - The pattern can be a parameter: `/?/`, `/?#1/` or `/?:name/`, whose value
+    is a `String` or a `RegExp` (its case flag is used).
+  - The only flag is `i`. In a pattern, `\/` is a `/`.
+  - `KeyConditionRegExp`: the same matching in every `SQLAdapter`
+    (PostgreSQL's semantics): anywhere in the value, `.` also matches a line
+    terminator, `^`/`$` only at the start/end of the whole value. A non-text
+    field is matched by its text (an enum by its name); a `null` field matches
+    neither `=~` nor `!~`. The pattern is always a SQL parameter.
+  - `SQLDialect.regExpSyntax` (`SQLRegExpSyntax`): PostgreSQL `~`/`~*` (a
+    non-text column cast to `TEXT`); MySQL 8.0.4+ `REGEXP_LIKE(..., 'cn'/'in')`
+    with `$` rewritten as `\z` (ICU's `$` also matches before a final line
+    terminator); SQLite a `regexp(pattern, value, flags)` function, registered
+    by `DBSQLiteAdapter` on its connection (also `value REGEXP pattern`); and
+    `DBSQLMemoryAdapter` matches the condition in memory.
+- A `RegExp` as an `==`/`!=`/`IN` parameter (`field =~ ?`) is now an
+  `ArgumentError` (it was compared as its `toString`): a regexp parameter is
+  written between `/` (`field =~ /?/`).
+- Fix: `selectFirstByQuery` (`EntitySource`, `EntityRepository`) dropped the
+  `positionalParameters` (not passed to `selectByQuery`).
+- README: the query conditions syntax.
+- New tests: `bones_api_condition_regexp_test.dart` (parsing, encoding,
+  matching and the SQL of each dialect), and the regexp conditions on every
+  `SQLAdapter` (memory, SQLite, PostgreSQL, MySQL).
+
 ## 1.30.2
 
 - Fix: a transaction opened before `Transaction.execute`/`executeOrError`

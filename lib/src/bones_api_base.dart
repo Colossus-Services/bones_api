@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.30.2';
+  static const String VERSION = '1.31.0';
 
   static bool _boot = false;
 

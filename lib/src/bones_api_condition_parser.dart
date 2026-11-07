@@ -275,33 +275,85 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
       (conditionID() | conditionKeyValue()).cast<Condition>();
 
   Parser<Condition> conditionKeyValue() =>
-      (conditionKeys() & conditionOperator() & conditionValue()).map((l) {
-        var keys = l[0] as List<ConditionKey>;
-        var op = l[1] as String;
-        var value = l[2];
+      (conditionKeys() &
+              conditionOperator() &
+              (_conditionRegExp() | conditionValue()))
+          .map((l) {
+            var keys = l[0] as List<ConditionKey>;
+            var op = l[1] as String;
+            var value = l[2];
 
-        switch (op) {
-          case '=':
-          case '==':
-            return KeyConditionEQ(keys, value);
-          case '!=':
-            return KeyConditionNotEQ(keys, value);
-          case '=~':
-            return KeyConditionIN(keys, value);
-          case '!~':
-            return KeyConditionNotIN(keys, value);
-          case '>':
-            return KeyConditionGreaterThan(keys, value);
-          case '>=':
-            return KeyConditionGreaterThanOrEqual(keys, value);
-          case '<':
-            return KeyConditionLessThan(keys, value);
-          case '<=':
-            return KeyConditionLessThanOrEqual(keys, value);
-          default:
-            throw FormatException('Unknown operator: $keys $op $value');
-        }
-      });
+            if (value is _RegExpValue) {
+              return switch (op) {
+                '=~' => KeyConditionRegExp(
+                  keys,
+                  value.pattern,
+                  caseInsensitive: value.caseInsensitive,
+                ),
+                '!~' => KeyConditionRegExp(
+                  keys,
+                  value.pattern,
+                  caseInsensitive: value.caseInsensitive,
+                  not: true,
+                ),
+                _ => throw FormatException(
+                  'A regexp (`/.../`) is only valid with the `=~` and `!~` '
+                  'operators: $keys $op /${value.pattern}/',
+                ),
+              };
+            }
+
+            return _keyValueCondition(keys, op, value);
+          });
+
+  /// A regexp: `/pattern/flags`, or a parameter as the pattern (`/?/`,
+  /// `/?#1/`, `/?:name/`). In a pattern, only `\/` is unescaped (as `/`):
+  /// any other `\x` is kept as is. The only flag is `i`.
+  Parser<_RegExpValue> _conditionRegExp() =>
+      (char('/') &
+              (conditionParameter() | conditionRegExpBody()) &
+              char('/') &
+              letter().star().flatten())
+          .trim()
+          .map((l) {
+            var pattern = l[1] as Object;
+            var flags = l[3] as String;
+
+            for (var i = 0; i < flags.length; ++i) {
+              var f = flags[i];
+              if (f != 'i') {
+                throw FormatException(
+                  'Unsupported regexp flag `$f` (only `i` is supported): '
+                  '/$pattern/$flags',
+                );
+              }
+            }
+
+            return _RegExpValue(pattern, flags.contains('i'));
+          });
+
+  Parser<String> conditionRegExpBody() =>
+      ((string(r'\/').map((_) => '/')) |
+              (char(r'\') & any()).flatten() |
+              pattern(r'^/\').cast<String>())
+          .plus()
+          .map((l) => l.join());
+
+  Condition _keyValueCondition(
+    List<ConditionKey> keys,
+    String op,
+    Object? value,
+  ) => switch (op) {
+    '==' => KeyConditionEQ(keys, value),
+    '!=' => KeyConditionNotEQ(keys, value),
+    '=~' => KeyConditionIN(keys, value),
+    '!~' => KeyConditionNotIN(keys, value),
+    '>' => KeyConditionGreaterThan(keys, value),
+    '>=' => KeyConditionGreaterThanOrEqual(keys, value),
+    '<' => KeyConditionLessThan(keys, value),
+    '<=' => KeyConditionLessThanOrEqual(keys, value),
+    _ => throw FormatException('Unknown operator: $keys $op $value'),
+  };
 
   Parser<List<ConditionKey>> conditionKeys() =>
       (conditionKey() & (char('.') & conditionKey()).map((l) => l[1]).star())
@@ -377,6 +429,15 @@ class ConditionGrammarDefinition extends JsonGrammarDefinition {
 
   Parser<ConditionParameter> conditionParameterPositional() =>
       char('?').trim().map((l) => ConditionParameter());
+}
+
+/// A parsed regexp value (`/pattern/flags`) of a condition.
+class _RegExpValue {
+  /// A [String] or a [ConditionParameter].
+  final Object pattern;
+  final bool caseInsensitive;
+
+  _RegExpValue(this.pattern, this.caseInsensitive);
 }
 
 class JsonParser {

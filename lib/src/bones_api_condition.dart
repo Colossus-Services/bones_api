@@ -176,6 +176,20 @@ class ConditionParameter extends ConditionElement {
     return null;
   }
 
+  /// Throws an [ArgumentError] if [value] is (or contains) a [RegExp]: as an
+  /// `==`/`=~` (`IN`) value it would be compared, not matched. A regexp
+  /// parameter is written `/?/`: `field =~ /?/`.
+  static void checkNotRegExpValue(Object? value) {
+    if (value is RegExp ||
+        (value is Iterable && value.any((e) => e is RegExp))) {
+      throw ArgumentError(
+        'A `RegExp` parameter value is only matched as a regexp pattern: '
+        'write the parameter between `/`, e.g. `field =~ /?/` '
+        '(not `field =~ ?`).',
+      );
+    }
+  }
+
   bool matches(
     Object? value, {
     Object? parameters,
@@ -188,6 +202,8 @@ class ConditionParameter extends ConditionElement {
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
     );
+
+    checkNotRegExpValue(myValue);
 
     var otherValue = value is ConditionParameter
         ? value.getValue(
@@ -365,6 +381,8 @@ class ConditionParameter extends ConditionElement {
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
     );
+
+    checkNotRegExpValue(myValue);
 
     if (myValue is List) {
       for (var v1 in myValue) {
@@ -1951,6 +1969,246 @@ class KeyConditionNotIN<O> extends KeyConditionINBase<O> {
             ? this as KeyConditionNotIN<T>
             : KeyConditionNotIN<T>(keys, value)
         .._markResolved(resolved, _parent);
+}
+
+/// A regular expression condition: `key =~ /pattern/flags` (matches) or
+/// `key !~ /pattern/flags` (does not match).
+///
+/// The pattern is a [String] or a [ConditionParameter] (`/?/`, `/?#1/`,
+/// `/?:name/`), whose value is a [String] or a [RegExp] (only its
+/// [RegExp.pattern] and [RegExp.isCaseSensitive] are used).
+///
+/// The only flag is `i` ([caseInsensitive]). The matching is the same in every
+/// adapter (PostgreSQL's semantics):
+/// - The pattern matches anywhere in the value (use `^...$` for all of it).
+/// - `.` also matches a line terminator.
+/// - `^` and `$` match only at the start and end of the whole value.
+///
+/// A value that is not a [String] is matched by its text (an [Enum] by its
+/// name). A `null` value matches neither `=~` nor `!~` (as in SQL). A list
+/// value (e.g. of a relationship) matches `=~` if any element matches, and
+/// `!~` if any element does not match (as a SQL join of its rows).
+class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
+  /// If `true`, the condition is `!~` (does not match).
+  final bool not;
+
+  /// The `i` flag.
+  final bool caseInsensitive;
+
+  /// Creates a regular expression condition. [pattern] can be a [String], a
+  /// [RegExp] (a case-insensitive one sets [caseInsensitive]) or a
+  /// [ConditionParameter].
+  ///
+  /// Throws a [FormatException] for an invalid pattern.
+  KeyConditionRegExp(
+    List<ConditionKey> keys,
+    Object pattern, {
+    bool caseInsensitive = false,
+    this.not = false,
+  }) : caseInsensitive =
+           caseInsensitive || (pattern is RegExp && !pattern.isCaseSensitive),
+       super(keys, _normalizePattern(pattern));
+
+  static Object _normalizePattern(Object pattern) {
+    if (pattern is ConditionParameter) return pattern;
+
+    var s = pattern is RegExp ? pattern.pattern : pattern;
+    if (s is! String) {
+      throw ArgumentError.value(
+        pattern,
+        'pattern',
+        'Not a `String`, `RegExp` or `ConditionParameter`',
+      );
+    }
+
+    // Validates it (throws a `FormatException`):
+    toDartRegExp(s);
+    return s;
+  }
+
+  /// The pattern, if not a [ConditionParameter].
+  String? get pattern {
+    var value = this.value;
+    return value is String ? value : null;
+  }
+
+  /// The pattern's [ConditionParameter], if any.
+  ConditionParameter? get patternParameter {
+    var value = this.value;
+    return value is ConditionParameter ? value : null;
+  }
+
+  static final Map<(String, bool), RegExp> _regExpCache = {};
+
+  /// The Dart [RegExp] with the semantics of a [KeyConditionRegExp]: `.`
+  /// matches a line terminator (`dotAll`) and `^`/`$` only the start/end of
+  /// the whole input (not `multiLine`). Cached.
+  ///
+  /// Throws a [FormatException] for an invalid [pattern].
+  static RegExp toDartRegExp(String pattern, {bool caseInsensitive = false}) {
+    var key = (pattern, caseInsensitive);
+    var regExp = _regExpCache[key];
+    if (regExp != null) return regExp;
+
+    regExp = RegExp(
+      pattern,
+      caseSensitive: !caseInsensitive,
+      dotAll: true,
+      multiLine: false,
+      unicode: true,
+    );
+
+    if (_regExpCache.length >= 256) {
+      _regExpCache.remove(_regExpCache.keys.first);
+    }
+    _regExpCache[key] = regExp;
+
+    return regExp;
+  }
+
+  /// The text of a [value] to match: an [Enum] by its name, otherwise by its
+  /// [Object.toString].
+  static String valueToText(Object value) =>
+      value is Enum ? value.name : value.toString();
+
+  /// Resolves the pattern of this condition and its `i` flag, with the
+  /// value of its [ConditionParameter], if any.
+  ///
+  /// Throws an [ArgumentError] if the parameter's value is not a [String] or
+  /// a [RegExp].
+  (String pattern, bool caseInsensitive) resolvePattern({
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    Map<String, Object?>? encodingParameters,
+  }) {
+    var value = this.value;
+
+    if (value is String) return (value, caseInsensitive);
+
+    var parameter = value as ConditionParameter;
+    var paramValue = parameter.getValue(
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+      encodingParameters: encodingParameters,
+    );
+
+    return resolvePatternValue(paramValue, caseInsensitive: caseInsensitive);
+  }
+
+  /// Resolves a pattern parameter's [value] ([String] or [RegExp]) and its
+  /// `i` flag (from [caseInsensitive] or a case-insensitive [RegExp]).
+  static (String pattern, bool caseInsensitive) resolvePatternValue(
+    Object? value, {
+    bool caseInsensitive = false,
+  }) {
+    if (value is String) {
+      return (value, caseInsensitive);
+    } else if (value is RegExp) {
+      return (value.pattern, caseInsensitive || !value.isCaseSensitive);
+    } else {
+      throw ArgumentError(
+        'A regexp pattern parameter must be a `String` or a `RegExp`, '
+        'not: ${value?.runtimeTypeNameUnsafe ?? 'null'}',
+      );
+    }
+  }
+
+  /// Matches a [keyValue] (see the class documentation).
+  bool matchesValue(Object? keyValue, String pattern, bool caseInsensitive) {
+    if (keyValue == null) return false;
+
+    var regExp = toDartRegExp(pattern, caseInsensitive: caseInsensitive);
+
+    if (keyValue is Iterable) {
+      return keyValue.nonNulls.any(
+        (v) => regExp.hasMatch(valueToText(v)) != not,
+      );
+    }
+
+    return regExp.hasMatch(valueToText(keyValue)) != not;
+  }
+
+  @override
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+    if (keyValue == null) return false;
+
+    var (pattern, caseInsensitive) = resolvePattern(
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
+
+    return matchesValue(keyValue, pattern, caseInsensitive);
+  }
+
+  @override
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler)?.value;
+    if (keyValue == null) return false;
+
+    var (pattern, caseInsensitive) = resolvePattern(
+      parameters: parameters,
+      positionalParameters: positionalParameters,
+      namedParameters: namedParameters,
+    );
+
+    return matchesValue(keyValue, pattern, caseInsensitive);
+  }
+
+  @override
+  KeyConditionRegExp<T> cast<T>() =>
+      this is KeyConditionRegExp<T>
+            ? this as KeyConditionRegExp<T>
+            : KeyConditionRegExp<T>(
+                keys,
+                value,
+                caseInsensitive: caseInsensitive,
+                not: not,
+              )
+        .._markResolved(resolved, _parent);
+
+  /// Encodes [pattern] as a regexp literal's body: `/` escaped as `\/`.
+  static String encodePatternLiteral(String pattern) {
+    var s = StringBuffer();
+
+    for (var i = 0; i < pattern.length; ++i) {
+      var c = pattern[i];
+      if (c == r'\' && i + 1 < pattern.length) {
+        s.write(c);
+        s.write(pattern[++i]);
+      } else if (c == '/') {
+        s.write(r'\/');
+      } else {
+        s.write(c);
+      }
+    }
+
+    return s.toString();
+  }
+
+  String get encodeValue {
+    var value = this.value;
+    var body = value is String ? encodePatternLiteral(value) : value.toString();
+    return '/$body/${caseInsensitive ? 'i' : ''}';
+  }
+
+  @override
+  String encode() => '$encodeKey ${not ? '!' : '='}~ $encodeValue';
 }
 
 class ConditionParseCache<O> {

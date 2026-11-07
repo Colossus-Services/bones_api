@@ -7,6 +7,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
@@ -201,6 +202,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
              // statement saves its compilation (~10–15%); beyond ~1024 IDs,
              // a (padded) length seldom repeats (at most 32766 parameters):
              maxIDsAsParameters: 1024,
+             // A `regexp` function, registered on the connection:
+             regExpSyntax: SQLRegExpSyntax.function,
            ),
            transactions: true,
            transactionAbort: true,
@@ -323,6 +326,29 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     return connWrapper;
   }
 
+  /// Registers the `regexp(pattern, value [, flags])` function of the
+  /// regular expression conditions ([SQLRegExpSyntax.function]), with 2
+  /// arguments also the `value REGEXP pattern` operator.
+  static void _registerRegExpFunction(Database db) {
+    Object? regexp(SqliteArguments args) {
+      var match = SQLRegExpSyntax.regexpFunction(
+        args[0],
+        args[1],
+        args.length > 2 ? args[2] : null,
+      );
+      return match == null ? null : (match ? 1 : 0);
+    }
+
+    for (var argumentCount in const [2, 3]) {
+      db.createFunction(
+        functionName: 'regexp',
+        function: regexp,
+        argumentCount: AllowedArgumentCount(argumentCount),
+        deterministic: true,
+      );
+    }
+  }
+
   /// Opens the shared handle on first use, then returns it.
   Database _openDatabase() {
     var db = _database;
@@ -334,6 +360,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
     // Foreign keys are OFF by default and are a per-connection setting.
     db.execute('PRAGMA foreign_keys = ON');
+
+    _registerRegExpFunction(db);
 
     if (!inMemory) {
       db.execute('PRAGMA busy_timeout = $busyTimeout');

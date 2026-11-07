@@ -3884,6 +3884,7 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   }) => selectByQuery(
     query,
     parameters: parameters,
+    positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     transaction: transaction,
     limit: 1,
@@ -6172,6 +6173,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
   }) => selectByQuery(
     query,
     parameters: parameters,
+    positionalParameters: positionalParameters,
     namedParameters: namedParameters,
     transaction: transaction,
     limit: 1,

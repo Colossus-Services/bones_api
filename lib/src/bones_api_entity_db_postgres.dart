@@ -6,6 +6,7 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_condition_sql.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_annotation.dart';
 import 'bones_api_entity_db.dart';
@@ -166,6 +167,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
              // Parameters are faster up to ~512 IDs (if the statement is
              // reused); from ~1024, values are (by 10–40%).
              maxIDsAsParameters: 512,
+             regExpSyntax: SQLRegExpSyntax.postgres,
            ),
            transactions: true,
            transactionAbort: true,

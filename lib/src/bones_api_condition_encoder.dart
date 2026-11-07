@@ -1522,6 +1522,8 @@ abstract class ConditionEncoder {
       return encodeKeyConditionLessThan(c, context);
     } else if (c is KeyConditionLessThanOrEqual) {
       return encodeKeyConditionLessThanOrEqual(c, context);
+    } else if (c is KeyConditionRegExp) {
+      return encodeKeyConditionRegExp(c, context);
     } else {
       throw ConditionEncodingError("$c");
     }
@@ -1564,6 +1566,11 @@ abstract class ConditionEncoder {
 
   FutureOr<EncodingContext> encodeKeyConditionLessThanOrEqual(
     KeyConditionLessThanOrEqual c,
+    EncodingContext context,
+  );
+
+  FutureOr<EncodingContext> encodeKeyConditionRegExp(
+    KeyConditionRegExp c,
     EncodingContext context,
   );
 
@@ -1646,6 +1653,10 @@ abstract class ConditionEncoder {
       namedParameters: context.namedParameters,
       encodingParameters: context.encodingParameters,
     );
+
+    // Not a regexp pattern parameter (`/?/`), which `encodeKeyConditionRegExp`
+    // resolves: a `RegExp` here would be compared as its text.
+    ConditionParameter.checkNotRegExpValue(paramValue);
 
     if (valueType != null) {
       return resolveValueToType(

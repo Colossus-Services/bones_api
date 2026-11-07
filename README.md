@@ -709,6 +709,63 @@ class AccountAPIRepository extends APIRepository<Account> {
 
 ```
 
+### Query conditions
+
+A query (`selectByQuery`, `selectFirstByQuery`, `paginateByQuery`, ...) is a
+condition over the entity's fields:
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `==`, `!=` | equals, not equals | `email == ?` |
+| `>`, `>=`, `<`, `<=` | comparison | `level >= 10` |
+| `=~`, `!~` | in, not in a list | `state =~ ["NY", "CA"]` |
+| `=~ /.../`, `!~ /.../` | matches, does not match a regexp | `email =~ /@corp\.com$/i` |
+| `&&`, `\|\|`, `( )` | and, or, grouping | `(a == 1 \|\| b == 2) && c != null` |
+
+A key can be a path through related entities (`address.city`) or a list
+index (`phones.[0]`). A value is JSON (strings also in `'...'`), or a
+parameter: `?` (positional), `?#1` (by index) or `?:name` (by name).
+`#ID == ?` matches the entity ID.
+
+#### Regular expressions
+
+`=~` and `!~` with a value between `/`, a regexp, match it (otherwise they're
+`IN`/`NOT IN`):
+
+```dart
+selectByQuery(r'email =~ /@corp\.com$/i');
+selectByQuery(r'address.city !~ /^s(ão|ao) paulo$/i');
+selectByQuery(r'url =~ /^https?:\/\//'); // `/` escaped as `\/`
+
+// The pattern as a parameter: `/?/`, `/?#1/` or `/?:name/`:
+selectByQuery('name =~ /?:pattern/i', parameters: {'pattern': '^jo'});
+selectByQuery('name =~ /?/', parameters: [RegExp('^jo', caseSensitive: false)]);
+```
+
+The matching is the same in every `SQLAdapter` (PostgreSQL, MySQL, SQLite and
+`DBSQLMemoryAdapter`):
+
+- The pattern matches anywhere in the value (use `^...$` for all of it).
+- The only flag is `i` (case-insensitive). A `RegExp` parameter's other
+  options (`multiLine`, `dotAll`) are ignored.
+- `.` also matches a line terminator, and `^`/`$` match only at the start/end
+  of the whole value.
+- A non-text field is matched by its text (e.g. `number =~ /^9\d$/`; an enum
+  by its name). The text of a date or a decimal depends on the database.
+- A `null` field matches neither `=~` nor `!~`.
+- The pattern is always sent as a SQL parameter.
+- Use the syntax common to the databases' regexp engines (PostgreSQL's,
+  MySQL's ICU and Dart's): characters and classes (`[a-z]`, `\d`, `\w`, `\s`),
+  anchors, quantifiers, groups and `|`. Lookarounds, backreferences and word
+  boundaries (`\b`) are not portable.
+- MySQL: 8.0.4+ (`REGEXP_LIKE`). SQLite: a `regexp` function registered by
+  the `DBSQLiteAdapter`.
+
+A `RegExp` as an `==`/`IN` parameter (`name =~ ?`) is an error: write the
+parameter between `/` (`name =~ /?/`).
+
+The `DBObjectAdapter`s (below) select only by ID.
+
 ### Ordering and pagination
 
 The `select*` methods accept `limit`, `offset`, `page`, `orderByID` and
