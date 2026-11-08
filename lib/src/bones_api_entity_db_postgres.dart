@@ -1500,13 +1500,23 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       return lastInsertResult;
     }
 
-    var fixSql =
-        "SELECT setval(pg_get_serial_sequence('$table', '$idFieldName'), coalesce(max(id),0) + 1, false) FROM \"$table\"";
+    var fixSql = fixTableSequenceSQL(table, idFieldName);
 
     _log.info("Fixing table PRIMARY KEY sequence: <$fixSql>");
 
     return connection.query(fixSql).then((r) => lastInsertResult);
   }
+
+  /// The SQL that moves the ID sequence of [table] after its greatest ID
+  /// (after an auto-insert with an explicit ID, see `_fixeTableSequence`).
+  ///
+  /// The greatest ID is of the column [idFieldName] (quoted, as the table),
+  /// the column of the sequence: not a literal `id` column, that a table
+  /// with another ID column doesn't have.
+  @visibleForTesting
+  static String fixTableSequenceSQL(String table, String idFieldName) =>
+      "SELECT setval(pg_get_serial_sequence('$table', '$idFieldName'), "
+      "coalesce(max(\"$idFieldName\"),0) + 1, false) FROM \"$table\"";
 
   dynamic _resolveResultID(
     List<Map<String, dynamic>> results,

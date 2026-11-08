@@ -39,4 +39,19 @@ void main() {
       );
     });
   });
+
+  group('DBPostgreSQLAdapter.fixTableSequenceSQL', () {
+    test('max of the ID field (not a literal `id`)', () {
+      var sql = DBPostgreSQLAdapter.fixTableSequenceSQL('account', 'user_id');
+
+      expect(
+        sql,
+        equals(
+          "SELECT setval(pg_get_serial_sequence('account', 'user_id'), "
+          "coalesce(max(\"user_id\"),0) + 1, false) FROM \"account\"",
+        ),
+      );
+      expect(sql, isNot(contains('max(id)')));
+    });
+  });
 }

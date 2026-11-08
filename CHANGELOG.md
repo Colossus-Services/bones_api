@@ -135,6 +135,9 @@ Fixes:
   `isEagerEntityType`/`isLazyEntityType` recursed forever on it.
 - `DBPostgreSQLAdapter.doCountSQL`: a result without a row threw a
   `StateError`: now `0`, as the SQLite and MySQL adapters.
+- `DBPostgreSQLAdapter`: the ID sequence fix after an update's auto-insert
+  used `max(id)`, failing for a table whose ID column isn't `id`: now the
+  table's (quoted) ID column.
 
 ## 1.34.0
 
