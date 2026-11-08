@@ -201,6 +201,13 @@ class SQLDialect extends DBDialect {
     this.subqueryAsDerivedTable = false,
   });
 
+  /// A [column] qualified by its [tableAlias], quoted with [elementQuote]:
+  /// `"alias"."column"`.
+  String qualifiedColumnSQL(String tableAlias, String column) {
+    var q = elementQuote;
+    return '$q$tableAlias$q.$q$column$q';
+  }
+
   /// Builds the ` ORDER BY <tableAlias>.<column> ASC|DESC` clause
   /// of this dialect.
   String orderBySQL(
@@ -208,9 +215,8 @@ class SQLDialect extends DBDialect {
     String column, {
     OrderDirection? direction,
   }) {
-    var q = elementQuote;
     var keyword = OrderDirection.resolve(direction).sqlKeyword;
-    return ' ORDER BY $q$tableAlias$q.$q$column$q $keyword';
+    return ' ORDER BY ${qualifiedColumnSQL(tableAlias, column)} $keyword';
   }
 
   /// Builds the ` LIMIT <limit> OFFSET <offset>` clause of this dialect.
@@ -252,7 +258,7 @@ class SQLDialect extends DBDialect {
   @override
   String toString() {
     return 'SQLDialect{'
-        'name: $name,'
+        'name: $name, '
         'elementQuote: $elementQuote, '
         'acceptsOutputSyntax: $acceptsOutputSyntax, '
         'acceptsReturningSyntax: $acceptsReturningSyntax, '
@@ -261,6 +267,7 @@ class SQLDialect extends DBDialect {
         'acceptsInsertDefaultValues: $acceptsInsertDefaultValues, '
         'acceptsInsertIgnore: $acceptsInsertIgnore, '
         'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
+        'acceptsVarcharWithoutMaximumSize: $acceptsVarcharWithoutMaximumSize, '
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
         'createIndexIfNotExists: $createIndexIfNotExists, '
         'alterTableAddConstraint: $alterTableAddConstraint, '
@@ -268,7 +275,11 @@ class SQLDialect extends DBDialect {
         'dropIndexOnTable: $dropIndexOnTable, '
         'offsetRequiresLimit: $offsetRequiresLimit, '
         'offsetMaxLimitValue: $offsetMaxLimitValue, '
-        'maxIdentifierLength: $maxIdentifierLength'
+        'maxIdentifierLength: $maxIdentifierLength, '
+        'intParameterTypeSuffix: $intParameterTypeSuffix, '
+        'maxIDsAsParameters: $maxIDsAsParameters, '
+        'regExpSyntax: ${regExpSyntax.name}, '
+        'subqueryAsDerivedTable: $subqueryAsDerivedTable'
         '}';
   }
 }
@@ -480,27 +491,39 @@ class CreateTableSQL extends TableSQL {
     this.entityRepository,
   });
 
-  List<String>? _referenceTables;
+  /// A cache of [referenceTables], filled on its first call.
+  ///
+  /// Why: it's called repeatedly while sorting the tables by their
+  /// dependencies, and it's derived from the [entries]. Reset by
+  /// [_disposeCache].
+  List<String>? _referenceTablesCache;
 
   @override
-  List<String> get referenceTables => _referenceTables ??= <String>{
+  List<String> get referenceTables => _referenceTablesCache ??= <String>{
     ...entries.expand((e) => e.referenceTables ?? <String>[]),
   }.toList();
 
-  List<String>? _relationshipsTables;
+  /// A cache of [relationshipsTables], filled on its first call. As
+  /// [_referenceTablesCache], derived from the [relationships]. Reset by
+  /// [_disposeCache].
+  List<String>? _relationshipsTablesCache;
 
   /// Returns the tables of the [relationships].
-  List<String> get relationshipsTables => _relationshipsTables ??= <String>{
-    ...?relationships?.expand(
-      (e) => e.referenceTables.where((t) => t != table),
-    ),
-  }.toList();
+  List<String> get relationshipsTables =>
+      _relationshipsTablesCache ??= <String>{
+        ...?relationships?.expand(
+          (e) => e.referenceTables.where((t) => t != table),
+        ),
+      }.toList();
 
-  List<String>? _referenceAndRelationshipTables;
+  /// A cache of [referenceAndRelationshipTables] (the [dependentTables]),
+  /// filled on its first call. As [_referenceTablesCache]. Reset by
+  /// [_disposeCache].
+  List<String>? _referenceAndRelationshipTablesCache;
 
   /// Returns the tables in [referenceTables] and [relationshipsTables].
   List<String> get referenceAndRelationshipTables =>
-      _referenceAndRelationshipTables ??= <String>{
+      _referenceAndRelationshipTablesCache ??= <String>{
         ...referenceTables,
         ...relationshipsTables,
       }.toList();
@@ -520,9 +543,9 @@ class CreateTableSQL extends TableSQL {
       entries.where((e) => e.type == 'CONSTRAINT').toList();
 
   void _disposeCache() {
-    _referenceTables = null;
-    _relationshipsTables = null;
-    _referenceAndRelationshipTables = null;
+    _referenceTablesCache = null;
+    _relationshipsTablesCache = null;
+    _referenceAndRelationshipTablesCache = null;
   }
 
   /// Converts the [constraints] to [AlterTableSQL].
@@ -685,10 +708,14 @@ class AlterTableSQL extends TableSQL {
     super.parentTable,
   });
 
-  List<String>? _referenceTables;
+  /// A cache of [referenceTables], filled on its first call.
+  ///
+  /// Why: it's called repeatedly while sorting the tables by their
+  /// dependencies, and it's derived from the [entries].
+  List<String>? _referenceTablesCache;
 
   @override
-  List<String> get referenceTables => _referenceTables ??= <String>{
+  List<String> get referenceTables => _referenceTablesCache ??= <String>{
     ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls,
   }.toList();
 
@@ -1429,6 +1456,36 @@ extension SQLBuilderListExtension on List<SQLBuilder> {
 
 /// Base class for a `SQL` generator.
 abstract mixin class SQLGenerator {
+  /// The name of the `UNIQUE` constraint (or unique index, where a
+  /// constraint can't be added) of [column] of [table]:
+  /// `<table>__<column>__unique`. Without a [column], of the whole [table]
+  /// (a relationship table's `UNIQUE (source, target)`):
+  /// `<table>__unique`.
+  ///
+  /// The single source of these names: the `CREATE TABLE`, the `ALTER TABLE`
+  /// that adds a missing one, and the scheme check that looks for it must
+  /// agree on it.
+  static String uniqueConstraintName(String table, [String? column]) =>
+      column == null ? '${table}__unique' : '${table}__${column}__unique';
+
+  /// The name of the (non-unique) index of [column] of [table]:
+  /// `<table>__<column>__idx`.
+  static String indexName(String table, String column) =>
+      '${table}__${column}__idx';
+
+  /// The name of the `FOREIGN KEY` constraint of [column] of [table]:
+  /// `<table>__<column>__fkey`.
+  static String foreignKeyName(String table, String column) =>
+      '${table}__${column}__fkey';
+
+  /// The name of the relationship table of the to-many field [column] of
+  /// [table]: `<table>__<column>__rel`.
+  ///
+  /// Also used to find it in the in-memory adapter, which must match the
+  /// name of the SQL adapters' tables.
+  static String relationshipTableName(String table, String column) =>
+      '${table}__${column}__rel';
+
   /// The generated SQL dialect.
   SQLDialect get dialect;
 
@@ -1753,7 +1810,10 @@ abstract mixin class SQLGenerator {
 
     if (entityFieldAnnotations != null && entityFieldAnnotations.isNotEmpty) {
       if (entityFieldAnnotations.hasUnique && !alterTableAddConstraint) {
-        var uniqueIndexName = '${table}__${columnName}__unique';
+        var uniqueIndexName = SQLGenerator.uniqueConstraintName(
+          table,
+          columnName,
+        );
         indexes = [
           CreateIndexSQL.columns(
             dialect,
@@ -1765,11 +1825,14 @@ abstract mixin class SQLGenerator {
           ),
         ];
       } else if (entityFieldAnnotations.hasUnique) {
-        var constrainUniqueName = '${table}__${columnName}__unique';
+        var constraintUniqueName = SQLGenerator.uniqueConstraintName(
+          table,
+          columnName,
+        );
 
         var uniqueEntry = SQLEntry(
           'CONSTRAINT',
-          ' ADD CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
+          ' ADD CONSTRAINT $q$constraintUniqueName$q UNIQUE ($q$columnName$q)',
           columns: [
             SQLColumn(
               table,
@@ -1784,7 +1847,7 @@ abstract mixin class SQLGenerator {
           AlterTableSQL(dialect, table, [uniqueEntry]),
         ];
       } else if (entityFieldAnnotations.hasIndexed) {
-        var indexName = '${table}__${columnName}__idx';
+        var indexName = SQLGenerator.indexName(table, columnName);
         indexes = [CreateIndexSQL(dialect, table, columnName, indexName)];
       }
     }
@@ -1798,13 +1861,13 @@ abstract mixin class SQLGenerator {
 
       // (Without `ADD CONSTRAINT`: in the column, above.)
       if (alterTableAddConstraint) {
-        var constrainName = '${table}__${columnName}__fkey';
+        var constraintName = SQLGenerator.foreignKeyName(table, columnName);
 
         constraints ??= [];
 
         var constraintEntry = SQLEntry(
           'CONSTRAINT',
-          ' ADD CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
+          ' ADD CONSTRAINT $q$constraintName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
           comment: '$fieldName @ $refTableName.$refField',
           columns: [
             SQLColumn(
@@ -1820,7 +1883,7 @@ abstract mixin class SQLGenerator {
       }
 
       if (!dialect.foreignKeyCreatesImplicitIndex) {
-        var indexName = '${table}__${columnName}__idx';
+        var indexName = SQLGenerator.indexName(table, columnName);
 
         indexes ??= [];
         indexes.add(
@@ -1850,7 +1913,7 @@ abstract mixin class SQLGenerator {
     var columnName = normalizeColumnName(fieldName);
 
     // The same name as in the `CREATE TABLE`:
-    var constraintName = '${table}__${columnName}__unique';
+    var constraintName = SQLGenerator.uniqueConstraintName(table, columnName);
 
     var comment = '${fieldType.toString(withT: false)} $fieldName UNIQUE';
 
@@ -2139,12 +2202,15 @@ abstract mixin class SQLGenerator {
 
       if (entityFieldAnnotations != null) {
         if (entityFieldAnnotations.hasUnique) {
-          var constrainUniqueName = '${table}__${columnName}__unique';
+          var constraintUniqueName = SQLGenerator.uniqueConstraintName(
+            table,
+            columnName,
+          );
 
           sqlEntries.add(
             SQLEntry(
               'CONSTRAINT',
-              ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$columnName$q)',
+              ' CONSTRAINT $q$constraintUniqueName$q UNIQUE ($q$columnName$q)',
               columns: [
                 SQLColumn(
                   table,
@@ -2157,11 +2223,11 @@ abstract mixin class SQLGenerator {
           );
 
           uniqueConstraints.add((
-            name: constrainUniqueName,
+            name: constraintUniqueName,
             columns: [columnName],
           ));
         } else if (entityFieldAnnotations.hasIndexed) {
-          var indexName = '${table}__${columnName}__idx';
+          var indexName = SQLGenerator.indexName(table, columnName);
           indexSQLs.add(
             CreateIndexSQL(dialect, table, columnName, indexName, q: q),
           );
@@ -2178,12 +2244,12 @@ abstract mixin class SQLGenerator {
       var refTableName = ref.key;
       var refField = ref.value.key.toLowerCase();
 
-      var constrainName = '${table}__${columnName}__fkey';
+      var constraintName = SQLGenerator.foreignKeyName(table, columnName);
 
       sqlEntries.add(
         SQLEntry(
           'CONSTRAINT',
-          ' CONSTRAINT $q$constrainName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
+          ' CONSTRAINT $q$constraintName$q FOREIGN KEY ($q$columnName$q) REFERENCES $q$refTableName$q($q$refField$q)',
           comment: '$fieldName @ $refTableName.$refField',
           columns: [
             SQLColumn(
@@ -2197,7 +2263,7 @@ abstract mixin class SQLGenerator {
       );
 
       if (!dialect.foreignKeyCreatesImplicitIndex) {
-        var indexName = '${table}__${columnName}__idx';
+        var indexName = SQLGenerator.indexName(table, columnName);
         indexSQLs.add(
           CreateIndexSQL(dialect, table, columnName, indexName, q: q),
         );
@@ -2308,11 +2374,17 @@ abstract mixin class SQLGenerator {
 
       var dstFieldName = normalizeColumnName(relDstTable);
 
-      var relName = '${table}__${columnName}__rel';
+      var relName = SQLGenerator.relationshipTableName(table, columnName);
 
-      var constrainUniqueName = '${relName}__unique';
-      var constrainSrcName = '${relName}__${srcFieldName}__fkey';
-      var constrainDstName = '${relName}__${dstFieldName}__fkey';
+      var constraintUniqueName = SQLGenerator.uniqueConstraintName(relName);
+      var constraintSrcName = SQLGenerator.foreignKeyName(
+        relName,
+        srcFieldName,
+      );
+      var constraintDstName = SQLGenerator.foreignKeyName(
+        relName,
+        dstFieldName,
+      );
 
       var sqlRelEntries = <SQLEntry>[
         SQLEntry(
@@ -2344,7 +2416,7 @@ abstract mixin class SQLGenerator {
         ),
         SQLEntry(
           'CONSTRAINT',
-          ' CONSTRAINT $q$constrainUniqueName$q UNIQUE ($q$srcFieldName$q, $q$dstFieldName$q)',
+          ' CONSTRAINT $q$constraintUniqueName$q UNIQUE ($q$srcFieldName$q, $q$dstFieldName$q)',
           columns: [
             SQLColumn(relName, srcFieldName),
             SQLColumn(relName, dstFieldName),
@@ -2352,7 +2424,7 @@ abstract mixin class SQLGenerator {
         ),
         SQLEntry(
           'CONSTRAINT',
-          ' CONSTRAINT $q$constrainSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON DELETE CASCADE',
+          ' CONSTRAINT $q$constraintSrcName$q FOREIGN KEY ($q$srcFieldName$q) REFERENCES $q$table$q($q$idColumnName$q) ON DELETE CASCADE',
           comment: ' $srcFieldName @ $table.$idColumnName',
           columns: [
             SQLColumn(
@@ -2365,7 +2437,7 @@ abstract mixin class SQLGenerator {
         ),
         SQLEntry(
           'CONSTRAINT',
-          ' CONSTRAINT $q$constrainDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON DELETE CASCADE',
+          ' CONSTRAINT $q$constraintDstName$q FOREIGN KEY ($q$dstFieldName$q) REFERENCES $q$relDstTable$q($q$relDstTableId$q) ON DELETE CASCADE',
           comment: ' $dstFieldName @ $relDstTable.$relDstTableId',
           columns: [
             SQLColumn(
@@ -2385,7 +2457,7 @@ abstract mixin class SQLGenerator {
       // the target column needs its own index (another one on the source
       // would just be updated on every write).
       if (!dialect.foreignKeyCreatesImplicitIndex) {
-        var indexName2 = '${relName}__${dstFieldName}__idx';
+        var indexName2 = SQLGenerator.indexName(relName, dstFieldName);
 
         relIndexes.add(
           CreateIndexSQL(dialect, relName, dstFieldName, indexName2, q: q),

@@ -1267,38 +1267,36 @@ class EncodingContext {
     return null;
   }
 
-  bool isValidAlias(String alias) {
-    if (isReservedWord(alias)) {
-      return false;
-    }
+  bool isValidAlias(String alias) => !isReservedWord(alias);
 
-    return true;
-  }
+  /// The words that can't be a generated table alias (see [isReservedWord]):
+  /// SQL keywords and function names an alias could collide with.
+  static const Set<String> _reservedAliases = {
+    'as',
+    'eq',
+    'by',
+    'null',
+    'not',
+    'def',
+    'sum',
+    'add',
+    'from',
+    'default',
+    'alias',
+    'equals',
+    'count',
+    'order',
+    'table',
+    'column',
+    'select',
+    'alter',
+    'drop',
+    'delete',
+    'sql',
+    'empty',
+  };
 
-  bool isReservedWord(String alias) {
-    return alias == 'as' ||
-        alias == 'eq' ||
-        alias == 'by' ||
-        alias == 'null' ||
-        alias == 'not' ||
-        alias == 'def' ||
-        alias == 'sum' ||
-        alias == 'add' ||
-        alias == 'from' ||
-        alias == 'default' ||
-        alias == 'alias' ||
-        alias == 'equals' ||
-        alias == 'count' ||
-        alias == 'order' ||
-        alias == 'table' ||
-        alias == 'column' ||
-        alias == 'select' ||
-        alias == 'alter' ||
-        alias == 'drop' ||
-        alias == 'delete' ||
-        alias == 'sql' ||
-        alias == 'empty';
-  }
+  bool isReservedWord(String alias) => _reservedAliases.contains(alias);
 
   String addEncodingParameter(
     String suggestedKey,
@@ -1326,6 +1324,16 @@ class EncodingContext {
 
     throw StateError("Can't create encoding parameter: $suggestedKey = $value");
   }
+
+  /// The value of [parameter], resolved with all the parameters of this
+  /// context ([parameters], [positionalParameters], [namedParameters] and
+  /// [encodingParameters]).
+  Object? parameterValue(ConditionParameter parameter) => parameter.getValue(
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+    encodingParameters: encodingParameters,
+  );
 }
 
 /// Base class to encode [Condition].
@@ -1732,12 +1740,7 @@ abstract class ConditionEncoder {
     Type? valueType,
     bool valueAsList,
   ) {
-    var paramValue = value.getValue(
-      parameters: context.parameters,
-      positionalParameters: context.positionalParameters,
-      namedParameters: context.namedParameters,
-      encodingParameters: context.encodingParameters,
-    );
+    var paramValue = context.parameterValue(value);
 
     // Not a regexp pattern parameter (`/?/`), which `encodeKeyConditionRegExp`
     // resolves: a `RegExp` here would be compared as its text.
@@ -1805,13 +1808,15 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<Object?> _resolveValueToTypeImpl(Object? value, Type valueType) {
+    // `late`: computed once, and only if needed (the early returns below
+    // don't need it).
+    late final valueTypeInfo = TypeInfo.from(valueType);
+
     // A list as a single value (`== [x]` is `== x`), unless the field is a
     // list itself (a `List<String>`, a `Uint8List`: compared as a whole):
     // first, so its element is resolved as a value (an enum by its name, an
     // entity by its ID), not the list as text.
-    if (value is Iterable &&
-        value is! TypedData &&
-        !TypeInfo.from(valueType).isIterable) {
+    if (value is Iterable && value is! TypedData && !valueTypeInfo.isIterable) {
       var list = value.toList();
       if (list.isEmpty) return null;
       if (list.length == 1) value = list.first;
@@ -1871,8 +1876,6 @@ abstract class ConditionEncoder {
       );
       if (entityID != null) value = entityID;
     }
-
-    var valueTypeInfo = TypeInfo.from(valueType);
 
     var valueParser = TypeParser.parserForTypeInfo(valueTypeInfo);
     if (valueParser != null) {

@@ -192,6 +192,14 @@ class SQL implements SQLWrapper {
 
   static final RegExp _defaultPlaceholderRegexp = RegExp(r'@(\w+)');
 
+  // The lazily computed [sqlPositional], [parametersKeysByPosition] and
+  // [parametersValuesByPosition] (`null`: not computed yet), filled together
+  // by [_computeSQLPositional] on the first access of any of them: only an
+  // adapter with positional placeholders (`?`) needs them. They can also be
+  // given to the constructor (a [copy]). Not named `*Cache` because they're
+  // also private named constructor parameters (`sqlPositional:` ...), whose
+  // public names would change.
+
   String? _sqlPositional;
 
   List<String>? _parametersKeysByPosition;
@@ -290,6 +298,17 @@ class SQL implements SQLWrapper {
     return _parametersValuesByPosition!;
   }
 
+  /// A cache of [sqlPositional] and [parametersKeysByPosition] by SQL text
+  /// (default placeholder only), filled by [_computeSQLPositional].
+  ///
+  /// Why: the same statements repeat, and converting their placeholders is a
+  /// regexp replace per statement: only the values are resolved per
+  /// instance. Cleared when it reaches [_positionalCacheLimit] (e.g. SQLs
+  /// with inlined values, all different).
+  static final Map<String, (String, List<String>)> _positionalCache = {};
+
+  static const int _positionalCacheLimit = 2000;
+
   void _computeSQLPositional() {
     var keys = <String>[];
     var values = <Object?>[];
@@ -338,13 +357,6 @@ class SQL implements SQLWrapper {
     _parametersKeysByPosition ??= keys;
     _parametersValuesByPosition ??= values;
   }
-
-  /// [sqlPositional] and [parametersKeysByPosition] by SQL text (default
-  /// placeholder only). Cleared when it reaches [_positionalCacheLimit]
-  /// (e.g. SQLs with inlined values, all different).
-  static final Map<String, (String, List<String>)> _positionalCache = {};
-
-  static const int _positionalCacheLimit = 2000;
 
   @override
   String toString() {
@@ -1242,13 +1254,10 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     var repoType = repository.type;
 
     if (scheme == null) {
-      _log.severe(
-        'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this',
-      );
-
-      return _DBTableCheck.error(
-        'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this',
-      );
+      var errorMsg =
+          'No scheme for repository `${repository.name}` (`$repoType`) in this adapter> generateTables: $_generateTables @ $this';
+      _log.severe(errorMsg);
+      return _DBTableCheck.error(errorMsg);
     }
 
     var schemeTableName = scheme.name;
@@ -1389,108 +1398,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     if (capability.constraintSupport) {
       // REF CONSTRAINTS //
 
-      var fieldEntityTypes = entityHandler
-          .getFieldsEntityTypes()
-          .entries
-          .map((e) {
-            var entityType = e.value.entityType;
-            if (entityType == null) return null;
-
-            var refRepository = repository.provider.getEntityRepositoryByType(
-              entityType,
-            );
-
-            if (refRepository == null ||
-                !refRepository.isSameEntityManager(repository)) {
-              return null;
-            }
-
-            return MapEntry(e.key, entityType);
-          })
-          .nonNulls
-          .toMapFromEntries();
-
-      if (fieldEntityTypes.isNotEmpty) {
-        var fieldsReferencedTables = scheme.fieldsReferencedTables;
-
-        var fieldsReferences = fieldsReferencedTables.entries
-            .map((e) {
-              var colum = e.key;
-              var field = schemeToRepoMap[colum] ?? colum;
-
-              var entityType = fieldEntityTypes[field];
-              if (entityType == null) return null;
-
-              var refTable = e.value.targetTable;
-              return MapEntry(field, refTable);
-            })
-            .nonNulls
-            .toMapFromEntries();
-
-        missingFieldReferenceConstraints = fieldEntityTypes.keys
-            .where((f) => !fieldsReferences.containsKey(f))
-            .toSet();
-
-        if (!dialect.foreignKeyCreatesImplicitIndex) {
-          missingFieldReferenceIndexes = fieldsReferencedTables.entries
-              .where((e) => e.value.indexName == null)
-              .map((e) => e.key)
-              .toSet();
-        }
-      }
+      (missingFieldReferenceConstraints, missingFieldReferenceIndexes) =
+          _findMissingReferenceConstraints(repository, scheme, schemeToRepoMap);
 
       // RELATIONSHIP CONSTRAINTS //
 
-      var fieldListEntityTypes = entityHandler
-          .getFieldsListEntityTypes()
-          .entries
-          .map((e) {
-            var entityType = e.value.entityType;
-            if (entityType == null) return null;
-
-            var refRepository = repository.provider.getEntityRepositoryByType(
-              entityType,
-            );
-
-            if (refRepository == null ||
-                !refRepository.isSameEntityManager(repository)) {
-              return null;
-            }
-
-            return MapEntry(e.key, entityType);
-          })
-          .nonNulls
-          .toMapFromEntries();
-
-      if (fieldListEntityTypes.isNotEmpty) {
-        if (!dialect.foreignKeyCreatesImplicitIndex) {
-          missingRelationshipFieldReferenceIndexes = collectionReferenceFields
-              .entries
-              .expand((e) {
-                var relFieldRef = e.value;
-                if (relFieldRef == null) {
-                  return <(String, String, TypeInfo)>[];
-                }
-
-                return [
-                  if (relFieldRef.sourceRelationshipFieldIndex == null)
-                    (
-                      relFieldRef.relationshipTable,
-                      relFieldRef.sourceRelationshipField,
-                      relFieldRef.sourceFieldEntityType,
-                    ),
-                  if (relFieldRef.targetRelationshipFieldIndex == null)
-                    (
-                      relFieldRef.relationshipTable,
-                      relFieldRef.targetRelationshipField,
-                      relFieldRef.targetFieldEntityType,
-                    ),
-                ];
-              })
-              .nonNulls
-              .toSet();
-        }
-      }
+      missingRelationshipFieldReferenceIndexes =
+          _findMissingRelationshipIndexes(
+            repository,
+            collectionReferenceFields,
+          );
 
       // UNIQUE CONSTRAINTS (unique indexes unknown) //
 
@@ -1510,49 +1427,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       // ENUM CONSTRAINTS //
 
-      var enumConstraints = scheme.constraints
-          .whereType<TableEnumConstraint>()
-          .toList();
-
-      var enumConstraintsFields = enumConstraints.toFields(
-        fieldMap: schemeToRepoMap,
+      (missingEnumConstraints, missingEnumValues) = _findMissingEnumConstraints(
+        entityHandler,
+        scheme,
+        schemeToRepoMap,
       );
-
-      var entityEnumFields = entityHandler.getFieldsEnumTypes().keys.toList();
-
-      missingEnumConstraints = entityEnumFields
-          .whereNotIn(enumConstraintsFields)
-          .toSet();
-
-      // A column's enum values are missing only if no `CHECK` over it has
-      // them all: with a duplicated `CHECK` (an old one never dropped), the
-      // current one has them, and the duplicate is warned
-      // (`findTableDuplicates`).
-      var columnsWithAllValues = <String>{};
-      var columnsMissingValues = <String, List<String>>{};
-
-      for (var e in enumConstraints) {
-        var valuesNames = _columnEnumValues(
-          entityHandler,
-          e.field,
-          schemeToRepoMap,
-        );
-        if (valuesNames == null) continue;
-
-        var missingValues = valuesNames.whereNotIn(e.values).toList();
-
-        if (missingValues.isEmpty) {
-          columnsWithAllValues.add(e.field);
-        } else {
-          columnsMissingValues.putIfAbsent(e.field, () => missingValues);
-        }
-      }
-
-      for (var e in columnsMissingValues.entries) {
-        if (!columnsWithAllValues.contains(e.key)) {
-          missingEnumValues[e.key] = e.value;
-        }
-      }
     }
 
     // The entity's indexes (`@EntityIndex`) without an index over their
@@ -1579,51 +1458,17 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       (f) => missingColumns.contains(f) || missingReferenceColumns.contains(f),
     );
 
-    // As in the `CREATE TABLE`, not one over the same columns as another
-    // missing one: a unique field's constraint (reported with the field), a
-    // unique `@EntityIndex` (also serving a non-unique one), or the same
-    // index twice.
-    var missingUniqueColumns = [
-      for (var f in missingUniqueConstraints) [fieldColumn(f)],
-    ];
-    var missingEntityIndexesKept = <CreateIndexSQL>[];
-    for (var sql in [
-      ...missingEntityIndexes.where((e) => e.unique),
-      ...missingEntityIndexes.where((e) => !e.unique),
-    ]) {
-      var columns = sql.columns;
-      if (missingUniqueColumns.any((c) => c.equals(columns))) continue;
-      if (missingEntityIndexesKept.any(
-        (e) => e.columns.equals(columns) && (e.unique || !sql.unique),
-      )) {
-        continue;
-      }
-      missingEntityIndexesKept.add(sql);
-    }
-    // In the declared order:
-    missingEntityIndexes = missingEntityIndexes
-        .where(missingEntityIndexesKept.contains)
-        .toList();
+    missingEntityIndexes = _dedupeMissingEntityIndexes(
+      missingEntityIndexes,
+      missingUniqueColumns: [
+        for (var f in missingUniqueConstraints) [fieldColumn(f)],
+      ],
+    );
 
-    // A missing index whose name is in use by another index (other
-    // columns, or not unique): `CREATE INDEX IF NOT EXISTS` would do
-    // nothing; it must be dropped first. By index name, where it's in use
-    // (other tables: [findIndexesNamesInUse], in `_checkDBTablesImpl`).
-    var entityIndexesNameConflicts = <String, String>{
-      for (var sql in missingEntityIndexes)
-        if (sql.indexName case var indexName?)
-          if (scheme.indexes?[indexName] case var columns?)
-            indexName:
-                'over (${columns.join(', ')})'
-                '${sql.unique && !(scheme.uniqueIndexes?.contains(indexName) ?? false) ? ', not unique' : ''}',
-    };
-
-    if (entityIndexesNameConflicts.isNotEmpty) {
-      _log.severe(
-        "Table `$schemeTableName`: `@EntityIndex` names in use by other "
-        "indexes (drop them first): $entityIndexesNameConflicts",
-      );
-    }
+    var entityIndexesNameConflicts = _findEntityIndexesNameConflicts(
+      scheme,
+      missingEntityIndexes,
+    );
 
     if (missingColumns.isNotEmpty ||
         missingReferenceColumns.isNotEmpty ||
@@ -1637,45 +1482,36 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         missingEntityIndexes.isNotEmpty) {
       _log.severe(
         "ERROR Checking table `$schemeTableName`> entityType: `$repoType`\n"
-        "${missingEntityIndexes.isNotEmpty ? '-- missingEntityIndexes: ${missingEntityIndexes.map((e) => e.indexName).toList()}\n' : ''}"
-        "${missingColumns.isNotEmpty ? '-- missingColumns: $missingColumns\n' : ''}"
-        "${missingReferenceColumns.isNotEmpty ? '-- missingReferenceColumns: $missingReferenceColumns\n' : ''}"
-        "${missingCollectionReferenceColumns.isNotEmpty ? '-- missingCollectionReferenceColumns: $missingCollectionReferenceColumns\n' : ''}"
-        "${missingFieldReferenceConstraints.isNotEmpty ? '-- missingFieldReferenceConstraints: $missingFieldReferenceConstraints\n' : ''}"
-        "${missingFieldReferenceIndexes.isNotEmpty ? '-- missingFieldReferenceIndexes: $missingFieldReferenceIndexes\n' : ''}"
-        "${missingRelationshipFieldReferenceIndexes.isNotEmpty ? '-- missingRelationshipFieldReferenceIndexes: $missingRelationshipFieldReferenceIndexes\n' : ''}"
-        "${missingUniqueConstraints.isNotEmpty ? '-- missingUniqueConstraints: $missingUniqueConstraints\n' : ''}"
-        "${missingEnumConstraints.isNotEmpty ? '-- missingEnumConstraints: $missingEnumConstraints\n' : ''}"
-        "${missingEnumValues.isNotEmpty ? '-- missingEnumValues: $missingEnumValues\n' : ''}",
+        "${_tableCheckErrorLine('missingEntityIndexes', missingEntityIndexes.map((e) => e.indexName).toList())}"
+        "${_tableCheckErrorLine('missingColumns', missingColumns)}"
+        "${_tableCheckErrorLine('missingReferenceColumns', missingReferenceColumns)}"
+        "${_tableCheckErrorLine('missingCollectionReferenceColumns', missingCollectionReferenceColumns)}"
+        "${_tableCheckErrorLine('missingFieldReferenceConstraints', missingFieldReferenceConstraints)}"
+        "${_tableCheckErrorLine('missingFieldReferenceIndexes', missingFieldReferenceIndexes)}"
+        "${_tableCheckErrorLine('missingRelationshipFieldReferenceIndexes', missingRelationshipFieldReferenceIndexes)}"
+        "${_tableCheckErrorLine('missingUniqueConstraints', missingUniqueConstraints)}"
+        "${_tableCheckErrorLine('missingEnumConstraints', missingEnumConstraints)}"
+        "${_tableCheckErrorLine('missingEnumValues', missingEnumValues)}",
       );
+
+      // The columns of [fields], as reported by the [_DBTableCheck]:
+      List<_DBTableColumn> columnsOf(Iterable<String> fields) => fields
+          .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
+          .toList();
 
       return _DBTableCheck.missing(
         repository,
         scheme,
-        missingColumns
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
-        missingReferenceColumns
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
-        missingCollectionReferenceColumns
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
-        missingFieldReferenceConstraints
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
-        missingFieldReferenceIndexes
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
+        columnsOf(missingColumns),
+        columnsOf(missingReferenceColumns),
+        columnsOf(missingCollectionReferenceColumns),
+        columnsOf(missingFieldReferenceConstraints),
+        columnsOf(missingFieldReferenceIndexes),
         missingRelationshipFieldReferenceIndexes
             .map((f) => _DBRelationshipTableColumn(f.$1, f.$2, f.$3, []))
             .toList(),
-        missingUniqueConstraints
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
-        missingEnumConstraints
-            .map((f) => _DBTableColumn.fromEntityHandler(entityHandler, f))
-            .toList(),
+        columnsOf(missingUniqueConstraints),
+        columnsOf(missingEnumConstraints),
         missingEnumValues.entries
             .map(
               (e) => MapEntry(
@@ -1692,6 +1528,252 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     _log.info('Checking table `$schemeTableName`: OK');
 
     return _DBTableCheck.ok();
+  }
+
+  /// A line of the table check's error log (see [_checkDBTableScheme]):
+  /// `-- <label>: <values>`, or an empty `String` if [values] (an [Iterable]
+  /// or a [Map]) is empty.
+  static String _tableCheckErrorLine(String label, Object values) {
+    var isEmpty = values is Map ? values.isEmpty : (values as Iterable).isEmpty;
+    return isEmpty ? '' : '-- $label: $values\n';
+  }
+
+  /// Of [fieldsEntityTypes] (a field's entity type, as
+  /// [EntityHandler.getFieldsEntityTypes] and
+  /// [EntityHandler.getFieldsListEntityTypes]), the fields whose entity is
+  /// stored by the same entity manager as [repository] (only those have a
+  /// `FOREIGN KEY` to check), with their entity type.
+  ///
+  /// Used by [_findMissingReferenceConstraints] (to-one) and
+  /// [_findMissingRelationshipIndexes] (to-many).
+  Map<String, Type> _sameManagerEntityTypes(
+    EntityRepository<Object> repository,
+    Map<String, TypeInfo> fieldsEntityTypes,
+  ) => fieldsEntityTypes.entries
+      .map((e) {
+        var entityType = e.value.entityType;
+        if (entityType == null) return null;
+
+        var refRepository = repository.provider.getEntityRepositoryByType(
+          entityType,
+        );
+
+        if (refRepository == null ||
+            !refRepository.isSameEntityManager(repository)) {
+          return null;
+        }
+
+        return MapEntry(e.key, entityType);
+      })
+      .nonNulls
+      .toMapFromEntries();
+
+  /// The to-one reference fields of [repository]'s entity without a
+  /// `FOREIGN KEY` constraint in the table ([scheme]), and (when the
+  /// [dialect] doesn't create an index for a foreign key) the reference
+  /// columns without an index. Part of [_checkDBTableScheme].
+  (Set<String>, Set<String>) _findMissingReferenceConstraints(
+    EntityRepository<Object> repository,
+    TableScheme scheme,
+    Map<String, String?> schemeToRepoMap,
+  ) {
+    var missingFieldReferenceConstraints = <String>{};
+    var missingFieldReferenceIndexes = <String>{};
+
+    var fieldEntityTypes = _sameManagerEntityTypes(
+      repository,
+      repository.entityHandler.getFieldsEntityTypes(),
+    );
+
+    if (fieldEntityTypes.isNotEmpty) {
+      var fieldsReferencedTables = scheme.fieldsReferencedTables;
+
+      var fieldsReferences = fieldsReferencedTables.entries
+          .map((e) {
+            var column = e.key;
+            var field = schemeToRepoMap[column] ?? column;
+
+            var entityType = fieldEntityTypes[field];
+            if (entityType == null) return null;
+
+            var refTable = e.value.targetTable;
+            return MapEntry(field, refTable);
+          })
+          .nonNulls
+          .toMapFromEntries();
+
+      missingFieldReferenceConstraints = fieldEntityTypes.keys
+          .where((f) => !fieldsReferences.containsKey(f))
+          .toSet();
+
+      if (!dialect.foreignKeyCreatesImplicitIndex) {
+        missingFieldReferenceIndexes = fieldsReferencedTables.entries
+            .where((e) => e.value.indexName == null)
+            .map((e) => e.key)
+            .toSet();
+      }
+    }
+
+    return (missingFieldReferenceConstraints, missingFieldReferenceIndexes);
+  }
+
+  /// The relationship tables' columns (of the to-many fields of
+  /// [repository]'s entity) without an index, when the [dialect] doesn't
+  /// create an index for a foreign key: `(relationship table, column, the
+  /// column's entity type)`. Part of [_checkDBTableScheme].
+  Set<(String, String, TypeInfo)> _findMissingRelationshipIndexes(
+    EntityRepository<Object> repository,
+    Map<String, TableRelationshipReferenceEntityTyped?>
+    collectionReferenceFields,
+  ) {
+    var fieldListEntityTypes = _sameManagerEntityTypes(
+      repository,
+      repository.entityHandler.getFieldsListEntityTypes(),
+    );
+
+    if (fieldListEntityTypes.isEmpty ||
+        dialect.foreignKeyCreatesImplicitIndex) {
+      return <(String, String, TypeInfo)>{};
+    }
+
+    return collectionReferenceFields.entries
+        .expand((e) {
+          var relFieldRef = e.value;
+          if (relFieldRef == null) {
+            return <(String, String, TypeInfo)>[];
+          }
+
+          return [
+            if (relFieldRef.sourceRelationshipFieldIndex == null)
+              (
+                relFieldRef.relationshipTable,
+                relFieldRef.sourceRelationshipField,
+                relFieldRef.sourceFieldEntityType,
+              ),
+            if (relFieldRef.targetRelationshipFieldIndex == null)
+              (
+                relFieldRef.relationshipTable,
+                relFieldRef.targetRelationshipField,
+                relFieldRef.targetFieldEntityType,
+              ),
+          ];
+        })
+        .nonNulls
+        .toSet();
+  }
+
+  /// The enum fields of [entityHandler]'s entity without a `CHECK`
+  /// constraint (of its values) in the table ([scheme]), and the enum values
+  /// missing in a column's `CHECK` (by column). Part of
+  /// [_checkDBTableScheme].
+  (Set<String>, Map<String, List<String>>) _findMissingEnumConstraints(
+    EntityHandler<Object> entityHandler,
+    TableScheme scheme,
+    Map<String, String?> schemeToRepoMap,
+  ) {
+    var enumConstraints = scheme.constraints
+        .whereType<TableEnumConstraint>()
+        .toList();
+
+    var enumConstraintsFields = enumConstraints.toFields(
+      fieldMap: schemeToRepoMap,
+    );
+
+    var entityEnumFields = entityHandler.getFieldsEnumTypes().keys.toList();
+
+    var missingEnumConstraints = entityEnumFields
+        .whereNotIn(enumConstraintsFields)
+        .toSet();
+
+    // A column's enum values are missing only if no `CHECK` over it has
+    // them all: with a duplicated `CHECK` (an old one never dropped), the
+    // current one has them, and the duplicate is warned
+    // (`findTableDuplicates`).
+    var columnsWithAllValues = <String>{};
+    var columnsMissingValues = <String, List<String>>{};
+
+    for (var e in enumConstraints) {
+      var valuesNames = _columnEnumValues(
+        entityHandler,
+        e.field,
+        schemeToRepoMap,
+      );
+      if (valuesNames == null) continue;
+
+      var missingValues = valuesNames.whereNotIn(e.values).toList();
+
+      if (missingValues.isEmpty) {
+        columnsWithAllValues.add(e.field);
+      } else {
+        columnsMissingValues.putIfAbsent(e.field, () => missingValues);
+      }
+    }
+
+    var missingEnumValues = <String, List<String>>{};
+    for (var e in columnsMissingValues.entries) {
+      if (!columnsWithAllValues.contains(e.key)) {
+        missingEnumValues[e.key] = e.value;
+      }
+    }
+
+    return (missingEnumConstraints, missingEnumValues);
+  }
+
+  /// Of the [missingEntityIndexes], as in the `CREATE TABLE`, not one over
+  /// the same columns as another missing one: a unique field's constraint
+  /// ([missingUniqueColumns], reported with the field), a unique
+  /// `@EntityIndex` (also serving a non-unique one), or the same index
+  /// twice. In the declared order. Part of [_checkDBTableScheme].
+  static List<CreateIndexSQL> _dedupeMissingEntityIndexes(
+    List<CreateIndexSQL> missingEntityIndexes, {
+    required List<List<String>> missingUniqueColumns,
+  }) {
+    var missingEntityIndexesKept = <CreateIndexSQL>[];
+    for (var sql in [
+      ...missingEntityIndexes.where((e) => e.unique),
+      ...missingEntityIndexes.where((e) => !e.unique),
+    ]) {
+      var columns = sql.columns;
+      if (missingUniqueColumns.any((c) => c.equals(columns))) continue;
+      if (missingEntityIndexesKept.any(
+        (e) => e.columns.equals(columns) && (e.unique || !sql.unique),
+      )) {
+        continue;
+      }
+      missingEntityIndexesKept.add(sql);
+    }
+    // In the declared order:
+    return missingEntityIndexes
+        .where(missingEntityIndexesKept.contains)
+        .toList();
+  }
+
+  /// A missing index whose name is in use by another index of the table
+  /// ([scheme]; other columns, or not unique): `CREATE INDEX IF NOT EXISTS`
+  /// would do nothing; it must be dropped first. By index name, where it's
+  /// in use (other tables: [findIndexesNamesInUse], in
+  /// `_checkDBTablesImpl`). Logged. Part of [_checkDBTableScheme].
+  Map<String, String> _findEntityIndexesNameConflicts(
+    TableScheme scheme,
+    List<CreateIndexSQL> missingEntityIndexes,
+  ) {
+    var entityIndexesNameConflicts = <String, String>{
+      for (var sql in missingEntityIndexes)
+        if (sql.indexName case var indexName?)
+          if (scheme.indexes?[indexName] case var columns?)
+            indexName:
+                'over (${columns.join(', ')})'
+                '${sql.unique && !(scheme.uniqueIndexes?.contains(indexName) ?? false) ? ', not unique' : ''}',
+    };
+
+    if (entityIndexesNameConflicts.isNotEmpty) {
+      _log.severe(
+        "Table `${scheme.name}`: `@EntityIndex` names in use by other "
+        "indexes (drop them first): $entityIndexesNameConflicts",
+      );
+    }
+
+    return entityIndexesNameConflicts;
   }
 
   MapEntry<String, TableRelationshipReferenceEntityTyped?>?
@@ -2391,7 +2473,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         var tableFieldID = context.tableFieldID ?? 'id';
         var tableAlias = context.resolveEntityAlias(table);
         var q = dialect.elementQuote;
-        var sql = 'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from';
+        var sql =
+            'SELECT ${dialect.qualifiedColumnSQL(tableAlias, tableFieldID)} '
+            'as ${q}id$q $from';
         return sql;
       },
     );
@@ -2438,21 +2522,55 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
+  /// The [TableScheme] of [table], or a [StateError] (logged) if there's
+  /// none. Used by the SQL generators that need the table's scheme (insert,
+  /// update and the relationship ones).
+  FutureOr<TableScheme> _requireTableScheme(String table) =>
+      getTableScheme(table).resolveMapped((tableScheme) {
+        if (tableScheme == null) {
+          var errorMsg = "Can't find `TableScheme` for table: $table";
+          _log.severe(errorMsg);
+          throw StateError(errorMsg);
+        }
+        return tableScheme;
+      });
+
+  /// The relationship (table) of the to-many [field] of [table] to
+  /// [otherTableName], or a [StateError] if there's none. Used by the
+  /// relationship SQL generators.
+  ///
+  /// - [tableSchemeInError]: also writes the [tableScheme] in the error
+  ///   (as [generateInsertRelationshipSQLs] always did).
+  TableRelationshipReference _requireRelationship(
+    TableScheme tableScheme,
+    String table,
+    String field,
+    String otherTableName, {
+    bool tableSchemeInError = false,
+  }) {
+    var relationship = tableScheme.getTableRelationshipReference(
+      sourceTable: table,
+      sourceField: field,
+      targetTable: otherTableName,
+    );
+
+    if (relationship == null) {
+      throw StateError(
+        "Can't find TableRelationshipReference for tables: $table -> $otherTableName"
+        "${tableSchemeInError ? '\n$tableScheme' : ''}",
+      );
+    }
+
+    return relationship;
+  }
+
   FutureOr<SQL> generateInsertSQL(
     Transaction transaction,
     String entityName,
     String table,
     Map<String, Object?> fields,
   ) {
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for table: $table";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
+    return _requireTableScheme(table).resolveMapped((tableScheme) {
       var context = EncodingContext(
         entityName,
         namedParameters: fields,
@@ -2580,15 +2698,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   ) {
     if (fields.isEmpty) return SQL.dummy;
 
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for table: $table";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
+    return _requireTableScheme(table).resolveMapped((tableScheme) {
       var context = EncodingContext(
         entityName,
         namedParameters: fields,
@@ -2660,7 +2770,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
             sql.write(conditionSQL);
 
             if (dialect.acceptsReturningSyntax) {
-              sql.write(' RETURNING $q$table$q.$q$idFieldName$q');
+              sql.write(
+                ' RETURNING ${dialect.qualifiedColumnSQL(table, idFieldName)}',
+              );
             }
 
             return SQL(
@@ -2727,26 +2839,14 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List otherIds, {
     bool newEntity = false,
   }) {
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for table: $table";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
-      var relationship = tableScheme.getTableRelationshipReference(
-        sourceTable: table,
-        sourceField: field,
-        targetTable: otherTableName,
+    return _requireTableScheme(table).resolveMapped((tableScheme) {
+      var relationship = _requireRelationship(
+        tableScheme,
+        table,
+        field,
+        otherTableName,
+        tableSchemeInError: true,
       );
-
-      if (relationship == null) {
-        throw StateError(
-          "Can't find TableRelationshipReference for tables: $table -> $otherTableName\n$tableScheme",
-        );
-      }
 
       var sqls = otherIds.isEmpty
           ? [SQL.dummy]
@@ -2759,12 +2859,9 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       if (newEntity) return sqls;
 
-      var constrainSQL = _generateConstrainRelationshipSQL(
-        tableScheme,
-        table,
-        field,
+      var constraintSQL = _generateConstrainRelationshipSQL(
+        relationship,
         id,
-        otherTableName,
         otherIds,
       );
 
@@ -2773,7 +2870,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var sqlsLast = sqls[lastIdx].ensureNotSharedDummy();
       sqls[lastIdx] = sqlsLast;
 
-      sqlsLast.posSQL = [constrainSQL];
+      sqlsLast.posSQL = [constraintSQL];
 
       return sqls;
     });
@@ -2822,26 +2919,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     );
   }
 
+  /// The `DELETE` of the [relationship] rows of [id] to IDs other than
+  /// [otherIds] (all of them without [otherIds]). Used by
+  /// [generateInsertRelationshipSQLs], with its already resolved
+  /// [relationship].
   SQL _generateConstrainRelationshipSQL(
-    TableScheme tableScheme,
-    String table,
-    String field,
+    TableRelationshipReference relationship,
     dynamic id,
-    String otherTableName,
     List otherIds,
   ) {
-    var relationship = tableScheme.getTableRelationshipReference(
-      sourceTable: table,
-      sourceField: field,
-      targetTable: otherTableName,
-    );
-
-    if (relationship == null) {
-      throw StateError(
-        "Can't find TableRelationshipReference for tables: $table -> $otherTableName",
-      );
-    }
-
     var relationshipTable = relationship.relationshipTable;
     var sourceIdField = relationship.sourceRelationshipField;
     var targetIdField = relationship.targetRelationshipField;
@@ -2960,26 +3046,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     dynamic id,
     String otherTableName,
   ) {
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for table: $table";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
-      var relationship = tableScheme.getTableRelationshipReference(
-        sourceTable: table,
-        sourceField: field,
-        targetTable: otherTableName,
+    return _requireTableScheme(table).resolveMapped((tableScheme) {
+      var relationship = _requireRelationship(
+        tableScheme,
+        table,
+        field,
+        otherTableName,
       );
-
-      if (relationship == null) {
-        throw StateError(
-          "Can't find TableRelationshipReference for tables: $table -> $otherTableName",
-        );
-      }
 
       var parameters = {'source_id': id};
 
@@ -2988,24 +3061,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       var conditionSQL =
           '$q${relationship.sourceRelationshipField}$q = @source_id';
 
-      var sql = StringBuffer();
-
-      sql.write('SELECT $q');
-      sql.write(relationship.sourceRelationshipField);
-      sql.write('$q as ${q}source_id$q , $q');
-      sql.write(relationship.targetRelationshipField);
-      sql.write('$q as ${q}target_id$q FROM $q');
-      sql.write(relationship.relationshipTable);
-      sql.write('$q WHERE ( ');
-      sql.write(conditionSQL);
-      sql.write(' )');
-
       var condition = KeyConditionEQ([
         ConditionKeyField(relationship.sourceRelationshipField),
       ], id);
 
       return SQL(
-        sql.toString(),
+        _selectRelationshipSQLText(relationship, conditionSQL),
         null,
         parameters,
         parameters,
@@ -3021,6 +3082,31 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
+  /// The `SELECT` of the [relationship] rows (`source_id`, `target_id`)
+  /// matching [conditionSQL] (over the source column): the SQL text shared
+  /// by [generateSelectRelationshipSQL] (one source ID) and
+  /// [generateSelectRelationshipsSQL] (an `IN` list of them).
+  String _selectRelationshipSQLText(
+    TableRelationshipReference relationship,
+    String conditionSQL,
+  ) {
+    var q = dialect.elementQuote;
+
+    var sql = StringBuffer();
+
+    sql.write('SELECT $q');
+    sql.write(relationship.sourceRelationshipField);
+    sql.write('$q as ${q}source_id$q , $q');
+    sql.write(relationship.targetRelationshipField);
+    sql.write('$q as ${q}target_id$q FROM $q');
+    sql.write(relationship.relationshipTable);
+    sql.write('$q WHERE ( ');
+    sql.write(conditionSQL);
+    sql.write(' )');
+
+    return sql.toString();
+  }
+
   FutureOr<Iterable<Map<String, dynamic>>> selectRelationshipSQL(
     TransactionOperation op,
     String entityName,
@@ -3028,11 +3114,29 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     SQL sql,
     dynamic id,
     String otherTable,
+  ) => _executeSelectRelationshipSQL(
+    'selectRelationshipSQL',
+    op,
+    entityName,
+    table,
+    sql,
+  );
+
+  /// Executes a relationship `SELECT` [sql] (from
+  /// [generateSelectRelationshipSQL] or [generateSelectRelationshipsSQL]):
+  /// the shared body of [selectRelationshipSQL] and [selectRelationshipsSQL],
+  /// which only differ by the [logLabel] of the operation.
+  FutureOr<Iterable<Map<String, dynamic>>> _executeSelectRelationshipSQL(
+    String logLabel,
+    TransactionOperation op,
+    String entityName,
+    String table,
+    SQL sql,
   ) {
     if (sql.isDummy) return <Map<String, dynamic>>[];
 
     return executeTransactionOperation(op, sql, (connection) {
-      _onTransactionOperationSQL('selectRelationshipSQL', op, sql);
+      _onTransactionOperationSQL(logLabel, op, sql);
 
       var ret = doSelectSQL(
         entityName,
@@ -3053,26 +3157,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     List<dynamic> ids,
     String otherTableName,
   ) {
-    var retTableScheme = getTableScheme(table);
-
-    return retTableScheme.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for table: $table";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
-      var relationship = tableScheme.getTableRelationshipReference(
-        sourceTable: table,
-        sourceField: field,
-        targetTable: otherTableName,
+    return _requireTableScheme(table).resolveMapped((tableScheme) {
+      var relationship = _requireRelationship(
+        tableScheme,
+        table,
+        field,
+        otherTableName,
       );
-
-      if (relationship == null) {
-        throw StateError(
-          "Can't find TableRelationshipReference for tables: $table -> $otherTableName",
-        );
-      }
 
       var q = dialect.elementQuote;
 
@@ -3093,24 +3184,12 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
       var conditionSQLStr = conditionSQL.toString();
 
-      var sql = StringBuffer();
-
-      sql.write('SELECT $q');
-      sql.write(relationship.sourceRelationshipField);
-      sql.write('$q as ${q}source_id$q , $q');
-      sql.write(relationship.targetRelationshipField);
-      sql.write('$q as ${q}target_id$q FROM $q');
-      sql.write(relationship.relationshipTable);
-      sql.write('$q WHERE ( ');
-      sql.write(conditionSQLStr);
-      sql.write(' )');
-
       var condition = KeyConditionIN([
         ConditionKeyField(relationship.sourceRelationshipField),
       ], ids);
 
       return SQL(
-        sql.toString(),
+        _selectRelationshipSQLText(relationship, conditionSQLStr),
         ids,
         {'ids': ids},
         parameters,
@@ -3133,22 +3212,13 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     SQL sql,
     List<dynamic> ids,
     String otherTable,
-  ) {
-    if (sql.isDummy) return <Map<String, dynamic>>[];
-
-    return executeTransactionOperation(op, sql, (connection) {
-      _onTransactionOperationSQL('selectRelationshipsSQL', op, sql);
-
-      var ret = doSelectSQL(
-        entityName,
-        sql.mainTable ?? table,
-        sql,
-        op.transaction,
-        connection,
-      );
-      return ret;
-    });
-  }
+  ) => _executeSelectRelationshipSQL(
+    'selectRelationshipsSQL',
+    op,
+    entityName,
+    table,
+    sql,
+  );
 
   Object resolveError(
     Object error,
@@ -3366,7 +3436,8 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           orderDirection: orderDirection,
         );
         var sql =
-            'SELECT $q$tableAlias$q.$q$tableFieldID$q as ${q}id$q $from$tail';
+            'SELECT ${dialect.qualifiedColumnSQL(tableAlias, tableFieldID)} '
+            'as ${q}id$q $from$tail';
         return sql;
       },
     );
@@ -3472,18 +3543,26 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     );
     var idField = encodedSQL.tableFieldID ?? 'id';
 
+    var tableIdColumn = dialect.qualifiedColumnSQL(tableAlias, idField);
+
     var subquery =
-        'SELECT $q$tableAlias$q.$q$idField$q ${_fromSQL(table, encodedSQL)} '
+        'SELECT $tableIdColumn ${_fromSQL(table, encodedSQL)} '
         'WHERE $conditionSQL';
 
     if (derivedTable) {
       subquery =
-          'SELECT ${q}rel_ids$q.$q$idField$q FROM ( $subquery ) '
-          'as ${q}rel_ids$q';
+          'SELECT ${dialect.qualifiedColumnSQL('rel_ids', idField)} '
+          'FROM ( $subquery ) as ${q}rel_ids$q';
     }
 
-    return '$q$tableAlias$q.$q$idField$q IN ( $subquery )';
+    return '$tableIdColumn IN ( $subquery )';
   }
+
+  /// The keyword of a `JOIN` in [_fromSQL]: `INNER JOIN ` if [inner] (the
+  /// condition requires the joined row), else `LEFT OUTER JOIN ` (a missing
+  /// joined row is a `NULL`, which the condition may match).
+  static String _joinKeyword(bool inner) =>
+      inner ? 'INNER JOIN ' : 'LEFT OUTER JOIN ';
 
   /// `FROM table as alias`: only the main [table] (see [_fromSQL]).
   String _fromSQLMainTable(String table, EncodingContext encodedSQL) {
@@ -3522,11 +3601,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
         var join = StringBuffer();
 
-        if (innerRef) {
-          join.write('INNER JOIN ');
-        } else {
-          join.write('LEFT OUTER JOIN ');
-        }
+        join.write(_joinKeyword(innerRef));
 
         join.write('$q$refTable$q as $q$refTableAlias$q ON ');
 
@@ -3546,23 +3621,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           refAliases.add(sourceTableAlias);
           refAliases.add(targetTableAlias);
 
-          join.write(q);
-          join.write(sourceTableAlias);
-          join.write(q);
-          join.write('.');
-          join.write(q);
-          join.write(fieldRef.sourceField);
-          join.write(q);
+          join.write(
+            dialect.qualifiedColumnSQL(sourceTableAlias, fieldRef.sourceField),
+          );
 
           join.write(' = ');
 
-          join.write(q);
-          join.write(targetTableAlias);
-          join.write(q);
-          join.write('.');
-          join.write(q);
-          join.write(fieldRef.targetField);
-          join.write(q);
+          join.write(
+            dialect.qualifiedColumnSQL(targetTableAlias, fieldRef.targetField),
+          );
           join.write(' ');
         }
 
@@ -3605,31 +3672,19 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
         var join = StringBuffer();
 
-        if (innerRel) {
-          join.write('INNER JOIN ');
-        } else {
-          join.write('LEFT OUTER JOIN ');
-        }
+        join.write(_joinKeyword(innerRel));
 
         join.write('$q$relTable$q as $q$relTableAlias$q ON (');
 
-        join.write(q);
-        join.write(relTableAlias);
-        join.write(q);
-        join.write('.');
-        join.write(q);
-        join.write(sourceRelationshipField);
-        join.write(q);
+        join.write(
+          dialect.qualifiedColumnSQL(relTableAlias, sourceRelationshipField),
+        );
 
         join.write(' = ');
 
-        join.write(q);
-        join.write(nearTableAlias);
-        join.write(q);
-        join.write('.');
-        join.write(q);
-        join.write(sourceTableField);
-        join.write(q);
+        join.write(
+          dialect.qualifiedColumnSQL(nearTableAlias, sourceTableField),
+        );
 
         join.write(') ');
 
@@ -3649,31 +3704,19 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
           targetRelationshipField = relationship.sourceRelationshipField;
         }
 
-        if (innerRel) {
-          join.write('INNER JOIN ');
-        } else {
-          join.write('LEFT OUTER JOIN ');
-        }
+        join.write(_joinKeyword(innerRel));
 
         join.write('$q$targetTable$q as $q$targetTableAlias$q ON (');
 
-        join.write(q);
-        join.write(targetTableAlias);
-        join.write(q);
-        join.write('.');
-        join.write(q);
-        join.write(targetTableField);
-        join.write(q);
+        join.write(
+          dialect.qualifiedColumnSQL(targetTableAlias, targetTableField),
+        );
 
         join.write(' = ');
 
-        join.write(q);
-        join.write(relTableAlias);
-        join.write(q);
-        join.write('.');
-        join.write(q);
-        join.write(targetRelationshipField);
-        join.write(q);
+        join.write(
+          dialect.qualifiedColumnSQL(relTableAlias, targetRelationshipField),
+        );
 
         join.write(') ');
 
@@ -4465,7 +4508,7 @@ class _DBTableCheck {
       var column = sqlGenerator.normalizeColumnName(f.name);
       return sqlGenerator.generateAddUniqueConstraintSQL(
         table,
-        '${table}__${column}__unique',
+        SQLGenerator.uniqueConstraintName(table, column),
         [column],
         comment: '${f.type.toString(withT: false)} ${f.name} UNIQUE',
       );

@@ -240,8 +240,33 @@ void main() {
       expect(d1, equals(d2));
       expect(d1.hashCode, equals(d2.hashCode));
       expect(d1, isNot(equals(d3)));
-      expect(d1.toString(), startsWith('SQLDialect{name: X,elementQuote: ", '));
-      expect(d1.toString(), endsWith('maxIdentifierLength: null}'));
+      expect(
+        d1.toString(),
+        startsWith('SQLDialect{name: X, elementQuote: ", '),
+      );
+      expect(d1.toString(), endsWith('subqueryAsDerivedTable: false}'));
+    });
+
+    test('SQLDialect: toString with all the fields', () {
+      const d = SQLDialect(
+        'Z',
+        elementQuote: '`',
+        acceptsVarcharWithoutMaximumSize: true,
+        maxIdentifierLength: 64,
+        intParameterTypeSuffix: ':int8',
+        maxIDsAsParameters: 0,
+        regExpSyntax: SQLRegExpSyntax.dart,
+        subqueryAsDerivedTable: true,
+      );
+
+      var s = d.toString();
+      expect(s, contains('name: Z, elementQuote: `, '));
+      expect(s, contains('acceptsVarcharWithoutMaximumSize: true, '));
+      expect(s, contains('maxIdentifierLength: 64, '));
+      expect(s, contains('intParameterTypeSuffix: :int8, '));
+      expect(s, contains('maxIDsAsParameters: 0, '));
+      expect(s, contains('regExpSyntax: dart, '));
+      expect(s, endsWith('subqueryAsDerivedTable: true}'));
     });
 
     test('CreateTableSQL: constraints as ALTER TABLE', () {

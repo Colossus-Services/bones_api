@@ -27,6 +27,23 @@ API/server layer clean-up (behavior-preserving):
 - Private cache fields named `*Cache`, documented, declared before their
   users.
 
+Conditions and SQL generation clean-up (behavior-preserving, the same SQL):
+
+- `Condition`: the ordering comparisons (`>`, `>=`, `<`, `<=`) written once
+  (a private enum and a private base of the `KeyCondition{GreaterThan,...}`
+  classes; public API unchanged); `KeyCondition.encodeValue` in the base
+  class; `ConditionParameter.matchesIn` resolves its parameters once.
+- `EncodingContext.parameterValue`; `isReservedWord` by a set;
+  `ConditionSQLEncoder.qualifiedColumnSQL` and shared ID/empty-set helpers.
+- `SQLDialect.qualifiedColumnSQL`; `SQLGenerator.uniqueConstraintName`,
+  `indexName`, `foreignKeyName` and `relationshipTableName` (the names of
+  the generated indexes, constraints and relationship tables, in one place).
+- `DBSQLAdapter`: the table check (`_checkDBTableScheme`), the relationship
+  SQL generators and the `JOIN`s split into documented helpers.
+- `DBSQLMemoryAdapter`: one select matcher; shared delete helpers.
+- `APIDBModule.select`: directives, table and pagination helpers.
+- Cache fields named `*Cache` and documented.
+
 Fixes:
 
 - `APIServerResponseCache`: the eviction (`maxMemorySize` reached) sorted
@@ -45,6 +62,12 @@ Fixes:
 - `FieldsFromMap.getFieldsKeysInMap`: the given `fieldLC`/`fieldSimple`
   (of one field) were used for every field: now computed per field (the
   parameters are ignored and `@Deprecated`).
+- `Condition.parse`: an escaped quote in a single-quoted string
+  (`name == 'a\'b'`) failed to parse.
+- `SQLDialect.toString`: lists all its fields (and a missing space).
+- `APIDBModule.select`: the entities' values are HTML-escaped in its page
+  (they were written as is: a `<` or `&` broke the page, and could inject
+  markup).
 
 ## 1.34.0
 

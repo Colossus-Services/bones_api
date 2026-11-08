@@ -270,27 +270,14 @@ class ConditionParameter extends ConditionElement {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     EntityHandler? entityHandler,
-  }) {
-    var myValue = getValue(
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-          )
-        : value;
-
-    return EntityHandler.graterThanValue(
-      myValue,
-      otherValue,
-      entityHandler: entityHandler,
-    );
-  }
+  }) => _compareOrdering(
+    _Ordering.gt,
+    value,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    entityHandler,
+  );
 
   bool greaterThanOrEqual(
     Object? value, {
@@ -298,27 +285,14 @@ class ConditionParameter extends ConditionElement {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     EntityHandler? entityHandler,
-  }) {
-    var myValue = getValue(
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-          )
-        : value;
-
-    return EntityHandler.graterThanOrEqualValue(
-      myValue,
-      otherValue,
-      entityHandler: entityHandler,
-    );
-  }
+  }) => _compareOrdering(
+    _Ordering.gte,
+    value,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    entityHandler,
+  );
 
   bool lessThan(
     Object? value, {
@@ -326,27 +300,14 @@ class ConditionParameter extends ConditionElement {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     EntityHandler? entityHandler,
-  }) {
-    var myValue = getValue(
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-
-    var otherValue = value is ConditionParameter
-        ? value.getValue(
-            parameters: parameters,
-            positionalParameters: positionalParameters,
-            namedParameters: namedParameters,
-          )
-        : value;
-
-    return EntityHandler.lessThanValue(
-      myValue,
-      otherValue,
-      entityHandler: entityHandler,
-    );
-  }
+  }) => _compareOrdering(
+    _Ordering.lt,
+    value,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    entityHandler,
+  );
 
   bool lessThanOrEqual(
     Object? value, {
@@ -354,7 +315,28 @@ class ConditionParameter extends ConditionElement {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     EntityHandler? entityHandler,
-  }) {
+  }) => _compareOrdering(
+    _Ordering.lte,
+    value,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    entityHandler,
+  );
+
+  /// Compares this parameter's value (the left side) with [value] (the right
+  /// side, itself resolved if it's a [ConditionParameter]) by [ordering].
+  ///
+  /// The shared body of [greaterThan], [greaterThanOrEqual], [lessThan] and
+  /// [lessThanOrEqual], which only differ by the [ordering].
+  bool _compareOrdering(
+    _Ordering ordering,
+    Object? value,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  ) {
     var myValue = getValue(
       parameters: parameters,
       positionalParameters: positionalParameters,
@@ -369,11 +351,7 @@ class ConditionParameter extends ConditionElement {
           )
         : value;
 
-    return EntityHandler.lessThanOrEqualValue(
-      myValue,
-      otherValue,
-      entityHandler: entityHandler,
-    );
+    return ordering.test(myValue, otherValue, entityHandler);
   }
 
   bool matchesIn(
@@ -391,18 +369,25 @@ class ConditionParameter extends ConditionElement {
 
     checkNotRegExpValue(myValue);
 
-    if (myValue is List) {
-      for (var v1 in myValue) {
-        checkNotRegExpValue(v1);
-        for (var v2 in values) {
-          var otherValue = v2 is ConditionParameter
+    // Resolve the parameters among [values] once, not once per element of
+    // `myValue` (`getValue` is pure, but it may convert the `parameters`
+    // object with `Json.toJson` on every call):
+    var otherValues = values
+        .map(
+          (v2) => v2 is ConditionParameter
               ? v2.getValue(
                   parameters: parameters,
                   positionalParameters: positionalParameters,
                   namedParameters: namedParameters,
                 )
-              : v2;
+              : v2,
+        )
+        .toList();
 
+    if (myValue is List) {
+      for (var v1 in myValue) {
+        checkNotRegExpValue(v1);
+        for (var otherValue in otherValues) {
           var match = EntityHandler.equalsValuesBasic(
             v1,
             otherValue,
@@ -414,15 +399,7 @@ class ConditionParameter extends ConditionElement {
 
       return false;
     } else {
-      for (var v2 in values) {
-        var otherValue = v2 is ConditionParameter
-            ? v2.getValue(
-                parameters: parameters,
-                positionalParameters: positionalParameters,
-                namedParameters: namedParameters,
-              )
-            : v2;
-
+      for (var otherValue in otherValues) {
         var match = EntityHandler.equalsValuesBasic(
           myValue,
           otherValue,
@@ -470,6 +447,50 @@ class ConditionParameter extends ConditionElement {
       (index?.hashCode ?? 0) ^
       (key?.hashCode ?? 0) ^
       (contextPosition?.hashCode ?? 0);
+}
+
+/// The four ordering comparisons of a condition (`>`, `>=`, `<`, `<=`).
+///
+/// Written once here, instead of once per operator in [ConditionParameter],
+/// [Condition] and the `KeyCondition` subclasses: used by
+/// [ConditionParameter._compareOrdering], [Condition._orderingConditionValue]
+/// and [_KeyConditionOrdering].
+enum _Ordering {
+  gt('>'),
+  gte('>='),
+  lt('<'),
+  lte('<=');
+
+  /// The operator symbol, as encoded in a condition (see [Condition.encode]).
+  final String symbol;
+
+  const _Ordering(this.symbol);
+
+  /// The same comparison with its sides swapped: `a > b` is `b < a`. Used
+  /// when the [ConditionParameter] to resolve is the right side.
+  _Ordering get mirrored => switch (this) {
+    gt => lt,
+    gte => lte,
+    lt => gt,
+    lte => gte,
+  };
+
+  /// Compares [a] with [b] by the matching [EntityHandler] function.
+  bool test(Object? a, Object? b, EntityHandler? entityHandler) =>
+      switch (this) {
+        gt => EntityHandler.graterThanValue(a, b, entityHandler: entityHandler),
+        gte => EntityHandler.graterThanOrEqualValue(
+          a,
+          b,
+          entityHandler: entityHandler,
+        ),
+        lt => EntityHandler.lessThanValue(a, b, entityHandler: entityHandler),
+        lte => EntityHandler.lessThanOrEqualValue(
+          a,
+          b,
+          entityHandler: entityHandler,
+        ),
+      };
 }
 
 abstract class EntityMatcher<O> {
@@ -558,6 +579,10 @@ abstract class Condition<O> extends ConditionElement
   static bool _isToManyValues(Object? value1, Object? value2) =>
       value1 is Iterable && value2 is! Iterable;
 
+  /// If [value1] `>` [value2] (see [_orderingConditionValue]).
+  ///
+  /// [keyType] is unused: kept for the API (and symmetry with
+  /// [equalsConditionValue]).
   bool greaterThanConditionValue(
     Object? value1,
     Object? value2, {
@@ -566,47 +591,20 @@ abstract class Condition<O> extends ConditionElement
     Map<String, Object?>? namedParameters,
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
-  }) {
-    if (_isToManyValues(value1, value2)) {
-      return (value1 as Iterable).any(
-        (v) => greaterThanConditionValue(
-          v,
-          value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          keyType: keyType,
-          keyEntityHandler: keyEntityHandler,
-        ),
-      );
-    }
+  }) => _orderingConditionValue(
+    _Ordering.gt,
+    value1,
+    value2,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    keyEntityHandler,
+  );
 
-    if (value1 is ConditionParameter) {
-      return value1.greaterThan(
-        value2,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
-      );
-    } else if (value2 is ConditionParameter) {
-      return value2.lessThan(
-        value1,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
-      );
-    } else {
-      var match = EntityHandler.graterThanValue(
-        value1,
-        value2,
-        entityHandler: keyEntityHandler,
-      );
-      return match;
-    }
-  }
-
+  /// If [value1] `>=` [value2] (see [_orderingConditionValue]).
+  ///
+  /// [keyType] is unused: kept for the API (and symmetry with
+  /// [equalsConditionValue]).
   bool greaterThanOrEqualConditionValue(
     Object? value1,
     Object? value2, {
@@ -615,47 +613,20 @@ abstract class Condition<O> extends ConditionElement
     Map<String, Object?>? namedParameters,
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
-  }) {
-    if (_isToManyValues(value1, value2)) {
-      return (value1 as Iterable).any(
-        (v) => greaterThanOrEqualConditionValue(
-          v,
-          value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          keyType: keyType,
-          keyEntityHandler: keyEntityHandler,
-        ),
-      );
-    }
+  }) => _orderingConditionValue(
+    _Ordering.gte,
+    value1,
+    value2,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    keyEntityHandler,
+  );
 
-    if (value1 is ConditionParameter) {
-      return value1.greaterThanOrEqual(
-        value2,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
-      );
-    } else if (value2 is ConditionParameter) {
-      return value2.lessThanOrEqual(
-        value1,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
-      );
-    } else {
-      var match = EntityHandler.graterThanOrEqualValue(
-        value1,
-        value2,
-        entityHandler: keyEntityHandler,
-      );
-      return match;
-    }
-  }
-
+  /// If [value1] `<` [value2] (see [_orderingConditionValue]).
+  ///
+  /// [keyType] is unused: kept for the API (and symmetry with
+  /// [equalsConditionValue]).
   bool lessThanConditionValue(
     Object? value1,
     Object? value2, {
@@ -664,47 +635,20 @@ abstract class Condition<O> extends ConditionElement
     Map<String, Object?>? namedParameters,
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
-  }) {
-    if (_isToManyValues(value1, value2)) {
-      return (value1 as Iterable).any(
-        (v) => lessThanConditionValue(
-          v,
-          value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          keyType: keyType,
-          keyEntityHandler: keyEntityHandler,
-        ),
-      );
-    }
+  }) => _orderingConditionValue(
+    _Ordering.lt,
+    value1,
+    value2,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    keyEntityHandler,
+  );
 
-    if (value1 is ConditionParameter) {
-      return value1.lessThan(
-        value2,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
-      );
-    } else if (value2 is ConditionParameter) {
-      return value2.greaterThan(
-        value1,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
-      );
-    } else {
-      var match = EntityHandler.lessThanValue(
-        value1,
-        value2,
-        entityHandler: keyEntityHandler,
-      );
-      return match;
-    }
-  }
-
+  /// If [value1] `<=` [value2] (see [_orderingConditionValue]).
+  ///
+  /// [keyType] is unused: kept for the API (and symmetry with
+  /// [equalsConditionValue]).
   bool lessThanOrEqualConditionValue(
     Object? value1,
     Object? value2, {
@@ -713,44 +657,69 @@ abstract class Condition<O> extends ConditionElement
     Map<String, Object?>? namedParameters,
     TypeInfo? keyType,
     EntityHandler? keyEntityHandler,
-  }) {
+  }) => _orderingConditionValue(
+    _Ordering.lte,
+    value1,
+    value2,
+    parameters,
+    positionalParameters,
+    namedParameters,
+    keyEntityHandler,
+  );
+
+  /// Compares [value1] (an entity's value) with [value2] by [ordering]: the
+  /// shared body of [greaterThanConditionValue],
+  /// [greaterThanOrEqualConditionValue], [lessThanConditionValue] and
+  /// [lessThanOrEqualConditionValue].
+  ///
+  /// - The values of a to-many relationship: any of them (as a SQL join of
+  ///   its rows).
+  /// - A [ConditionParameter] on the left is resolved and compared by
+  ///   [ordering]; on the right, it's the left side of the [_Ordering.mirrored]
+  ///   comparison (`a > ?` is `? < a`).
+  bool _orderingConditionValue(
+    _Ordering ordering,
+    Object? value1,
+    Object? value2,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? keyEntityHandler,
+  ) {
     if (_isToManyValues(value1, value2)) {
       return (value1 as Iterable).any(
-        (v) => lessThanOrEqualConditionValue(
+        (v) => _orderingConditionValue(
+          ordering,
           v,
           value2,
-          parameters: parameters,
-          positionalParameters: positionalParameters,
-          namedParameters: namedParameters,
-          keyType: keyType,
-          keyEntityHandler: keyEntityHandler,
+          parameters,
+          positionalParameters,
+          namedParameters,
+          keyEntityHandler,
         ),
       );
     }
 
     if (value1 is ConditionParameter) {
-      return value1.lessThanOrEqual(
+      return value1._compareOrdering(
+        ordering,
         value2,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
+        parameters,
+        positionalParameters,
+        namedParameters,
+        keyEntityHandler,
       );
     } else if (value2 is ConditionParameter) {
-      return value2.greaterThanOrEqual(
+      return value2._compareOrdering(
+        ordering.mirrored,
         value1,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        entityHandler: keyEntityHandler,
+        parameters,
+        positionalParameters,
+        namedParameters,
+        keyEntityHandler,
       );
     } else {
-      var match = EntityHandler.lessThanOrEqualValue(
-        value1,
-        value2,
-        entityHandler: keyEntityHandler,
-      );
-      return match;
+      return ordering.test(value1, value2, keyEntityHandler);
     }
   }
 
@@ -1488,6 +1457,9 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     }
   }
 
+  /// The [value] encoded as in a condition string (see [encode]).
+  String get encodeValue => Condition.encodeConditionValue(value);
+
   /// If `true` this is a negated operator (`!=`, `!~`), that also matches a
   /// `null` field.
   bool get isNegated => false;
@@ -2149,8 +2121,6 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     );
   }
 
-  String get encodeValue => Condition.encodeConditionValue(value);
-
   @override
   String encode() => '$encodeKey == $encodeValue';
 }
@@ -2262,14 +2232,72 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     return notEquals(keyValue);
   }
 
-  String get encodeValue => Condition.encodeConditionValue(value);
-
   @override
   String encode() => '$encodeKey != $encodeValue';
 }
 
-class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
+/// The base of the ordering key conditions ([KeyConditionGreaterThan],
+/// [KeyConditionGreaterThanOrEqual], [KeyConditionLessThan] and
+/// [KeyConditionLessThanOrEqual]), which only differ by their [_ordering]:
+/// matching and encoding are written once here. Each public subclass keeps
+/// its own constructor and [cast].
+abstract class _KeyConditionOrdering<O> extends KeyCondition<O, Object?> {
+  _KeyConditionOrdering(super.keys, super.value);
+
+  /// The comparison of this condition.
+  _Ordering get _ordering;
+
+  @override
+  bool matchesEntity(
+    O o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
+    var keyValue = getEntityKeyValue(o, entityHandler);
+
+    return _orderingConditionValue(
+      _ordering,
+      keyValue,
+      value,
+      parameters,
+      positionalParameters,
+      namedParameters,
+      null,
+    );
+  }
+
+  @override
+  bool matchesEntityMap(
+    Map<String, dynamic> o, {
+    EntityHandler<O>? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  }) {
+    var keyValue = getEntityMapKeyValue(o, entityHandler);
+
+    return _orderingConditionValue(
+      _ordering,
+      keyValue?.value,
+      value,
+      parameters,
+      positionalParameters,
+      namedParameters,
+      keyValue?.entityHandler,
+    );
+  }
+
+  @override
+  String encode() => '$encodeKey ${_ordering.symbol} $encodeValue';
+}
+
+class KeyConditionGreaterThan<O> extends _KeyConditionOrdering<O> {
   KeyConditionGreaterThan(super.keys, dynamic super.value);
+
+  @override
+  _Ordering get _ordering => _Ordering.gt;
 
   @override
   KeyConditionGreaterThan<T> cast<T>() =>
@@ -2277,55 +2305,13 @@ class KeyConditionGreaterThan<O> extends KeyCondition<O, Object?> {
             ? this as KeyConditionGreaterThan<T>
             : KeyConditionGreaterThan<T>(keys, value)
         .._markResolved(resolved, _parent);
-
-  @override
-  bool matchesEntity(
-    O o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityKeyValue(o, entityHandler);
-
-    return greaterThanConditionValue(
-      keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-  }
-
-  @override
-  bool matchesEntityMap(
-    Map<String, dynamic> o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityMapKeyValue(o, entityHandler);
-
-    return greaterThanConditionValue(
-      keyValue?.value,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
-    );
-  }
-
-  String get encodeValue => Condition.encodeConditionValue(value);
-
-  @override
-  String encode() => '$encodeKey > $encodeValue';
 }
 
-class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
+class KeyConditionGreaterThanOrEqual<O> extends _KeyConditionOrdering<O> {
   KeyConditionGreaterThanOrEqual(super.keys, dynamic super.value);
+
+  @override
+  _Ordering get _ordering => _Ordering.gte;
 
   @override
   KeyConditionGreaterThanOrEqual<T> cast<T>() =>
@@ -2333,55 +2319,13 @@ class KeyConditionGreaterThanOrEqual<O> extends KeyCondition<O, Object?> {
             ? this as KeyConditionGreaterThanOrEqual<T>
             : KeyConditionGreaterThanOrEqual<T>(keys, value)
         .._markResolved(resolved, _parent);
-
-  @override
-  bool matchesEntity(
-    O o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityKeyValue(o, entityHandler);
-
-    return greaterThanOrEqualConditionValue(
-      keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-  }
-
-  @override
-  bool matchesEntityMap(
-    Map<String, dynamic> o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityMapKeyValue(o, entityHandler);
-
-    return greaterThanOrEqualConditionValue(
-      keyValue?.value,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
-    );
-  }
-
-  String get encodeValue => Condition.encodeConditionValue(value);
-
-  @override
-  String encode() => '$encodeKey >= $encodeValue';
 }
 
-class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
+class KeyConditionLessThan<O> extends _KeyConditionOrdering<O> {
   KeyConditionLessThan(super.keys, dynamic super.value);
+
+  @override
+  _Ordering get _ordering => _Ordering.lt;
 
   @override
   KeyConditionLessThan<T> cast<T>() =>
@@ -2389,55 +2333,13 @@ class KeyConditionLessThan<O> extends KeyCondition<O, Object?> {
             ? this as KeyConditionLessThan<T>
             : KeyConditionLessThan<T>(keys, value)
         .._markResolved(resolved, _parent);
-
-  @override
-  bool matchesEntity(
-    O o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityKeyValue(o, entityHandler);
-
-    return lessThanConditionValue(
-      keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-  }
-
-  @override
-  bool matchesEntityMap(
-    Map<String, dynamic> o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityMapKeyValue(o, entityHandler);
-
-    return lessThanConditionValue(
-      keyValue?.value,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
-    );
-  }
-
-  String get encodeValue => Condition.encodeConditionValue(value);
-
-  @override
-  String encode() => '$encodeKey < $encodeValue';
 }
 
-class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
+class KeyConditionLessThanOrEqual<O> extends _KeyConditionOrdering<O> {
   KeyConditionLessThanOrEqual(super.keys, dynamic super.value);
+
+  @override
+  _Ordering get _ordering => _Ordering.lte;
 
   @override
   KeyConditionLessThanOrEqual<T> cast<T>() =>
@@ -2445,51 +2347,6 @@ class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
             ? this as KeyConditionLessThanOrEqual<T>
             : KeyConditionLessThanOrEqual<T>(keys, value)
         .._markResolved(resolved, _parent);
-
-  @override
-  bool matchesEntity(
-    O o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityKeyValue(o, entityHandler);
-
-    return lessThanOrEqualConditionValue(
-      keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-    );
-  }
-
-  @override
-  bool matchesEntityMap(
-    Map<String, dynamic> o, {
-    EntityHandler<O>? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
-  }) {
-    var keyValue = getEntityMapKeyValue(o, entityHandler);
-
-    return lessThanOrEqualConditionValue(
-      keyValue?.value,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
-    );
-  }
-
-  String get encodeValue => Condition.encodeConditionValue(value);
-
-  @override
-  String encode() => '$encodeKey <= $encodeValue';
 }
 
 abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
@@ -2721,8 +2578,6 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     return inIDs(keyValue) != not;
   }
 
-  String get encodeValue => Condition.encodeConditionValue(value);
-
   @override
   String encode() => '$encodeKey ${not ? '!' : '='}~ $encodeValue';
 }
@@ -2906,8 +2761,12 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     }
   }
 
-  /// The [RegExp] of a literal pattern (without a parameter).
-  RegExp? _literalRegExp;
+  /// A cache of the [RegExp] of a literal [pattern] (without a parameter),
+  /// filled by [_resolveRegExp].
+  ///
+  /// Why: a literal pattern never changes, and a condition is matched once
+  /// per entity (an in-memory select): compiled once, not once per entity.
+  RegExp? _literalRegExpCache;
 
   /// The [RegExp] of this condition, with its parameter's value, if any.
   ///
@@ -2921,7 +2780,7 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
   ) {
     var pattern = this.pattern;
     if (pattern != null) {
-      return _literalRegExp ??= toDartRegExp(
+      return _literalRegExpCache ??= toDartRegExp(
         pattern,
         caseInsensitive: caseInsensitive,
       );
@@ -3066,6 +2925,8 @@ class KeyConditionRegExp<O> extends KeyCondition<O, Object> {
     return s.toString();
   }
 
+  /// A regexp is encoded as `/pattern/flags`, not as a JSON value.
+  @override
   String get encodeValue {
     var value = this.value;
     var body = value is String ? encodePatternLiteral(value) : value.toString();
