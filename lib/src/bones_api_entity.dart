@@ -2095,6 +2095,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     equals = equalsValuesTime(value1, value2);
     if (equals != null) return equals;
 
+    equals = equalsValuesDynamicNumber(value1, value2);
+    if (equals != null) return equals;
+
     equals = equalsValuesPrimitive(value1, value2);
     if (equals != null) return equals;
 
@@ -2238,6 +2241,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     equals = equalsValuesTime(value1, value2);
     if (equals != null) return equals;
 
+    equals = equalsValuesDynamicNumber(value1, value2);
+    if (equals != null) return equals;
+
     equals = equalsValuesPrimitive(value1, value2);
     if (equals != null) return equals;
 
@@ -2378,6 +2384,24 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     }
 
     return null;
+  }
+
+  /// A [DynamicNumber] (a [Decimal] field) compared with a number, another
+  /// [DynamicNumber] or a numeric [String]: by value (as SQL compares a
+  /// `DECIMAL` column), `Decimal('1.5') == 1.5`.
+  static bool? equalsValuesDynamicNumber(Object value1, Object value2) {
+    if (value1 is! DynamicNumber && value2 is! DynamicNumber) return null;
+
+    bool isNumeric(Object v) =>
+        v is DynamicNumber ||
+        v is num ||
+        (v is String && Decimal.from(v.trim()) != null);
+
+    if (!isNumeric(value1) || !isNumeric(value2)) return null;
+
+    return valueToDynamicNumber(value1)
+            .compareTo(valueToDynamicNumber(value2)) ==
+        0;
   }
 
   static bool? equalsValuesPrimitive(Object value1, Object value2) {
@@ -3874,9 +3898,9 @@ abstract class EntitySource<O extends Object> extends EntityAccessor<O> {
   ///   [OrderDirection.ascending] by default.
   ///   **Ignored while the ordering is not active** (see [orderByID]).
   ///
-  /// Note that a query over a to-many relationship generates a `JOIN` without
-  /// a `DISTINCT`, so it can return the same entity more than once. Paginating
-  /// such a query is best-effort.
+  /// A query over a to-many relationship returns (and counts, and paginates)
+  /// each entity once: with a SQL database, its `JOIN`s are in a subquery of
+  /// the matching IDs.
   /// {@endtemplate}
   FutureOr<O?> selectFirstByQuery(
     String query, {

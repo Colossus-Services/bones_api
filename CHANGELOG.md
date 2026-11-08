@@ -1,15 +1,38 @@
-## 1.32.2
+## 1.33.0
 
-- Tests: the condition operators, compared on every DB adapter (memory,
-  SQLite, PostgreSQL, MySQL), each case also through `!(...)` (its
-  complement): `==`, `!=`, `=~`, `!~`, `>`, `>=`, `<`, `<=`, `!`, `&&`,
-  `||` and groups, with a literal value, a list, `null`, `[null]`, a list
-  with a `null`, an empty list (`[]`), a regexp (`/.../`, `/.../i`), and the
-  parameters `?`, `?:name`, `/?/` and `/?:name/` (also `null` and an empty
-  list). Over a text field, a nullable number, a nullable to-one
-  relationship (by its ID, a field of it, and `owner.address.city`, 2
-  relationships away) and a to-many one (`roles`, also a user without any).
-  No library change.
+The condition operators give the same results on every DB adapter (memory,
+SQLite, PostgreSQL, MySQL). Behavior changes:
+
+- SQL: a query through a to-many relationship returns each entity once (it
+  returned one per matching related row): its `JOIN`s are in a subquery,
+  `id IN ( SELECT id ... JOIN ... WHERE cond )`. So `countByQuery`, `limit`
+  and pagination also count each entity once. (MySQL: a derived table.)
+- SQL: a comparison with `null` through a relationship (`owner.level ==
+  null`, `=~ null`, `=~ [x, null]`, a `null` parameter) uses an outer join:
+  a missing related entity (a `null` owner, or no rows of a to-many
+  relationship) is a `null` field, so it matches, as in memory, and as `!=`
+  and `!~` already did (since 1.32.0). It was an inner join: `== null`
+  missed it while `!= x` matched it.
+- Memory: a to-many relationship without related entities is compared as
+  one row of `null`s (as a SQL outer join): `roles.type == null` and
+  `roles.type =~ [null]` match it, and `roles.type != null` and `!~ [null]`
+  don't (they did). `!= "admin"` and `!~ ["admin"]` still match it.
+- Memory: a `Decimal` field compares by value: `value == 1.5`,
+  `value =~ [1.5, 3]` and `value == ?` with a `Decimal` matched nothing (an
+  entity's map keeps it as a `String`; `EntityHandler.equalsValues*` now
+  compare a `DynamicNumber` with a number or a numeric `String` by value).
+
+- Tests: 'Operators: the same results on every adapter', on all the DB
+  adapters: ~230 conditions, each also checked through `!(...)` (its
+  complement), as a sorted list (an entity selected twice fails), and
+  `x == null` / `x != null` checked to split the entities. `==`, `!=`,
+  `=~`, `!~`, `>`, `>=`, `<`, `<=`, `!`, `&&`, `||` and groups; a literal, a
+  single value, a list, `null`, `[null]`, a list with a `null`, `[]`, a
+  regexp (`/.../`, `/.../i`), and the parameters `?`, `?:name`, `/?/` and
+  `/?:name/` (also `null` and `[]`). Over text, a nullable number, a date,
+  an enum, a bool, a nullable decimal, a nullable to-one relationship (by
+  its ID, a field of it, `owner.address.city` 2 relationships away), and a
+  to-many one (`roles`, also a user without any); and `countByQuery`.
 
 ## 1.32.1
 

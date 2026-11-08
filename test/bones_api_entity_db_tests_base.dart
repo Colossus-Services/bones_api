@@ -4756,8 +4756,8 @@ Future<bool> runAdapterTests(
           unorderedEquals(userIDs),
         );
         expect(
-          // (Only one row of a user's roles matches: the SQL adapters return
-          // a user once per matching row of a list relationship.)
+          // (Each user once, also with more than one matching role: see
+          // 'Operators: the same results on every adapter'.)
           await selectUsers('roles.type !~ /^(admin|guest)\$/'),
           equals([userIDs[1]]),
         );
@@ -5075,8 +5075,9 @@ Future<bool> runAdapterTests(
         final userRepo = entityRepositoryProvider.userAPIRepository;
         final storeRepo = entityRepositoryProvider.storeAPIRepository;
 
-        // Users: `level` (a nullable int), `address.city`, and `roles` (a
-        // to-many relationship, `uC` without any).
+        // Users: `level` (a nullable int), `creationTime` (a date),
+        // `address.city`, and `roles` (a to-many relationship, `uC` without
+        // any; an enum, a bool and a nullable decimal).
         var alpha = Address('OX', 'OX Alpha', 'OX Street', 1);
         var beta = Address('OX', 'OX Beta', 'OX Street', 2);
 
@@ -5084,21 +5085,21 @@ Future<bool> runAdapterTests(
           'ox-a@$testDomain',
           'p',
           alpha,
-          [Role(RoleType.admin)],
+          [Role(RoleType.admin, value: Decimal.parse('1.5'))],
           level: 10,
           creationTime: DateTime.utc(2020),
         );
         var uB = User('ox-b@$testDomain', 'p', beta, [
           Role(RoleType.guest, enabled: false),
-          Role(RoleType.unknown),
-        ], creationTime: DateTime.utc(2020));
+          Role(RoleType.unknown, value: Decimal.parse('3')),
+        ], creationTime: DateTime.utc(2021));
         var uC = User(
           'ox-c@$testDomain',
           'p',
           alpha,
           [],
           level: 5,
-          creationTime: DateTime.utc(2020),
+          creationTime: DateTime.utc(2022),
         );
 
         var userNames = <Object, String>{};
@@ -5124,28 +5125,29 @@ Future<bool> runAdapterTests(
         }
         var allStores = storeNames.values.toSet();
 
-        Future<Set<String>> selectStores(
+        // The names of the selected entities, sorted: a list, not a set, so
+        // an entity selected more than once (a to-many relationship's join)
+        // is a failure too.
+        Future<List<String>> selectStores(
           String query,
           Object? parameters,
         ) async => (await storeRepo.selectByQuery(
           query,
           parameters: parameters,
-        )).map((e) => storeNames[e.id]).nonNulls.toSet();
+        )).map((e) => storeNames[e.id]).nonNulls.toList()..sort();
 
-        Future<Set<String>> selectUsers(
+        Future<List<String>> selectUsers(
           String query,
           Object? parameters,
         ) async => (await userRepo.selectByQuery(
           query,
           parameters: parameters,
-        )).map((e) => userNames[e.id]).nonNulls.toSet();
+        )).map((e) => userNames[e.id]).nonNulls.toList()..sort();
 
         var failures = <String>[];
 
-        String show(Set<String> s) => (s.toList()..sort()).join(',');
-
         Future<void> check(
-          Future<Set<String>> Function(String, Object?) select,
+          Future<List<String>> Function(String, Object?) select,
           Set<String> all,
           String query,
           Object? parameters,
@@ -5157,15 +5159,43 @@ Future<bool> runAdapterTests(
             (query, expected),
             ('!($query)', all.difference(expected)),
           ]) {
+            var expList = exp.toList()..sort();
             try {
               var got = await select(q, parameters);
-              if (got.length != exp.length || !got.containsAll(exp)) {
-                failures.add('`$q`$p: {${show(got)}}, expected {${show(exp)}}');
+              if (got.join(',') != expList.join(',')) {
+                failures.add('`$q`$p: [${got.join(',')}], expected [$expList]');
               }
             } catch (e) {
               failures.add('`$q`$p: ERROR $e');
             }
           }
+        }
+
+        // `x == null` and `x != null` split the entities (none in both, none
+        // in neither), as `cond` and `!(cond)`.
+        Future<void> nullSplit(
+          Future<List<String>> Function(String, Object?) select,
+          Set<String> all,
+          String key,
+          Set<String> isNull,
+        ) async {
+          await check(select, all, '$key == null', null, isNull);
+          await check(
+            select,
+            all,
+            '$key != null',
+            null,
+            all.difference(isNull),
+          );
+          await check(select, all, '$key == ?', [null], isNull);
+          await check(select, all, '$key =~ [null]', null, isNull);
+          await check(
+            select,
+            all,
+            '$key !~ [null]',
+            null,
+            all.difference(isNull),
+          );
         }
 
         Future<void> s(String q, Set<String> exp, [Object? params]) =>
@@ -5338,16 +5368,22 @@ Future<bool> runAdapterTests(
         await s('owner.email =~ /?:r/', {'s3', 's5'}, {'r': '^ox-b@'});
         await s('owner.email =~ ?', {}, [<String>[]]);
         await s('owner.email !~ ?', allStores, [<String>[]]);
-        await s('owner.email == ?', {'s4'}, [ec]);
+        await s('owner.email !~ ?:e', {'s2', 's3', 's4', 's5'}, {'e': ea});
+        await s('owner.email =~ ?', {'s1'}, [ea]);
+        // A missing owner (`s2`) is a `null` field: `== null` matches it (as
+        // `!=` does):
+        await nullSplit(selectStores, allStores, 'owner.email', {'s2'});
+        await s('owner.email =~ null', {'s2'});
         await s(
           'owner.email =~ ?',
-          {'s3', 's5'},
+          {'s1', 's2'},
           [
-            [eb],
+            [ea, null],
           ],
         );
 
-        // A nullable field of a to-one relationship (`uB` has no level):
+        // A nullable field of a to-one relationship (`uB` has no level, `s2`
+        // no owner):
         await s('owner.level == 10', {'s1'});
         await s('owner.level != 10', {'s2', 's3', 's4', 's5'});
         await s('owner.level =~ [5, 10]', {'s1', 's4'});
@@ -5358,6 +5394,17 @@ Future<bool> runAdapterTests(
         await s('owner.level !~ ?', allStores, [<int>[]]);
         await s('owner.level =~ /^1/', {'s1'});
         await s('owner.level !~ /^1/', {'s2', 's3', 's4', 's5'});
+        await s(r'owner.level =~ /?:r/', {'s4'}, {'r': r'^5$'});
+        await nullSplit(selectStores, allStores, 'owner.level', {
+          's2',
+          's3',
+          's5',
+        });
+        await s('owner.level =~ null', {'s2', 's3', 's5'});
+        await s('owner.level =~ [5, null]', {'s2', 's3', 's4', 's5'});
+        await s('owner.level !~ [5, null]', {'s1'});
+        await s('owner.level == ?:l', {'s2', 's3', 's5'}, {'l': null});
+        await s('owner.level != ?:l', {'s1', 's4'}, {'l': null});
 
         // A field 2 relationships away (`owner.address.city`):
         await s('owner.address.city == "OX Alpha"', {'s1', 's4'});
@@ -5381,6 +5428,27 @@ Future<bool> runAdapterTests(
         await s('owner.address.city =~ ?', {}, [<String>[]]);
         await s('owner.address.city !~ ?', allStores, [<String>[]]);
         await s('owner.address.state == "OX"', {'s1', 's3', 's4', 's5'});
+        await s(
+          'owner.address.city !~ /?:r/i',
+          {'s2', 's3', 's5'},
+          {'r': 'alpha'},
+        );
+        await s('owner.address.city =~ /?/', {'s3', 's5'}, ['Beta\$']);
+        await nullSplit(selectStores, allStores, 'owner.address.city', {'s2'});
+        await s('owner.address.city =~ null', {'s2'});
+
+        // Each entity's own `null`s:
+        await nullSplit(selectStores, allStores, 'name', {});
+        await nullSplit(selectStores, allStores, 'number', {'s2'});
+        await nullSplit(selectStores, allStores, 'owner', {'s2'});
+
+        // A single value (not a list) with `=~`/`!~`:
+        await s('name =~ "ox-apple"', {'s1'});
+        await s('name =~ ?', {'s1'}, ['ox-apple']);
+        await s('name !~ ?:n', {'s2', 's3', 's4', 's5'}, {'n': 'ox-apple'});
+        await s('number =~ 3', {'s3'});
+        await s('number =~ ?', {'s3'}, [3]);
+        await s('number !~ 3', {'s1', 's2', 's4', 's5'});
 
         // `!`, and groups:
         await s('!name == "ox-apple"', {'s2', 's3', 's4', 's5'});
@@ -5422,9 +5490,12 @@ Future<bool> runAdapterTests(
           },
         );
 
-        // The users: a to-many relationship (`roles`, `uC` without any),
-        // compared row by row (as a SQL join): `!=` / `!~` are "some role
-        // is not", and `!(...)` is "no role is".
+        // The users: a to-many relationship (`roles`), compared row by row
+        // (as a SQL outer join): `==`/`=~` are "some role is", `!=`/`!~`
+        // "some role is not", and `!(...)` "no role is". A user without any
+        // (`uC`) is one row of `null`s: `roles.type == null` and
+        // `roles.type != "admin"` match it, `roles.type != null` doesn't.
+        // Each user is selected once (not once per matching role).
         await u('roles.type == "admin"', {'a'});
         await u('roles.type != "admin"', {'b', 'c'});
         await u('roles.type =~ ["guest", "unknown"]', {'b'});
@@ -5458,7 +5529,63 @@ Future<bool> runAdapterTests(
             [uB.roles.first.id],
           ],
         );
+        await nullSplit(selectUsers, allUsers, 'roles.type', {'c'});
+        await u('roles.type =~ null', {'c'});
+        await u('roles.type =~ ["admin", null]', {'a', 'c'});
+        await u('roles.type !~ ["admin", null]', {'b'});
+        await u(
+          'roles.type !~ ?:t',
+          {'b', 'c'},
+          {
+            't': ['admin'],
+          },
+        );
+        await u('roles.type =~ /?:r/', {'a'}, {'r': '^adm'});
+        await u('roles.type !~ /?:r/i', {'b', 'c'}, {'r': '^ADM'});
+        // An enum parameter:
+        await u('roles.type == ?', {'a'}, [RoleType.admin]);
+        await u(
+          'roles.type =~ ?',
+          {'a', 'b'},
+          [
+            [RoleType.admin, RoleType.guest],
+          ],
+        );
+        await u('roles.type != ?:t', {'b', 'c'}, {'t': RoleType.admin});
+        // A bool:
+        await u('roles.enabled =~ [false]', {'b'});
+        await u('roles.enabled != true', {'b', 'c'});
+        await nullSplit(selectUsers, allUsers, 'roles.enabled', {'c'});
+        // A nullable decimal (`uB`'s guest and `uC` are `null`):
+        await u('roles.value == 1.5', {'a'});
+        await u('roles.value > 1', {'a', 'b'});
+        await u('roles.value >= 3', {'b'});
+        await u('roles.value < 2', {'a'});
+        await u('roles.value != 3', {'a', 'b', 'c'});
+        await u('roles.value =~ [1.5, 3]', {'a', 'b'});
+        // (Not split by `null`: `uB` has a role with and one without.)
+        await u('roles.value == null', {'b', 'c'});
+        await u('roles.value != null', {'a', 'b'});
+        await u('roles.value =~ [null]', {'b', 'c'});
+        await u('roles.value =~ [3, null]', {'b', 'c'});
+        await u('roles.value !~ [3, null]', {'a'});
+        await u('roles.value == ?', {'b'}, [Decimal.parse('3')]);
+
+        // A date:
+        await u('creationTime == ?', {'b'}, [DateTime.utc(2021)]);
+        await u('creationTime != ?', {'a', 'c'}, [DateTime.utc(2021)]);
+        await u('creationTime > ?', {'b', 'c'}, [DateTime.utc(2020)]);
+        await u('creationTime <= ?:t', {'a', 'b'}, {'t': DateTime.utc(2021)});
+        await u(
+          'creationTime =~ ?',
+          {'a', 'c'},
+          [
+            [DateTime.utc(2020), DateTime.utc(2022)],
+          ],
+        );
+
         // The user's own fields:
+        await nullSplit(selectUsers, allUsers, 'level', {'b'});
         await u('level == null', {'b'});
         await u('level =~ null', {'b'});
         await u('level !~ null', {'a', 'c'});
@@ -5482,6 +5609,17 @@ Future<bool> runAdapterTests(
         await u('email !~ /^ox-a@/', {'b', 'c'});
         await u('email =~ /^ox-/ && roles.type =~ /^gu/', {'b'});
         await u('level == 10 || !(roles.type == "admin")', {'a', 'b', 'c'});
+        await u('level == 5 || roles.type == "guest"', {'b', 'c'});
+
+        // Counted once each, as selected (a to-many relationship's join):
+        for (var (q, n) in [
+          ('roles.type != "admin"', 2),
+          ('roles.type =~ ["guest", "unknown"]', 1),
+          ('roles.enabled == true', 2),
+        ]) {
+          var count = await userRepo.countByQuery('email =~ /^ox-/ && ($q)');
+          if (count != n) failures.add('count `$q`: $count, expected $n');
+        }
 
         expect(failures, isEmpty, reason: failures.join('\n'));
       });

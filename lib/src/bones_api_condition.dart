@@ -1,4 +1,5 @@
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart' show Decimal, DynamicNumber;
 
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
@@ -1496,6 +1497,29 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   @override
   bool get isInner => !isNegated && super.isInner;
 
+  /// A to-many relationship without related entities (an empty [keyValue])
+  /// is compared as a `null` (as the `NULL` row of a SQL outer join), unless
+  /// [value] (or its parameter's) is a list.
+  Object? _noRowsAsNull(
+    Object? keyValue,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    if (keyValue is! Iterable || keyValue.isNotEmpty) return keyValue;
+
+    Object? v = value;
+    if (v is ConditionParameter) {
+      v = v.getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
+    }
+
+    return v is Iterable ? keyValue : null;
+  }
+
   @override
   void resolve({
     Condition? parent,
@@ -1661,7 +1685,24 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       }
     }
 
-    return KeyConditionValue(value, valueType, valueEntityHandler);
+    return KeyConditionValue(
+      _parseDecimalValue(value, valueType),
+      valueType,
+      valueEntityHandler,
+    );
+  }
+
+  /// A [Decimal] field is kept as a `String` in an entity's `Map` (as in
+  /// memory): parsed (also each of a to-many relationship's), so it's
+  /// compared as a number (as SQL compares a `DECIMAL` column).
+  static Object _parseDecimalValue(Object value, TypeInfo? valueType) {
+    var type = valueType?.type;
+    if (type != Decimal && type != DynamicNumber) return value;
+
+    Object? parse(Object? v) => v is String ? (Decimal.from(v.trim()) ?? v) : v;
+
+    if (value is List) return value.map(parse).toList();
+    return parse(value)!;
   }
 
   EntityHandler? _resolveValueEntityHandler(
@@ -1755,7 +1796,12 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
     return equalsConditionValue(
-      keyValue,
+      _noRowsAsNull(
+        keyValue,
+        parameters,
+        positionalParameters,
+        namedParameters,
+      ),
       value,
       parameters: parameters,
       positionalParameters: positionalParameters,
@@ -1774,7 +1820,12 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
     return equalsConditionValue(
-      keyValue?.value,
+      _noRowsAsNull(
+        keyValue?.value,
+        parameters,
+        positionalParameters,
+        namedParameters,
+      ),
       value,
       parameters: parameters,
       positionalParameters: positionalParameters,
@@ -1843,7 +1894,8 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   }
 
   /// The values of a to-many relationship are compared one by one (as a SQL
-  /// join of its rows): any of them not equal, or none (a `NULL` row).
+  /// join of its rows): any of them not equal; without any, as a `NULL` row
+  /// (not equal to a value, but not `!= null`).
   bool _notEquals(
     Object? keyValue,
     KeyConditionValue? keyConditionValue,
@@ -1862,7 +1914,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     );
 
     if (keyValue is Iterable && value is! Iterable) {
-      return keyValue.isEmpty || keyValue.any(notEquals);
+      return keyValue.isEmpty ? notEquals(null) : keyValue.any(notEquals);
     }
 
     return notEquals(keyValue);
@@ -2163,9 +2215,10 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     );
   }
 
-  /// With [not] (`NOT IN`), the values of a to-many relationship are
-  /// compared one by one (as a SQL join of its rows): any of them not in, or
-  /// none (a `NULL` row).
+  /// The values of a to-many relationship are compared one by one (as a SQL
+  /// join of its rows), with [not] (`NOT IN`): any of them not in. Without
+  /// any, as a `NULL` row (in a list with a `null`; also `NOT IN` a list
+  /// without one).
   bool _matchesIn(
     Object? keyValue,
     Object? parameters,
@@ -2182,8 +2235,12 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
       entityHandler: entityHandler,
     );
 
+    if (keyValue is Iterable && keyValue.isEmpty) {
+      return inValues(null) != not;
+    }
+
     if (not && keyValue is Iterable) {
-      return keyValue.isEmpty || keyValue.any((v) => !inValues(v));
+      return keyValue.any((v) => !inValues(v));
     }
 
     return inValues(keyValue) != not;

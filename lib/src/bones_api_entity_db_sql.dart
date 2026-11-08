@@ -3398,9 +3398,23 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return retEncodedSQL.resolveMapped((encodedSQL) {
       var conditionSQL = encodedSQL.outputString;
 
-      var from = _fromSQL(table, encodedSQL);
-      if (conditionSQL.isNotEmpty) {
-        from = '$from WHERE $conditionSQL';
+      String from;
+      if (encodedSQL.relationshipTables.isNotEmpty &&
+          conditionSQL.trim().isNotEmpty) {
+        // A to-many relationship's `JOIN` repeats an entity for each matching
+        // related row: the matching IDs, in a subquery, select each entity
+        // once (as in memory; also counted and paginated once).
+        conditionSQL = _relationshipsSubqueryConditionSQL(
+          table,
+          encodedSQL,
+          conditionSQL,
+        );
+        from = '${_fromSQLMainTable(table, encodedSQL)} WHERE $conditionSQL';
+      } else {
+        from = _fromSQL(table, encodedSQL);
+        if (conditionSQL.isNotEmpty) {
+          from = '$from WHERE $conditionSQL';
+        }
       }
 
       var sqlQuery = sqlBuilder(from, encodedSQL);
@@ -3424,21 +3438,60 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
-  /// The `FROM` clause (without the `WHERE`) of an [encodedSQL] condition
-  /// of [table]: the table and the `JOIN`s of its referenced tables and
-  /// relationships. Also used for the subqueries of [ConditionNOT].
-  String _fromSQL(String table, EncodingContext encodedSQL) {
+  /// `alias.id IN ( SELECT alias.id FROM ... JOIN ... WHERE cond )`: the
+  /// [conditionSQL] of [table] through a to-many relationship, as the IDs of
+  /// its entities (each once). With [SQLDialect.subqueryAsDerivedTable] (a
+  /// MySQL `DELETE` can't select from its own table), in a derived table.
+  String _relationshipsSubqueryConditionSQL(
+    String table,
+    EncodingContext encodedSQL,
+    String conditionSQL,
+  ) {
+    var q = dialect.elementQuote;
     var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
       encodedSQL,
       table,
     );
+    var idField = encodedSQL.tableFieldID ?? 'id';
 
+    var subquery =
+        'SELECT $q$tableAlias$q.$q$idField$q ${_fromSQL(table, encodedSQL)} '
+        'WHERE $conditionSQL';
+
+    if (dialect.subqueryAsDerivedTable) {
+      subquery =
+          'SELECT ${q}rel_ids$q.$q$idField$q FROM ( $subquery ) '
+          'as ${q}rel_ids$q';
+    }
+
+    return '$q$tableAlias$q.$q$idField$q IN ( $subquery )';
+  }
+
+  /// `FROM table as alias`: only the main [table] (see [_fromSQL]).
+  String _fromSQLMainTable(String table, EncodingContext encodedSQL) {
+    var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
+      encodedSQL,
+      table,
+    );
     var q = dialect.elementQuote;
+    return 'FROM $q$table$q as $q$tableAlias$q';
+  }
 
+  /// The `FROM` clause (without the `WHERE`) of an [encodedSQL] condition
+  /// of [table]: the table and the `JOIN`s of its referenced tables and
+  /// relationships. Also used for the subqueries of [ConditionNOT].
+  String _fromSQL(String table, EncodingContext encodedSQL) {
     if (encodedSQL.fieldsReferencedTables.isEmpty &&
         encodedSQL.relationshipTables.isEmpty) {
-      return 'FROM $q$table$q as $q$tableAlias$q';
+      return _fromSQLMainTable(table, encodedSQL);
     } else {
+      var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
+        encodedSQL,
+        table,
+      );
+
+      var q = dialect.elementQuote;
+
       var joins = <_JoinEntry>[];
 
       for (var e in encodedSQL.referencedTablesFields.entries) {
