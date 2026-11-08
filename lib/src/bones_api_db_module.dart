@@ -1,3 +1,4 @@
+import 'dart:convert' show HtmlEscape, HtmlEscapeMode;
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -591,29 +592,36 @@ class APIDBModule extends APIModule {
 
           content.add('<td style="text-align: center">');
 
+          // A related entity's ID (also a `String` one) is escaped as any
+          // value, in the link and its text:
+          String idLink(Object? id) =>
+              '<a href="${basePath}update/$repoName/${_escapeHTMLAttribute(id)}">'
+              '${_escapeHTML(id)}</a>';
+
           if (v2 is List) {
-            var ids = v2
-                .map((e) => '<a href="${basePath}update/$repoName/$e">$e</a>')
-                .join(' , ');
-            content.add(ids);
+            content.add(v2.map(idLink).join(' , '));
           } else {
-            content.add('<a href="${basePath}update/$repoName/$v2">$v2</a>');
+            content.add(idLink(v2));
           }
 
           content.add('</td>');
         } else {
-          content.add('<td style="text-align: center">$v2</td>');
+          content.add('<td style="text-align: center">${_escapeHTML(v2)}</td>');
         }
       }
 
       var id = entityHandler.getID(o);
 
       if (id != null) {
+        var idAttr = _escapeHTMLAttribute(id);
+
         content.add('<td style="text-align: center"> &nbsp; [ ');
 
-        content.add('<a href="../update/$repoName/$id">edit</a>');
+        content.add('<a href="../update/$repoName/$idAttr">edit</a>');
 
-        content.add(' &nbsp;|&nbsp; <a href="../delete/$repoName/$id">del</a>');
+        content.add(
+          ' &nbsp;|&nbsp; <a href="../delete/$repoName/$idAttr">del</a>',
+        );
 
         content.add(' ] &nbsp;</td>');
       }
@@ -630,6 +638,19 @@ class APIDBModule extends APIModule {
 
     return content;
   }
+
+  /// [value] (its `toString`) escaped as HTML text (`&`, `<`, `>`): an
+  /// entity's value (e.g. a name with `<`) would otherwise be read as HTML
+  /// (and could inject markup or scripts in the page). Used by
+  /// [_buildSelectTableHTML].
+  static String _escapeHTML(Object? value) =>
+      const HtmlEscape(HtmlEscapeMode.element).convert('$value');
+
+  /// [value] (its `toString`) escaped for an HTML attribute value between
+  /// `"` (as [_escapeHTML], also `"`): an entity's ID in a link. Used by
+  /// [_buildSelectTableHTML].
+  static String _escapeHTMLAttribute(Object? value) =>
+      const HtmlEscape(HtmlEscapeMode.attribute).convert('$value');
 
   /// The HTML of the pagination of a select of [repoName] (when it has a
   /// [limit]): the range of the selected entities ([list]) and the links to

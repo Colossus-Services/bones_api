@@ -247,6 +247,36 @@ void main() {
       expect({...stores, ...closedStores}, equals({1, 2, 3}));
     });
 
+    test('select (HTML) escapes the entities values', () async {
+      var repository = provider.getEntityRepository<UserInfo>()!;
+
+      var info = UserInfo('<script>alert("x")</script> & <b>bold</b>');
+      var id = await repository.store(info);
+
+      try {
+        var tables = (await get('/db/tables/json')).payload as Map;
+        var table = tables['UserInfo'] as String;
+
+        var response = await get('/db/select/$table');
+        expect(response.isOK, isTrue);
+
+        var html = response.payload as String;
+        expect(html, isNot(contains('<script>')));
+        expect(html, isNot(contains('<b>bold</b>')));
+        expect(
+          html,
+          contains(
+            '&lt;script&gt;alert("x")&lt;/script&gt; &amp; '
+            '&lt;b&gt;bold&lt;/b&gt;',
+          ),
+        );
+        // An ID is not changed by the escaping:
+        expect(html, contains('<a href="../update/$table/$id">edit</a>'));
+      } finally {
+        await repository.deleteByID(id);
+      }
+    });
+
     test('select: unknown table', () async {
       var response = await get('/db/select/nope');
       expect(response.isError, isTrue);
