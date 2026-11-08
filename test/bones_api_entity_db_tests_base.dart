@@ -5071,6 +5071,421 @@ Future<bool> runAdapterTests(
         expect((await storeRepo.selectByID(d2ID))?.id, equals(d2ID));
       });
 
+      test('Operators: the same results on every adapter', () async {
+        final userRepo = entityRepositoryProvider.userAPIRepository;
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        // Users: `level` (a nullable int), `address.city`, and `roles` (a
+        // to-many relationship, `uC` without any).
+        var alpha = Address('OX', 'OX Alpha', 'OX Street', 1);
+        var beta = Address('OX', 'OX Beta', 'OX Street', 2);
+
+        var uA = User(
+          'ox-a@$testDomain',
+          'p',
+          alpha,
+          [Role(RoleType.admin)],
+          level: 10,
+          creationTime: DateTime.utc(2020),
+        );
+        var uB = User('ox-b@$testDomain', 'p', beta, [
+          Role(RoleType.guest, enabled: false),
+          Role(RoleType.unknown),
+        ], creationTime: DateTime.utc(2020));
+        var uC = User(
+          'ox-c@$testDomain',
+          'p',
+          alpha,
+          [],
+          level: 5,
+          creationTime: DateTime.utc(2020),
+        );
+
+        var userNames = <Object, String>{};
+        for (var (u, n) in [(uA, 'a'), (uB, 'b'), (uC, 'c')]) {
+          userNames[(await userRepo.store(u))!] = n;
+        }
+        var allUsers = userNames.values.toSet();
+        var (ea, eb, ec) = (uA.email, uB.email, uC.email);
+
+        // Stores: `name` (text), `number` (a nullable int) and `owner` (a
+        // nullable to-one relationship, with `owner.address.city` 2 levels
+        // away).
+        var stores = [
+          (Store('ox-apple', 1, owner: uA), 's1'),
+          (Store('ox-banana', null), 's2'),
+          (Store('ox-cherry', 3, owner: uB), 's3'),
+          (Store('OX-Date', 30, owner: uC), 's4'),
+          (Store('ox-elder', 1, owner: uB), 's5'),
+        ];
+        var storeNames = <Object, String>{};
+        for (var (s, n) in stores) {
+          storeNames[(await storeRepo.store(s))!] = n;
+        }
+        var allStores = storeNames.values.toSet();
+
+        Future<Set<String>> selectStores(
+          String query,
+          Object? parameters,
+        ) async => (await storeRepo.selectByQuery(
+          query,
+          parameters: parameters,
+        )).map((e) => storeNames[e.id]).nonNulls.toSet();
+
+        Future<Set<String>> selectUsers(
+          String query,
+          Object? parameters,
+        ) async => (await userRepo.selectByQuery(
+          query,
+          parameters: parameters,
+        )).map((e) => userNames[e.id]).nonNulls.toSet();
+
+        var failures = <String>[];
+
+        String show(Set<String> s) => (s.toList()..sort()).join(',');
+
+        Future<void> check(
+          Future<Set<String>> Function(String, Object?) select,
+          Set<String> all,
+          String query,
+          Object? parameters,
+          Set<String> expected,
+        ) async {
+          var p = parameters == null ? '' : '  $parameters';
+          // The condition, and `!(...)` its complement:
+          for (var (q, exp) in [
+            (query, expected),
+            ('!($query)', all.difference(expected)),
+          ]) {
+            try {
+              var got = await select(q, parameters);
+              if (got.length != exp.length || !got.containsAll(exp)) {
+                failures.add('`$q`$p: {${show(got)}}, expected {${show(exp)}}');
+              }
+            } catch (e) {
+              failures.add('`$q`$p: ERROR $e');
+            }
+          }
+        }
+
+        Future<void> s(String q, Set<String> exp, [Object? params]) =>
+            check(selectStores, allStores, q, params, exp);
+
+        Future<void> u(String q, Set<String> exp, [Object? params]) =>
+            check(selectUsers, allUsers, q, params, exp);
+
+        // A text field, never `null`:
+        await s('name == "ox-apple"', {'s1'});
+        await s('name != "ox-apple"', {'s2', 's3', 's4', 's5'});
+        await s('name =~ ["ox-apple", "ox-cherry"]', {'s1', 's3'});
+        await s('name !~ ["ox-apple", "ox-cherry"]', {'s2', 's4', 's5'});
+        await s('name =~ /^ox-[ab]/', {'s1', 's2'});
+        await s('name !~ /^ox-[ab]/', {'s3', 's4', 's5'});
+        await s('name =~ /^ox-d/', {});
+        await s('name =~ /^ox-d/i', {'s4'});
+        await s('name !~ /^ox-d/i', {'s1', 's2', 's3', 's5'});
+        await s('name =~ /e/', {'s1', 's3', 's4', 's5'});
+        await s('name == null', {});
+        await s('name != null', allStores);
+        await s('name =~ null', {});
+        await s('name !~ null', allStores);
+        await s('name =~ []', {});
+        await s('name !~ []', allStores);
+        await s('name == ?', {'s3'}, ['ox-cherry']);
+        await s('name != ?:n', {'s1', 's2', 's4', 's5'}, {'n': 'ox-cherry'});
+        await s(
+          'name =~ ?',
+          {'s2', 's4'},
+          [
+            ['ox-banana', 'OX-Date'],
+          ],
+        );
+        await s(
+          'name !~ ?',
+          {'s1', 's3', 's5'},
+          [
+            ['ox-banana', 'OX-Date'],
+          ],
+        );
+        await s(
+          'name =~ ?:n',
+          {'s2', 's4'},
+          {
+            'n': ['ox-banana', 'OX-Date'],
+          },
+        );
+        await s(
+          'name !~ ?:n',
+          {'s1', 's3', 's5'},
+          {
+            'n': ['ox-banana', 'OX-Date'],
+          },
+        );
+        await s('name =~ ?', {}, [<String>[]]);
+        await s('name !~ ?:n', allStores, {'n': <String>[]});
+        await s('name =~ ?', {}, [null]);
+        await s('name !~ ?', allStores, [null]);
+        await s('name =~ /?/', {'s3'}, ['^ox-c']);
+        await s('name !~ /?:r/i', {'s4', 's5'}, {'r': '^ox-[a-c]'});
+
+        // A nullable number (`s2` is `null`):
+        await s('number == 1', {'s1', 's5'});
+        await s('number != 1', {'s2', 's3', 's4'});
+        await s('number == null', {'s2'});
+        await s('number != null', {'s1', 's3', 's4', 's5'});
+        await s('number =~ [1, 3]', {'s1', 's3', 's5'});
+        await s('number !~ [1, 3]', {'s2', 's4'});
+        await s('number =~ null', {'s2'});
+        await s('number !~ null', {'s1', 's3', 's4', 's5'});
+        await s('number =~ [null]', {'s2'});
+        await s('number !~ [null]', {'s1', 's3', 's4', 's5'});
+        await s('number =~ [3, null]', {'s2', 's3'});
+        await s('number !~ [3, null]', {'s1', 's4', 's5'});
+        await s('number =~ []', {});
+        await s('number !~ []', allStores);
+        await s('number =~ /^3/', {'s3', 's4'});
+        await s('number !~ /^3/', {'s1', 's2', 's5'});
+        await s(r'number =~ /0$/', {'s4'});
+        await s('number > 1', {'s3', 's4'});
+        await s('number >= 3', {'s3', 's4'});
+        await s('number < 3', {'s1', 's5'});
+        await s('number <= 1', {'s1', 's5'});
+        await s('number == ?', {'s3'}, [3]);
+        await s('number != ?:n', {'s1', 's2', 's4', 's5'}, {'n': 3});
+        await s('number == ?', {'s2'}, [null]);
+        await s('number != ?', {'s1', 's3', 's4', 's5'}, [null]);
+        await s(
+          'number =~ ?',
+          {'s1', 's4', 's5'},
+          [
+            [1, 30],
+          ],
+        );
+        await s(
+          'number !~ ?:n',
+          {'s2', 's3'},
+          {
+            'n': [1, 30],
+          },
+        );
+        await s('number =~ ?', {'s2'}, [null]);
+        await s('number !~ ?', {'s1', 's3', 's4', 's5'}, [null]);
+        await s(
+          'number =~ ?',
+          {'s2', 's3'},
+          [
+            [3, null],
+          ],
+        );
+        await s(
+          'number !~ ?',
+          {'s1', 's4', 's5'},
+          [
+            [3, null],
+          ],
+        );
+        await s('number =~ ?:n', {}, {'n': <int>[]});
+        await s('number !~ ?', allStores, [<int>[]]);
+        await s('number =~ /?/', {'s1', 's5'}, [r'^1$']);
+        await s('number !~ /?:r/', {'s2', 's3', 's4'}, {'r': r'^1$'});
+        await s('number > ? && number < ?', {'s3'}, [1, 30]);
+
+        // A to-one relationship, by its ID (`s2` has no owner):
+        var (ia, ib, ic) = (uA.id, uB.id, uC.id);
+        await s('owner == ?', {'s1'}, [ia]);
+        await s('owner != ?', {'s2', 's3', 's4', 's5'}, [ia]);
+        await s('owner == null', {'s2'});
+        await s('owner != null', {'s1', 's3', 's4', 's5'});
+        await s('owner =~ null', {'s2'});
+        await s('owner !~ null', {'s1', 's3', 's4', 's5'});
+        await s(
+          'owner =~ ?',
+          {'s1', 's4'},
+          [
+            [ia, ic],
+          ],
+        );
+        await s(
+          'owner !~ ?:o',
+          {'s2', 's3', 's5'},
+          {
+            'o': [ia, ic],
+          },
+        );
+        await s('owner =~ ?', {}, [<int>[]]);
+        await s('owner !~ ?:o', allStores, {'o': <int>[]});
+
+        // A field of a to-one relationship (a join):
+        await s('owner.email == ?', {'s1'}, [ea]);
+        await s('owner.email != ?', {'s2', 's3', 's4', 's5'}, [ea]);
+        await s(
+          'owner.email =~ ?',
+          {'s1', 's4'},
+          [
+            [ea, ec],
+          ],
+        );
+        await s(
+          'owner.email !~ ?:e',
+          {'s2', 's3', 's5'},
+          {
+            'e': [ea, ec],
+          },
+        );
+        await s('owner.email =~ /^ox-[ab]@/', {'s1', 's3', 's5'});
+        await s('owner.email !~ /^ox-[ab]@/', {'s2', 's4'});
+        await s('owner.email =~ /^OX-C@/i', {'s4'});
+        await s('owner.email =~ /?:r/', {'s3', 's5'}, {'r': '^ox-b@'});
+        await s('owner.email =~ ?', {}, [<String>[]]);
+        await s('owner.email !~ ?', allStores, [<String>[]]);
+        await s('owner.email == ?', {'s4'}, [ec]);
+        await s(
+          'owner.email =~ ?',
+          {'s3', 's5'},
+          [
+            [eb],
+          ],
+        );
+
+        // A nullable field of a to-one relationship (`uB` has no level):
+        await s('owner.level == 10', {'s1'});
+        await s('owner.level != 10', {'s2', 's3', 's4', 's5'});
+        await s('owner.level =~ [5, 10]', {'s1', 's4'});
+        await s('owner.level !~ [10]', {'s2', 's3', 's4', 's5'});
+        await s('owner.level > 1', {'s1', 's4'});
+        await s('owner.level < 10', {'s4'});
+        await s('owner.level =~ ?', {}, [<int>[]]);
+        await s('owner.level !~ ?', allStores, [<int>[]]);
+        await s('owner.level =~ /^1/', {'s1'});
+        await s('owner.level !~ /^1/', {'s2', 's3', 's4', 's5'});
+
+        // A field 2 relationships away (`owner.address.city`):
+        await s('owner.address.city == "OX Alpha"', {'s1', 's4'});
+        await s('owner.address.city != "OX Alpha"', {'s2', 's3', 's5'});
+        await s('owner.address.city =~ /beta/i', {'s3', 's5'});
+        await s('owner.address.city !~ /beta/i', {'s1', 's2', 's4'});
+        await s(
+          'owner.address.city =~ ?:c',
+          {'s3', 's5'},
+          {
+            'c': ['OX Beta'],
+          },
+        );
+        await s(
+          'owner.address.city !~ ?:c',
+          {'s1', 's2', 's4'},
+          {
+            'c': ['OX Beta'],
+          },
+        );
+        await s('owner.address.city =~ ?', {}, [<String>[]]);
+        await s('owner.address.city !~ ?', allStores, [<String>[]]);
+        await s('owner.address.state == "OX"', {'s1', 's3', 's4', 's5'});
+
+        // `!`, and groups:
+        await s('!name == "ox-apple"', {'s2', 's3', 's4', 's5'});
+        await s('!!(number == 1)', {'s1', 's5'});
+        await s('!(number == 1 || owner.level == 5)', {'s2', 's3'});
+        await s('!(number =~ [1, 3] && owner.email =~ /^ox-b@/)', {
+          's1',
+          's2',
+          's4',
+        });
+        await s('number == 1 && !(owner.email =~ /^ox-a@/)', {'s5'});
+        await s('number == null || owner.level == null', {'s2', 's3', 's5'});
+        await s('(number == 1 || number == 3) && owner.level != 10', {
+          's3',
+          's5',
+        });
+        await s(
+          '!(owner =~ ?)',
+          {'s1', 's2', 's4'},
+          [
+            [ib],
+          ],
+        );
+        await s(
+          // (`OX-Date` doesn't match the case-sensitive `^ox-`.)
+          'name =~ /?/ && !(number =~ ?)',
+          {'s1', 's2', 's5'},
+          [
+            '^ox-',
+            [3],
+          ],
+        );
+        await s(
+          'name =~ /?:r/i && number !~ ?:n',
+          {'s2', 's3', 's4'},
+          {
+            'r': '^ox-',
+            'n': [1],
+          },
+        );
+
+        // The users: a to-many relationship (`roles`, `uC` without any),
+        // compared row by row (as a SQL join): `!=` / `!~` are "some role
+        // is not", and `!(...)` is "no role is".
+        await u('roles.type == "admin"', {'a'});
+        await u('roles.type != "admin"', {'b', 'c'});
+        await u('roles.type =~ ["guest", "unknown"]', {'b'});
+        await u('roles.type !~ ["guest"]', {'a', 'b', 'c'});
+        await u('roles.type =~ /^(adm|unk)/', {'a', 'b'});
+        await u('roles.type !~ /^(adm|unk)/', {'b', 'c'});
+        await u('roles.type =~ ?:t', {}, {'t': <String>[]});
+        await u('roles.type !~ ?:t', allUsers, {'t': <String>[]});
+        await u(
+          'roles.type =~ ?',
+          {'a', 'b'},
+          [
+            ['admin', 'guest'],
+          ],
+        );
+        await u('roles.enabled == false', {'b'});
+        await u('roles.enabled == true', {'a', 'b'});
+        await u('!(roles.type =~ ["admin", "guest"])', {'c'});
+        await u(
+          'roles =~ ?',
+          {'a'},
+          [
+            [uA.roles.first.id],
+          ],
+        );
+        await u('roles =~ ?', {}, [<int>[]]);
+        await u(
+          '!(roles =~ ?)',
+          {'a', 'c'},
+          [
+            [uB.roles.first.id],
+          ],
+        );
+        // The user's own fields:
+        await u('level == null', {'b'});
+        await u('level =~ null', {'b'});
+        await u('level !~ null', {'a', 'c'});
+        await u('level !~ [10]', {'b', 'c'});
+        await u('level =~ [5, null]', {'b', 'c'});
+        await u('address.city =~ /alpha/i', {'a', 'c'});
+        await u(
+          'address.city !~ ?',
+          {'a', 'c'},
+          [
+            ['OX Beta'],
+          ],
+        );
+        await u(
+          'email =~ ?:e',
+          {'a', 'b'},
+          {
+            'e': [ea, eb],
+          },
+        );
+        await u('email !~ /^ox-a@/', {'b', 'c'});
+        await u('email =~ /^ox-/ && roles.type =~ /^gu/', {'b'});
+        await u('level == 10 || !(roles.type == "admin")', {'a', 'b', 'c'});
+
+        expect(failures, isEmpty, reason: failures.join('\n'));
+      });
+
       test('populate', () async {
         var result = await entityRepositoryProvider.storeAllFromJson({
           'user': [

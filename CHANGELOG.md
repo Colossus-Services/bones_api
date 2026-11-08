@@ -1,3 +1,16 @@
+## 1.32.2
+
+- Tests: the condition operators, compared on every DB adapter (memory,
+  SQLite, PostgreSQL, MySQL), each case also through `!(...)` (its
+  complement): `==`, `!=`, `=~`, `!~`, `>`, `>=`, `<`, `<=`, `!`, `&&`,
+  `||` and groups, with a literal value, a list, `null`, `[null]`, a list
+  with a `null`, an empty list (`[]`), a regexp (`/.../`, `/.../i`), and the
+  parameters `?`, `?:name`, `/?/` and `/?:name/` (also `null` and an empty
+  list). Over a text field, a nullable number, a nullable to-one
+  relationship (by its ID, a field of it, and `owner.address.city`, 2
+  relationships away) and a to-many one (`roles`, also a user without any).
+  No library change.
+
 ## 1.32.1
 
 - Fix (1.32.0 regression): on SQL an empty `IN` list was written as a
