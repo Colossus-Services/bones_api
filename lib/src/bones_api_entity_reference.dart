@@ -461,6 +461,31 @@ abstract class EntityReferenceBase<T> {
 
   @override
   String toString({bool withT = true});
+
+  /// The head of [toString]: `<T:$T> className<type>` (`<T:$T> ` only
+  /// [withT]), the type from the known [Type], else the type name, else `?`.
+  /// Shared by [EntityReference] and [EntityReferenceList].
+  String _toStringPrefix(String className, bool withT) {
+    var typeStr = _type?.toString() ?? _typeName ?? '?';
+    var prefix = '$className<$typeStr>';
+    return withT ? '<T:$T> $prefix' : prefix;
+  }
+
+  /// The tail of `equalsEntityID`/`equalsEntitiesIDs` when comparing with
+  /// another reference: by ID(s) only when both sides have them
+  /// ([compareIDs]); `false` when only one side has them; `null` (unknown)
+  /// when neither has.
+  static bool? _compareIDPresence(
+    bool otherHasIDs,
+    bool thisHasIDs,
+    bool Function() compareIDs,
+  ) {
+    if (otherHasIDs) {
+      return thisHasIDs ? compareIDs() : false;
+    } else {
+      return thisHasIDs ? false : null;
+    }
+  }
 }
 
 /// Reference wrapper to an entity.
@@ -638,30 +663,21 @@ class EntityReference<T> extends EntityReferenceBase<T> {
           );
 
           if (entityHandler != null) {
-            var instantiator = EntityInstantiatorHandler(
-              entityHandler,
+            return _fromInstantiator(
               id,
               entity,
-              entityCache: entityCache,
-              entityHandlerProvider: entityHandlerProvider,
+              type,
+              typeName,
+              entityHandler,
+              entityProvider,
+              entityHandlerProvider,
+              entityFetcher,
+              entityCache,
             );
-
-            return EntityReference<T>.fromEntityInstantiator(
-              id,
-              instantiator,
-              type: type,
-              typeName: typeName,
-              entityHandler: entityHandler,
-              entityProvider: entityProvider,
-              entityHandlerProvider: entityHandlerProvider,
-              entityFetcher: entityFetcher,
-              entityCache: entityCache,
-              checkGenericType: false,
-            )._autoCast();
           }
         }
 
-        var entityMapCast = _resolveEntityMap(entity);
+        var entityMapCast = EntityInstantiatorHandler.resolveEntityMap(entity);
 
         return EntityReference<T>.fromEntityMap(
           entityMapCast,
@@ -709,26 +725,17 @@ class EntityReference<T> extends EntityReferenceBase<T> {
       if (entityHandler != null) {
         var id = entityHandler.getIDFromMap(json);
         if (id != null) {
-          var instantiator = EntityInstantiatorHandler(
-            entityHandler,
+          return _fromInstantiator(
             id,
             json,
-            entityCache: entityCache,
-            entityHandlerProvider: entityHandlerProvider,
+            type,
+            typeName,
+            entityHandler,
+            entityProvider,
+            entityHandlerProvider,
+            entityFetcher,
+            entityCache,
           );
-
-          return EntityReference<T>.fromEntityInstantiator(
-            id,
-            instantiator,
-            type: type,
-            typeName: typeName,
-            entityHandler: entityHandler,
-            entityProvider: entityProvider,
-            entityHandlerProvider: entityHandlerProvider,
-            entityFetcher: entityFetcher,
-            entityCache: entityCache,
-            checkGenericType: false,
-          )._autoCast();
         }
       }
 
@@ -746,15 +753,42 @@ class EntityReference<T> extends EntityReferenceBase<T> {
     }
   }
 
-  static Map<String, dynamic> _resolveEntityMap(Object entity) {
-    var entityMap = entity is Map
-        ? entity
-        : TypeParser.parseMap(entity) ?? <String, dynamic>{};
+  /// An [EntityReference] with [id] whose entity is instantiated (lazily)
+  /// from [entityMap] by an [EntityInstantiatorHandler] (which also caches
+  /// the instantiator in [entityCache]). Used by [EntityReference.fromJson]
+  /// when the entity handler and the ID are known: for an `EntityReference`
+  /// JSON with an `entity`, and for an entity JSON.
+  static EntityReference<E> _fromInstantiator<E>(
+    Object id,
+    Object entityMap,
+    Type? type,
+    String? typeName,
+    EntityHandler<E> entityHandler,
+    EntityProvider? entityProvider,
+    EntityHandlerProvider? entityHandlerProvider,
+    EntityFetcher<E>? entityFetcher,
+    EntityCache? entityCache,
+  ) {
+    var instantiator = EntityInstantiatorHandler(
+      entityHandler,
+      id,
+      entityMap,
+      entityCache: entityCache,
+      entityHandlerProvider: entityHandlerProvider,
+    );
 
-    var entityMapCast = entityMap is Map<String, dynamic>
-        ? entityMap
-        : entityMap.map((key, value) => MapEntry('$key', value));
-    return entityMapCast;
+    return EntityReference<E>.fromEntityInstantiator(
+      id,
+      instantiator,
+      type: type,
+      typeName: typeName,
+      entityHandler: entityHandler,
+      entityProvider: entityProvider,
+      entityHandlerProvider: entityHandlerProvider,
+      entityFetcher: entityFetcher,
+      entityCache: entityCache,
+      checkGenericType: false,
+    )._autoCast();
   }
 
   /// Creates an [EntityReference] from [o] trying to resolve it in the best way.
@@ -1328,19 +1362,11 @@ class EntityReference<T> extends EntityReferenceBase<T> {
         return true;
       }
 
-      if (otherEntity.isIdSet) {
-        if (isIdSet) {
-          return id == otherEntity.id;
-        } else {
-          return false;
-        }
-      } else {
-        if (isIdSet) {
-          return false;
-        } else {
-          return null;
-        }
-      }
+      return EntityReferenceBase._compareIDPresence(
+        otherEntity.isIdSet,
+        isIdSet,
+        () => id == otherEntity.id,
+      );
     } else if (otherEntity is T) {
       if (isEntitySet && identical(entity, otherEntity)) return true;
 
@@ -1361,9 +1387,7 @@ class EntityReference<T> extends EntityReferenceBase<T> {
 
   @override
   String toString({bool withT = true}) {
-    var typeStr = _type?.toString() ?? _typeName ?? '?';
-    var prefix = 'EntityReference<$typeStr>';
-    if (withT) prefix = '<T:$T> $prefix';
+    var prefix = _toStringPrefix('EntityReference', withT);
 
     if (isNull) {
       return '$prefix{null}';
@@ -1928,11 +1952,8 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
   static List<E?>? _castListNullable<E>(List? l) {
     if (l == null) return null;
 
+    // (A `List<E>` is also a `List<E?>`.)
     if (l is List<E?>) {
-      return l;
-    }
-
-    if (l is List<E>) {
       return l;
     }
 
@@ -2568,19 +2589,11 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         return true;
       }
 
-      if (otherEntities.isIdSet) {
-        if (isIDsSet) {
-          return _idsEquality.equals(ids, [otherEntities.id]);
-        } else {
-          return false;
-        }
-      } else {
-        if (isIDsSet) {
-          return false;
-        } else {
-          return null;
-        }
-      }
+      return EntityReferenceBase._compareIDPresence(
+        otherEntities.isIdSet,
+        isIDsSet,
+        () => _idsEquality.equals(ids, [otherEntities.id]),
+      );
     } else if (otherEntities is EntityReferenceList) {
       if (type != otherEntities.type) return false;
 
@@ -2594,19 +2607,11 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
         return true;
       }
 
-      if (otherEntities.isIDsSet) {
-        if (isIDsSet) {
-          return _idsEquality.equals(ids, otherEntities.ids);
-        } else {
-          return false;
-        }
-      } else {
-        if (isIDsSet) {
-          return false;
-        } else {
-          return null;
-        }
-      }
+      return EntityReferenceBase._compareIDPresence(
+        otherEntities.isIDsSet,
+        isIDsSet,
+        () => _idsEquality.equals(ids, otherEntities.ids),
+      );
     } else if (otherEntities is T) {
       if (isEntitiesSet &&
           _listIdenticalEquality.equals(entities, [otherEntities])) {
@@ -2647,9 +2652,7 @@ class EntityReferenceList<T> extends EntityReferenceBase<T> {
 
   @override
   String toString({bool withT = true}) {
-    var typeStr = _type?.toString() ?? _typeName ?? '?';
-    var prefix = 'EntityReferenceList<$typeStr>';
-    if (withT) prefix = '<T:$T> $prefix';
+    var prefix = _toStringPrefix('EntityReferenceList', withT);
 
     if (isNull) {
       return '$prefix{null}';
