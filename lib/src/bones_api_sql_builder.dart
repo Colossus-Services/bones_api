@@ -496,34 +496,33 @@ class CreateTableSQL extends TableSQL {
   /// Why: it's called repeatedly while sorting the tables by their
   /// dependencies, and it's derived from the [entries]. Reset by
   /// [_disposeCache].
-  List<String>? _referenceTablesCache;
+  List<String>? _referenceTables;
 
   @override
-  List<String> get referenceTables => _referenceTablesCache ??= <String>{
+  List<String> get referenceTables => _referenceTables ??= <String>{
     ...entries.expand((e) => e.referenceTables ?? <String>[]),
   }.toList();
 
   /// A cache of [relationshipsTables], filled on its first call. As
-  /// [_referenceTablesCache], derived from the [relationships]. Reset by
+  /// [_referenceTables], derived from the [relationships]. Reset by
   /// [_disposeCache].
-  List<String>? _relationshipsTablesCache;
+  List<String>? _relationshipsTables;
 
   /// Returns the tables of the [relationships].
-  List<String> get relationshipsTables =>
-      _relationshipsTablesCache ??= <String>{
-        ...?relationships?.expand(
-          (e) => e.referenceTables.where((t) => t != table),
-        ),
-      }.toList();
+  List<String> get relationshipsTables => _relationshipsTables ??= <String>{
+    ...?relationships?.expand(
+      (e) => e.referenceTables.where((t) => t != table),
+    ),
+  }.toList();
 
   /// A cache of [referenceAndRelationshipTables] (the [dependentTables]),
-  /// filled on its first call. As [_referenceTablesCache]. Reset by
+  /// filled on its first call. As [_referenceTables]. Reset by
   /// [_disposeCache].
-  List<String>? _referenceAndRelationshipTablesCache;
+  List<String>? _referenceAndRelationshipTables;
 
   /// Returns the tables in [referenceTables] and [relationshipsTables].
   List<String> get referenceAndRelationshipTables =>
-      _referenceAndRelationshipTablesCache ??= <String>{
+      _referenceAndRelationshipTables ??= <String>{
         ...referenceTables,
         ...relationshipsTables,
       }.toList();
@@ -543,9 +542,9 @@ class CreateTableSQL extends TableSQL {
       entries.where((e) => e.type == 'CONSTRAINT').toList();
 
   void _disposeCache() {
-    _referenceTablesCache = null;
-    _relationshipsTablesCache = null;
-    _referenceAndRelationshipTablesCache = null;
+    _referenceTables = null;
+    _relationshipsTables = null;
+    _referenceAndRelationshipTables = null;
   }
 
   /// Converts the [constraints] to [AlterTableSQL].
@@ -712,10 +711,10 @@ class AlterTableSQL extends TableSQL {
   ///
   /// Why: it's called repeatedly while sorting the tables by their
   /// dependencies, and it's derived from the [entries].
-  List<String>? _referenceTablesCache;
+  List<String>? _referenceTables;
 
   @override
-  List<String> get referenceTables => _referenceTablesCache ??= <String>{
+  List<String> get referenceTables => _referenceTables ??= <String>{
     ...entries.expand((e) => e.referenceTables ?? <String>[]).nonNulls,
   }.toList();
 

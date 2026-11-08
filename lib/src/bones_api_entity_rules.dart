@@ -782,10 +782,10 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   /// Cache of [totalRules]: the rule tree is immutable, so the count is
   /// computed (a full traversal) only once.
-  int? _totalRulesCache;
+  int? _totalRules;
 
   @override
-  int totalRules() => _totalRulesCache ??= accessRules.totalRules();
+  int totalRules() => _totalRules ??= accessRules.totalRules();
 
   @override
   bool? get _innocuous => accessRules._innocuous;
@@ -828,20 +828,22 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   /// Cache of [hasRuleForEntityType] results by entity [Type]: called for
   /// every object encoded to JSON, and each call walks the rule tree.
-  final Map<Type, bool> _hasRuleForEntityTypeCache = <Type, bool>{};
+  final Map<Type, bool> _hasRuleForEntityType = <Type, bool>{};
 
   @override
-  bool hasRuleForEntityType(Type type) => _hasRuleForEntityTypeCache
-      .putIfAbsent(type, () => accessRules.hasRuleForEntityType(type));
+  bool hasRuleForEntityType(Type type) => _hasRuleForEntityType.putIfAbsent(
+    type,
+    () => accessRules.hasRuleForEntityType(type),
+  );
 
   /// Cache of [hasRuleType] results, keyed by the (element-wise compared)
   /// list of rule types queried: each call walks the rule tree.
-  final Map<_CacheKey, bool> _hasRuleTypeCache = <_CacheKey, bool>{};
+  final Map<_CacheKey, bool> _hasRuleType = <_CacheKey, bool>{};
 
   @override
   bool hasRuleType(List<EntityAccessRuleType> ruleTypes) {
     final cacheKey = _CacheKey(ruleTypes);
-    return _hasRuleTypeCache.putIfAbsent(
+    return _hasRuleType.putIfAbsent(
       cacheKey,
       () => accessRules.hasRuleType(ruleTypes),
     );
@@ -849,10 +851,10 @@ class EntityAccessRulesCached implements EntityAccessRules {
 
   /// Cache of [hasRuleForEntityTypeField] results by entity [Type]: called
   /// for every object encoded to JSON, and each call walks the rule tree.
-  final Map<Type, bool> _hasRuleForEntityTypeFieldCache = <Type, bool>{};
+  final Map<Type, bool> _hasRuleForEntityTypeField = <Type, bool>{};
 
   @override
-  bool hasRuleForEntityTypeField(Type type) => _hasRuleForEntityTypeFieldCache
+  bool hasRuleForEntityTypeField(Type type) => _hasRuleForEntityTypeField
       .putIfAbsent(type, () => accessRules.hasRuleForEntityTypeField(type));
 
   @override
