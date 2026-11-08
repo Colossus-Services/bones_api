@@ -1,5 +1,11 @@
 // Unit-level tests (no database needed) of the PostgreSQL and MySQL adapters'
 // fixes: their parsing of results and the SQL they generate.
+//
+// VM only: the PostgreSQL/MySQL adapters (64-bit integer literals) don't
+// compile to JavaScript.
+@TestOn('vm')
+library;
+
 import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/bones_api_db_mysql.dart';
 import 'package:bones_api/bones_api_db_postgre.dart';
