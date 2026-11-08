@@ -607,14 +607,14 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     String table,
     Iterable<String> indexesNames,
   ) {
-    var names = indexesNames.map(DBSQLAdapter.sqlStringLiteral).join(', ');
+    var names = indexesNames.map(mysqlStringLiteral).join(', ');
     if (names.isEmpty) return <String, String?>{};
 
     var sql =
         "SELECT DISTINCT INDEX_NAME AS index_name "
         "FROM information_schema.STATISTICS "
         "WHERE TABLE_SCHEMA = DATABASE() "
-        "AND TABLE_NAME = ${DBSQLAdapter.sqlStringLiteral(table)} "
+        "AND TABLE_NAME = ${mysqlStringLiteral(table)} "
         "AND INDEX_NAME IN ($names)";
 
     return executeWithPool(
@@ -628,9 +628,17 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     );
   }
 
+  /// [value] as a MySQL string literal ([DBSQLAdapter.sqlStringLiteral]
+  /// with `escapeBackslashes`): MySQL's default `sql_mode` treats `\` as an
+  /// escape character in literals, so a `\` must be escaped too (or `\'`
+  /// would end the literal).
+  @visibleForTesting
+  static String mysqlStringLiteral(String value) =>
+      DBSQLAdapter.sqlStringLiteral(value, escapeBackslashes: true);
+
   /// The SQL of [findFieldsReferencedTablesImpl]: the foreign keys of
   /// [table] in the database [databaseName] (both escaped as string
-  /// literals, see [DBSQLAdapter.sqlStringLiteral]).
+  /// literals, see [mysqlStringLiteral]).
   @visibleForTesting
   static String findFieldsReferencedTablesSQL(
     String databaseName,
@@ -643,7 +651,7 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     FROM
       INFORMATION_SCHEMA.KEY_COLUMN_USAGE
     WHERE
-      TABLE_SCHEMA = ${DBSQLAdapter.sqlStringLiteral(databaseName)} AND TABLE_NAME = ${DBSQLAdapter.sqlStringLiteral(table)}
+      TABLE_SCHEMA = ${mysqlStringLiteral(databaseName)} AND TABLE_NAME = ${mysqlStringLiteral(table)}
       AND REFERENCED_TABLE_NAME IS NOT NULL AND REFERENCED_COLUMN_NAME IS NOT NULL
     ''';
 

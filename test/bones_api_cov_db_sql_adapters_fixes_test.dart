@@ -83,6 +83,29 @@ void main() {
         equals("'x'' OR ''1''=''1'"),
       );
     });
+
+    test(r'a `\` is kept (standard SQL), or doubled (MySQL)', () {
+      expect(DBSQLAdapter.sqlStringLiteral(r'a\b'), equals(r"'a\b'"));
+      expect(
+        DBSQLAdapter.sqlStringLiteral(r'a\b', escapeBackslashes: true),
+        equals(r"'a\\b'"),
+      );
+    });
+  });
+
+  group('DBMySQLAdapter.mysqlStringLiteral', () {
+    // MySQL's default `sql_mode` makes `\` an escape in literals: a `\'`
+    // would end the literal (`x\' OR 1=1 -- ` matched every table).
+    test(r"a `\` before a `'` can't end the literal", () {
+      expect(
+        DBMySQLAdapter.mysqlStringLiteral(r"x\' OR 1=1 -- "),
+        equals(r"'x\\'' OR 1=1 -- '"),
+      );
+    });
+
+    test(r"a trailing `\` can't escape the closing quote", () {
+      expect(DBMySQLAdapter.mysqlStringLiteral(r'x\'), equals(r"'x\\'"));
+    });
   });
 
   group('findFieldsReferencedTablesSQL', () {
@@ -112,6 +135,12 @@ void main() {
         sqlQuote,
         contains("TABLE_SCHEMA = 'd''b' AND TABLE_NAME = 'x'' OR ''1''=''1'\n"),
       );
+
+      var sqlBackslash = DBMySQLAdapter.findFieldsReferencedTablesSQL(
+        'db',
+        r"x\' OR 1=1 -- ",
+      );
+      expect(sqlBackslash, contains(r"TABLE_NAME = 'x\\'' OR 1=1 -- '"));
     });
   });
 }

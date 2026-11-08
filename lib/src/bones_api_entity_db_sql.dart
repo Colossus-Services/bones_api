@@ -3436,10 +3436,20 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   /// with its `'` doubled (the standard SQL escape), so a `'` in [value]
   /// can't end the literal (and change the query).
   ///
+  /// With [escapeBackslashes] (MySQL: its default `sql_mode` makes `\` an
+  /// escape character in literals, so `\'` would end the literal), each `\`
+  /// is also doubled, first. Not for standard SQL literals (PostgreSQL's
+  /// `standard_conforming_strings`, SQLite), where `\` is a plain character.
+  ///
   /// Used by the schema introspection queries, which compare names with
   /// literals (e.g. `WHERE table_name = 'user'`).
-  static String sqlStringLiteral(String value) =>
-      "'${value.replaceAll("'", "''")}'";
+  static String sqlStringLiteral(
+    String value, {
+    bool escapeBackslashes = false,
+  }) {
+    var escaped = escapeBackslashes ? value.replaceAll(r'\', r'\\') : value;
+    return "'${escaped.replaceAll("'", "''")}'";
+  }
 
   // -------------------------------------------------------------------------
   // Schema introspection shared by the adapters that read their schema from
