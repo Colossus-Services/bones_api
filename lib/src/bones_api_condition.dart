@@ -1539,21 +1539,30 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   EntityHandler? _isToManyKeyHandler;
   bool? _isToManyKey;
 
-  /// Returns `null` for an entity without related entities through a
-  /// to-many relationship (an empty [keyValue], see [_isEmptyToMany]), so
-  /// it's compared as a `null` field; otherwise returns [keyValue]
-  /// unchanged.
+  /// Resolves the left side of a comparison, before it's compared with the
+  /// right side.
+  ///
+  /// In `roles.type == null`:
+  /// - [keyValue] is the left side: the value of the [keys] (`roles.type`)
+  ///   in the entity being matched. Through a to-many relationship it's a
+  ///   list, one value per related entity (`[admin, guest]`).
+  /// - [value] is the right side: this condition's value (`null`), or a
+  ///   [ConditionParameter] (`?`, `?:name`) resolved with [parameters],
+  ///   [positionalParameters] and [namedParameters].
+  ///
+  /// Returns `null` when [keyValue] is an empty list through a to-many
+  /// relationship (an entity without related entities, see
+  /// [_isEmptyToMany]), so the left side is compared as a `null` field.
+  /// Otherwise returns [keyValue] unchanged.
   ///
   /// Why: on SQL, a to-many relationship is an outer join, and an entity
-  /// without related rows joins one row of `NULL`s. So
-  /// `roles.type == null` matches a user without roles, as `IS NULL` does.
-  /// Without this, the empty list would be compared element by element
-  /// (none), and match nothing.
+  /// without related rows joins one row of `NULL`s. So `roles.type == null`
+  /// matches a user without roles, as `IS NULL` does. Without this, the
+  /// empty list on the left would be compared element by element (none),
+  /// and match nothing.
   ///
-  /// [keyValue] is also returned unchanged when the compared [value] (or its
-  /// [ConditionParameter]'s value, resolved with [parameters],
-  /// [positionalParameters] and [namedParameters]) is a list: lists are
-  /// compared as a whole.
+  /// [keyValue] is also returned unchanged when the right side ([value], or
+  /// its parameter's value) is a list: lists are compared as a whole.
   ///
   /// Used by [KeyConditionEQ] (`==`). [KeyConditionNotEQ] (`!=`) and
   /// [KeyConditionINBase] (`=~`/`!~`) handle an empty to-many the same way,
