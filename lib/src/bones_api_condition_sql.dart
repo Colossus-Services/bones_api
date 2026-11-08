@@ -647,15 +647,6 @@ class ConditionSQLEncoder extends ConditionEncoder {
         }
       }
 
-      // A relationship's `IN` a `null` (not a list): an empty set of IDs.
-      if (nullsAsAbsent &&
-          (operator == 'IN' || operator == 'NOT IN') &&
-          isNullEncodingValue(value, context)) {
-        _markPlaceholderInlinedAsNull(value, context);
-        context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
-        return context;
-      }
-
       if (isNullEncodingValue(value, context)) {
         switch (operator) {
           case '=':

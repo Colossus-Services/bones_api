@@ -91,11 +91,15 @@ These fixes, same machine and session (ops/sec; PR vs 1.32.1):
   the conditions' new checks (a relationship key, `null` and `[]` values)
   cost nothing measurable. 1.33.0's SQLite dip (`byState`/`list` -4%,
   `count` -10%) isn't in the PR.
-- PostgreSQL: 1-9% lower, but `count` (no condition: none of the changed
-  code runs) dropped as much (-7.4%), and the versions ran in order on one
-  container: the container's drift during the session (see the 2026-10-13
-  notes), not these fixes. Alternate the versions round by round to
-  measure a difference this small.
+- PostgreSQL: 1-9% lower in this table, but `count` (no condition: none
+  of the changed code runs) dropped as much (-7.4%), and the versions ran
+  in order on one container. An A/B alternating 1.32.1 and the PR 3 times
+  each on one container (`--repeat 3`, medians of the 3 runs) measured no
+  loss: `byId` 1741 vs 1733 (-0.5%), `byEmail` 1762 vs 1735 (-1.5%),
+  `byState` 1122 vs 1120 (-0.2%), `list` 1185 vs 1179 (-0.5%), `count`
+  6505 vs 6565 (+0.9%), within the runs' spread (`byEmail` 1710–1794,
+  `count` 5712–7006). The table's drop is the container's drift during the
+  session (see the 2026-10-13 notes), not these fixes.
 
 ‡ Memory `remove` is ~2.7k ops/sec on all three versions (1.32.1 too): the
 drop from 12476 (2026-10-14, 1.22.0) is older than these fixes (between
@@ -159,7 +163,8 @@ scans tables, so its numbers depend the most on the table size.
 existing `postgres:latest` container in Docker Desktop, shared by the runs
 of 1.32.1 and 1.33.0 just before it (see the progression's table). Lower
 than 1.32.1 by 1-9%, as `count` (none of the changed code) is: the
-container's drift, not the fixes.
+container's drift. Alternating 1.32.1 and this code on one container
+measured them within 1.5% (the progression's note).
 
 ### 2026-11-08 — `sqlite` — Apple M5
 

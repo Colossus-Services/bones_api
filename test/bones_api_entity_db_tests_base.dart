@@ -6326,10 +6326,36 @@ Future<bool> runAdapterTests(
             ],
             ['Y', 'Z'],
           ),
+          // An `EntityReferenceList` as the parameter (its IDs):
+          (
+            'owner.userInfo =~ ?',
+            [
+              EntityReferenceList<UserInfo>.fromIDs([infoX, infoY]),
+            ],
+            ['X', 'Y'],
+          ),
         ]) {
           var got = await selectStores(q, params);
           if (got.join(',') != exp.join(',')) {
             failures.add('`$q`  $params: $got, expected $exp');
+          }
+        }
+
+        // A path through a to-one whose row isn't resolved (only its ID: a
+        // missing row, or one stored by another adapter): its ID field is
+        // the ID, any other field a `null` (as a SQL outer join's row).
+        var storeHandler = entityRepositoryProvider.storeEntityHandler;
+        var unresolvedOwner = {'id': 1, 'name': 'rk-u', 'owner': 987654};
+        for (var (q, exp) in [
+          ('owner.id == 987654', true),
+          ('owner.email == null', true),
+          ('owner.email != null', false),
+          ('owner.email == "rk-x@$testDomain"', false),
+        ]) {
+          var got = Condition.parse(q)
+              .matchesEntityMap(unresolvedOwner, entityHandler: storeHandler);
+          if (got != exp) {
+            failures.add('unresolved owner `$q`: $got, expected $exp');
           }
         }
 

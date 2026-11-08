@@ -1901,17 +1901,8 @@ abstract class ConditionEncoder {
 
     if (schemeProvider != null) {
       if (!TypeParser.isPrimitiveType(valueType)) {
-        // A list as a single entity (a relationship's `== ?` with `[]`, or
-        // `[x]`), as a primitive's above: an empty list is `null` (no
-        // entity), a single element is that element. An entity's ID
-        // resolution expects an entity, not a list.
-        if (value is Iterable) {
-          var list = value.toList();
-          if (list.isEmpty) return null;
-          if (list.length == 1) {
-            return _resolveValueToTypeImpl(list.first, valueType);
-          }
-        }
+        // (A list as a single entity, `[]` or `[x]`, was unwrapped at the
+        // top.)
 
         // An ID (a primitive value, e.g. a `String` ID) for an entity type:
         // already the entity's ID.
