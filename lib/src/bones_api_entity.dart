@@ -3055,7 +3055,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
       if (fieldType == null && resolveFiledName) {
         var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
         if (resolvedFieldName != null) {
-          fieldType = o.getFieldType(key);
+          fieldType = o.getFieldType(resolvedFieldName);
         }
       }
     }
@@ -5289,6 +5289,12 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
   }) async {
     var results = <String, List<Object>>{};
 
+    // The `%name%` placeholders in the entries (see
+    // `resolveEntitySourceValueVariables`):
+    if (variables != null && variables.isNotEmpty) {
+      entries = resolveEntitiesSourceVariables(entries, variables);
+    }
+
     var allRepositoriesBuildOrder = allRepositories().values.toList(
       growable: false,
     );
@@ -5352,6 +5358,7 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       try {
         var os = await entityRepository.storeAllFromJson(
           typeEntries,
+          transaction: transaction,
           resolutionRules: resolutionRules,
         );
         results[typeName] = os;
@@ -5379,16 +5386,15 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     EntityResolutionRules? resolutionRules,
     Object? variables,
   }) {
-    var sourceMap = resolveEntitiesSource(source);
-    var variablesMap = resolveSource(variables);
+    var sourceMap = resolveEntitiesSource(source, workingPath: workingPath);
+    var variablesMap = resolveSource(variables, workingPath: workingPath);
 
     return sourceMap.resolveOther(variablesMap, (sourceMap, variablesMap) {
-      sourceMap = resolveEntitiesSourceVariables(sourceMap, variablesMap);
-
       _log.info(
         'Populating adapter ($this) [entries: ${sourceMap.length}; variables: ${variablesMap.length}]...$_logSectionOpen',
       );
 
+      // `storeAllFromJson` resolves the `variables` in the entries:
       return storeAllFromJson(
         sourceMap,
         resolutionRules: resolutionRules,
@@ -9055,7 +9061,7 @@ abstract class IterableEntityRepository<O extends Object>
 
   @override
   FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
-      deleteByID(getEntityID(o));
+      deleteByID(getEntityID(o), transaction: transaction);
 
   @override
   FutureOr<O?> tryDeleteEntity(O o, {Transaction? transaction}) =>

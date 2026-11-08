@@ -626,6 +626,10 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
 
   static final _rulesListEquality = ListEquality<EntityAccessRules>();
 
+  /// Compares the [entityFields] element-wise (two rules built with equal
+  /// field lists are equal; a `List` `==` is identity).
+  static final _fieldsListEquality = ListEquality<String>();
+
   @override
   bool operator ==(Object other) =>
       other is EntityAccessRules && simplified()._equals(other.simplified());
@@ -635,17 +639,18 @@ class EntityAccessRules extends EntityRules<EntityAccessRules> {
       runtimeType == other.runtimeType &&
           ruleType == other.ruleType &&
           entityType == other.entityType &&
-          entityFields == other.entityFields &&
+          _fieldsListEquality.equals(entityFields, other.entityFields) &&
           identical(condition, other.condition) &&
           _rulesListEquality.equals(rules, other.rules);
 
   @override
   int get hashCode => simplified()._hashCode();
 
+  // `entityFields` hashed element-wise, consistent with `_equals`:
   int _hashCode() =>
       ruleType.hashCode ^
       entityType.hashCode ^
-      entityFields.hashCode ^
+      _fieldsListEquality.hash(entityFields) ^
       condition.hashCode ^
       _rulesListEquality.hash(rules);
 
@@ -1299,6 +1304,12 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
   }
 
   String? _validateImpl() {
+    // Contradictory: every type eager and every type lazy (also made
+    // `isEagerEntityType`/`isLazyEntityType` recurse forever, before).
+    if ((allEager ?? false) && (allLazy ?? false)) {
+      return "Conflicting `allEager` and `allLazy`: both `true`";
+    }
+
     var conflict = _hasConflictingEntityTypes();
     if (conflict != null) {
       return "Conflicting `eagerEntityTypes` and `lazyEntityTypes`: $conflict";
@@ -1328,8 +1339,14 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
   /// Returns `true` if [entityType] load is eager.
   /// - [def] is returned in case there's not rule for [entityType].
   bool isEagerEntityType(Type entityType, [bool def = false]) {
+    // `allEager` excludes the types explicitly lazy. (Checks
+    // `lazyEntityTypes` directly: calling `isLazyEntityType`, which checks
+    // `isEagerEntityType` under `allLazy`, recursed forever with both
+    // `allEager` and `allLazy`; without `allLazy` it's the same result.)
     var allEager = this.allEager;
-    if (allEager != null && allEager && !isLazyEntityType(entityType)) {
+    if (allEager != null &&
+        allEager &&
+        !_listContains(this.lazyEntityTypes, entityType)) {
       return true;
     }
 
@@ -1349,8 +1366,12 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
   /// Returns `true` if [entityType] load is lazy.
   /// - [def] is returned in case there's not rule for [entityType].
   bool isLazyEntityType(Type entityType, [bool def = false]) {
+    // `allLazy` excludes the types explicitly eager (see
+    // `isEagerEntityType` about the former recursion).
     var allLazy = this.allLazy;
-    if (allLazy != null && allLazy && !isEagerEntityType(entityType)) {
+    if (allLazy != null &&
+        allLazy &&
+        !_listContains(this.eagerEntityTypes, entityType)) {
       return true;
     }
 
@@ -1366,6 +1387,12 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
 
     return def;
   }
+
+  /// `true` if [types] (e.g. [eagerEntityTypes]) has [type]. Used by
+  /// [isEagerEntityType] and [isLazyEntityType] for the explicit lists.
+  /// (Static: [EntityResolutionRules] is implemented by other classes.)
+  static bool _listContains(List<Type>? types, Type type) =>
+      types != null && types.contains(type);
 
   /// Alias to [isEagerEntityType] with a [TypeInfo] parameter.
   bool isEagerEntityTypeInfo(TypeInfo entityTypeInfo, [bool def = false]) {
