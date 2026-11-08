@@ -191,22 +191,14 @@ class Time implements Comparable<Time> {
     if (!_isDigitByte(value[0])) return false;
     if (value.length >= 2 && !_isDigitByte(value[1])) return false;
 
-    if (value.length == 8 &&
-        value[2] == _charColon &&
-        value[5] == _charColon &&
-        _isDigitByte(value[3]) &&
-        _isDigitByte(value[4]) &&
-        _isDigitByte(value[6]) &&
-        _isDigitByte(value[7])) {
+    // `HH:mm:ss`:
+    if (value.length == 8 && _hasHmsPrefix(value)) {
       return true;
-    } else if (value.length >= 10 &&
-        value[2] == _charColon &&
-        value[5] == _charColon &&
+    }
+    // `HH:mm:ss.S...` (one or more fraction digits):
+    else if (value.length >= 10 &&
+        _hasHmsPrefix(value) &&
         value[8] == _charDot &&
-        _isDigitByte(value[3]) &&
-        _isDigitByte(value[4]) &&
-        _isDigitByte(value[6]) &&
-        _isDigitByte(value[7]) &&
         _isDigitByte(value[9])) {
       for (var i = 10; i < value.length; ++i) {
         if (!_isDigitByte(value[i])) {
@@ -219,6 +211,17 @@ class Time implements Comparable<Time> {
 
     return false;
   }
+
+  /// Returns `true` if [value] (at least 8 bytes) starts with an `HH:mm:ss`
+  /// shape: the `:` at 2 and 5 and digits at 3, 4, 6 and 7 (the digits at 0
+  /// and 1 are checked by [_bytesInStringFormat], its only caller).
+  static bool _hasHmsPrefix(List<int> value) =>
+      value[2] == _charColon &&
+      value[5] == _charColon &&
+      _isDigitByte(value[3]) &&
+      _isDigitByte(value[4]) &&
+      _isDigitByte(value[6]) &&
+      _isDigitByte(value[7]);
 
   /// Parses [bytes] to [Time]. See [toBytes32] and [toBytes64].
   factory Time.fromBytes(List<int> bytes, {bool allowParseString = true}) {
@@ -519,19 +522,10 @@ class Time implements Comparable<Time> {
   Time operator +(Object? other) {
     if (other == null) return this;
 
-    if (other is Time) {
-      other = other.asDuration;
-    } else if (other is int) {
-      other = Duration(milliseconds: other);
-    }
+    var offset = _toOffsetDuration(other);
+    if (offset.inMicroseconds == 0) return this;
 
-    if (other is Duration) {
-      if (other.inMicroseconds == 0) return this;
-      var t = asDuration + other;
-      return t.toTime();
-    }
-
-    throw StateError("Can't handle type: $other");
+    return (asDuration + offset).toTime();
   }
 
   /// Subtracts a [Duration], [Time], or [int] (ms) from the current instance,
@@ -547,17 +541,19 @@ class Time implements Comparable<Time> {
   Time operator -(Object? other) {
     if (other == null) return this;
 
-    if (other is Time) {
-      other = other.asDuration;
-    } else if (other is int) {
-      other = Duration(milliseconds: other);
-    }
+    var offset = _toOffsetDuration(other);
+    if (offset.inMicroseconds == 0) return this;
 
-    if (other is Duration) {
-      if (other.inMicroseconds == 0) return this;
-      var t = asDuration - other;
-      return t.toTime();
-    }
+    return (asDuration - offset).toTime();
+  }
+
+  /// Converts the operand of [+] and [-] to a [Duration]: a [Time] (its
+  /// [asDuration]), an `int` (milliseconds) or a [Duration] itself.
+  /// Throws a [StateError] for any other type.
+  static Duration _toOffsetDuration(Object other) {
+    if (other is Duration) return other;
+    if (other is Time) return other.asDuration;
+    if (other is int) return Duration(milliseconds: other);
 
     throw StateError("Can't handle type: $other");
   }

@@ -269,6 +269,36 @@ void main() {
       );
     });
 
+    test('operations state: many operations (identity-set lookups)', () async {
+      // Past 16 operations the membership checks switch from a list scan to
+      // an identity set (built from the list): the same results either way.
+      var t = Transaction();
+      var ops = [for (var i = 0; i < 40; ++i) _select(t)];
+      expect(t.length, equals(40));
+      expect(ops.map((op) => op.id), equals([for (var i = 1; i <= 40; ++i) i]));
+
+      // An operation added before the set existed, and one after:
+      expect(() => t.addOperation(ops.first), throwsStateError);
+      expect(() => t.addOperation(ops.last), throwsStateError);
+
+      for (var op in ops) {
+        await op.finish(op.id);
+        expect(await t.waitOperation(op), isTrue);
+      }
+      expect(t.executedOperations.length, equals(40));
+
+      // Executed again: rejected (an early and a late operation):
+      expect(() => t.finishOperation(ops.first, 0), throwsStateError);
+      expect(() => t.finishOperation(ops.last, 0), throwsStateError);
+
+      var tOther = Transaction();
+      var opOther = _select(tOther);
+      expect(() => t.waitOperation(opOther), throwsStateError);
+      await opOther.finish(0);
+
+      expect(await t.commit(), equals(40));
+    });
+
     test('operations state', () async {
       var t = Transaction();
       expect(t.isEmpty, isTrue);

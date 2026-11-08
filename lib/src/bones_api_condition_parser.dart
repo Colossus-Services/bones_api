@@ -96,11 +96,18 @@ abstract class JsonGrammarLexer extends GrammarDefinition {
 
   Parser<List> characterEscape() => char('\\') & pattern(jsonEscapeCharsString);
 
+  /// The escapes of a single-quoted string: also `\'`
+  /// ([jsonEscapeCharsString2]).
+  Parser<List> characterEscape2() =>
+      char('\\') & pattern(jsonEscapeCharsString2);
+
   Parser<String> characterEscapeValue() =>
       characterEscape().map((each) => jsonEscapeChars[each[1]]!);
 
+  // With [characterEscape2]: [characterEscape] doesn't accept `\'`, so a
+  // single-quoted string with an escaped quote (`'a\'b'`) didn't parse.
   Parser<String> characterEscapeValue2() =>
-      characterEscape().map((each) => jsonEscapeChars2[each[1]]!);
+      characterEscape2().map((each) => jsonEscapeChars2[each[1]]!);
 
   Parser<List> characterUnicode() =>
       string('\\u') & pattern('0-9A-Fa-f').times(4);

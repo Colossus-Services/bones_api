@@ -58,6 +58,9 @@ class APIServerResponseCache {
          1024 * 1024 * 1024 * 32,
        );
 
+  /// The cached entries: each value is a [_CachedResponse] or, once a
+  /// compressed alternative is added, a `List<_CachedResponse>` (all with
+  /// the same key). See `asCachedEntries`.
   final Map<_CachedResponseKey, Object> _cachedResponses = {};
 
   int get cachedResponsesLength => _cachedResponses.length;
@@ -191,11 +194,13 @@ class APIServerResponseCache {
     _log.info(
       () => "REMOVED $key > File modified: ${prev.file?.path ?? key.path}",
     );
-    _cachedResponses.remove(key);
+    // Through `_remove`, so the memory size of the removed entries is
+    // subtracted from the total (it was leaked by a direct map removal):
+    _remove(key);
 
     if (key.statusCode == 200) {
       var key304 = _CachedResponseKey(304, key.path);
-      var prev304 = _cachedResponses.remove(key304);
+      var prev304 = _remove(key304);
       if (prev304 != null) {
         _log.info(
           () =>
@@ -248,7 +253,9 @@ class APIServerResponseCache {
     return true;
   }
 
-  void _remove(_CachedResponseKey key) {
+  /// Removes the entry of [key] (with all its alternatives), subtracting its
+  /// memory size from the total. Returns the removed value, if any.
+  Object? _remove(_CachedResponseKey key) {
     var prev = _cachedResponses.remove(key);
 
     if (prev != null) {
@@ -260,6 +267,8 @@ class APIServerResponseCache {
         }
       }
     }
+
+    return prev;
   }
 
   bool _checkMaxMemorySize() {
@@ -267,26 +276,33 @@ class APIServerResponseCache {
 
     var targetMemory = maxMemorySize * 0.80;
 
-    var cachedResponses = _cachedResponses.values.toList();
-    cachedResponses.sort();
+    // Sorted per entry (key), not per value: a value with compressed
+    // alternatives is a `List<_CachedResponse>`, which isn't `Comparable`
+    // (sorting the raw values threw a `TypeError`).
+    var evictionCandidates = _cachedResponses.entries
+        .map((e) => (key: e.key, cachedEntries: e.value.asCachedEntries!))
+        .toList();
+
+    evictionCandidates.sort(
+      (a, b) =>
+          _CachedResponse.compareEntries(a.cachedEntries, b.cachedEntries),
+    );
 
     var totalRemoved = 0;
     var totalMemoryRemoved = 0;
 
-    for (var entry in cachedResponses) {
-      var cachedEntries = entry.asCachedEntries;
+    for (var (:key, :cachedEntries) in evictionCandidates) {
+      for (var cached in cachedEntries) {
+        ++totalRemoved;
+        totalMemoryRemoved += cached.memorySize;
+      }
 
-      if (cachedEntries != null) {
-        for (var cached in cachedEntries) {
-          ++totalRemoved;
-          totalMemoryRemoved += cached.memorySize;
+      // `_remove` drops the whole entry (all its alternatives) and its
+      // memory size at once.
+      _remove(key);
 
-          _remove(cached.key);
-        }
-
-        if (_totalCachedResponsesMemorySize <= targetMemory) {
-          break;
-        }
+      if (_totalCachedResponsesMemorySize <= targetMemory) {
+        break;
       }
     }
 
@@ -410,6 +426,9 @@ class APIServerResponseCache {
   }
 
   Future<Response>? cacheResponse(Request request, Response response) {
+    // Only `GET` responses are cached (for any status):
+    if (request.method != 'GET') return null;
+
     switch (response.statusCode) {
       case 200:
         return _cacheResponse200(request, response);
@@ -477,22 +496,23 @@ class APIServerResponseCache {
     return response2;
   }
 
+  /// Stores the `304` [response] (in the background) and returns `null`:
+  /// a `304` has no body to replace, so the [response] is sent as is.
   Future<Response>? _cacheResponse304(Request request, Response response) {
-    var method = request.method;
-    if (method != 'GET') {
-      return null;
-    }
+    var ifModifiedSince = request.ifModifiedSinceHeader;
+    if (ifModifiedSince == null) return null;
 
-    var requestIfModifiableSince = request.ifModifiedSinceHeader;
-    if (requestIfModifiableSince == null) return null;
-
-    return _cacheResponse304Impl(response, request, requestIfModifiableSince);
+    _storeResponse304(response, request, ifModifiedSince);
+    return null;
   }
 
-  Future<Response>? _cacheResponse304Impl(
+  /// Puts a [_CachedResponse304] once the file stat resolves. Fire and
+  /// forget (`void`): the `304` [response] doesn't depend on it, so it
+  /// isn't delayed by the file stat. Used by [_cacheResponse304].
+  void _storeResponse304(
     Response response,
     Request request,
-    String requestIfModifiableSince,
+    String ifModifiedSince,
   ) {
     var cacheControl = response.headers[HttpHeaders.cacheControlHeader];
     var server = response.headers[HttpHeaders.serverHeader];
@@ -506,7 +526,7 @@ class APIServerResponseCache {
         path: request.url.path,
         file: file,
         fileStat: fileStat,
-        requestIfModifiableSince: requestIfModifiableSince,
+        ifModifiedSince: ifModifiedSince,
         cacheControl: cacheControl,
         server: server,
       );
@@ -518,16 +538,9 @@ class APIServerResponseCache {
 
       _put(cachedResponse);
     });
-
-    return null;
   }
 
   Future<Response>? _cacheResponse404(Request request, Response response) {
-    var method = request.method;
-    if (method != 'GET') {
-      return null;
-    }
-
     var path = request.url.path;
 
     return _cacheResponse404Impl(path, response);
@@ -620,12 +633,12 @@ class _CachedResponseKey {
       _CachedResponseKey(200, request.url.path);
 
   static _CachedResponseKey? status304(Request request) {
-    var requestIfModifiableSince = request.ifModifiedSinceHeader;
-    if (requestIfModifiableSince == null) return null;
+    var ifModifiedSince = request.ifModifiedSinceHeader;
+    if (ifModifiedSince == null) return null;
 
     return _CachedResponseKey304(
       request.url.path,
-      requestIfModifiableSince: requestIfModifiableSince,
+      ifModifiedSince: ifModifiedSince,
     );
   }
 
@@ -647,10 +660,9 @@ class _CachedResponseKey {
 }
 
 class _CachedResponseKey304 extends _CachedResponseKey {
-  final String? requestIfModifiableSince;
+  final String? ifModifiedSince;
 
-  _CachedResponseKey304(String path, {this.requestIfModifiableSince})
-    : super(304, path);
+  _CachedResponseKey304(String path, {this.ifModifiedSince}) : super(304, path);
 }
 
 abstract class WithMemorySize {
@@ -836,8 +848,7 @@ class _FileStat implements WithMemorySize {
   }
 }
 
-abstract class _CachedResponse
-    implements WithMemorySize, Comparable<_CachedResponse> {
+abstract class _CachedResponse implements WithMemorySize {
   final int statusCode;
   final String path;
 
@@ -954,19 +965,41 @@ abstract class _CachedResponse
 
   bool validate(Request request);
 
-  @override
-  int compareTo(_CachedResponse other) {
-    int cmp;
+  /// Compares two cache entries (a response and its compressed
+  /// alternatives) by the totals of each entry ([usageCount] and
+  /// [memorySize] summed): the entry is stored and evicted as a whole. Used
+  /// to sort the eviction candidates in
+  /// `APIServerResponseCache._checkMaxMemorySize`. (Responses aren't sorted
+  /// one by one: an entry's alternatives are evicted together.)
+  static int compareEntries(
+    List<_CachedResponse> entries1,
+    List<_CachedResponse> entries2,
+  ) => _compareUsageAndMemory(
+    entries1.map((e) => e.usageCount).sum,
+    entries1.map((e) => e.memorySize).sum,
+    entries2.map((e) => e.usageCount).sum,
+    entries2.map((e) => e.memorySize).sum,
+  );
 
-    {
-      var use1 = usageCount ~/ 1000;
-      var use2 = other.usageCount ~/ 1000;
-      cmp = use2.compareTo(use1);
-    }
+  /// The order of [compareEntries], the eviction order of
+  /// `APIServerResponseCache._checkMaxMemorySize` (it evicts from the
+  /// first): the least used first (usage in buckets of 1000, ascending),
+  /// then, among equally used, the largest first (memory size in buckets of
+  /// 8 KB, descending: fewer evictions free the memory).
+  ///
+  /// The usage was descending, so the most used responses were evicted
+  /// first: the opposite of a cache.
+  static int _compareUsageAndMemory(
+    int usage1,
+    int memory1,
+    int usage2,
+    int memory2,
+  ) {
+    var cmp = (usage1 ~/ 1000).compareTo(usage2 ~/ 1000);
 
     if (cmp == 0) {
-      var m1 = memorySize ~/ (1024 * 8);
-      var m2 = other.memorySize ~/ (1024 * 8);
+      var m1 = memory1 ~/ (1024 * 8);
+      var m2 = memory2 ~/ (1024 * 8);
       cmp = m2.compareTo(m1);
     }
 
@@ -1332,7 +1365,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
       path: path,
       file: file,
       fileStat: fileStat,
-      requestIfModifiableSince: lastModified,
+      ifModifiedSince: lastModified,
       cacheControl: cacheControl,
       server: server,
     );
@@ -1345,7 +1378,7 @@ class _CachedResponse200 extends _CachedResponseWithBody {
 }
 
 class _CachedResponse304 extends _CachedResponse {
-  final String requestIfModifiableSince;
+  final String ifModifiedSince;
   final String? cacheControl;
   final String? server;
 
@@ -1353,28 +1386,24 @@ class _CachedResponse304 extends _CachedResponse {
     required super.path,
     required super.file,
     super.fileStat,
-    required this.requestIfModifiableSince,
+    required this.ifModifiedSince,
     this.cacheControl,
     this.server,
   }) : super(statusCode: 304);
 
   @override
-  _CachedResponseKey _resolveKey() => _CachedResponseKey304(
-    path,
-    requestIfModifiableSince: requestIfModifiableSince,
-  );
+  _CachedResponseKey _resolveKey() =>
+      _CachedResponseKey304(path, ifModifiedSince: ifModifiedSince);
 
   @override
   int _computeMemorySize() =>
-      super._computeMemorySize() + (8 + requestIfModifiableSince.memorySize);
+      super._computeMemorySize() + (8 + ifModifiedSince.memorySize);
 
   @override
   bool validate(Request request) {
-    var requestIfModifiableSince = request.ifModifiedSinceHeader;
+    var ifModifiedSince = request.ifModifiedSinceHeader;
 
-    var ok =
-        requestIfModifiableSince != null &&
-        requestIfModifiableSince == this.requestIfModifiableSince;
+    var ok = ifModifiedSince != null && ifModifiedSince == this.ifModifiedSince;
 
     return ok;
   }
@@ -1387,7 +1416,7 @@ class _CachedResponse304 extends _CachedResponse {
     final server = this.server;
 
     var headers = <String, List<String>>{
-      'Last-Modified': [requestIfModifiableSince],
+      'Last-Modified': [ifModifiedSince],
       if (cacheControl != null) 'Cache-Control': [cacheControl],
       if (server != null) 'Server': [server],
     };
@@ -1400,7 +1429,7 @@ class _CachedResponse304 extends _CachedResponse {
   @override
   String toString() =>
       '[304]{ '
-      'If-Modifiable-Since: $requestIfModifiableSince, '
+      'If-Modified-Since: $ifModifiedSince, '
       'memory: ${memorySize.asBestUnit} '
       '}'
       '->$path'

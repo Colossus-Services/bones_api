@@ -1,6 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
@@ -18,7 +19,6 @@ import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
-import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsDbLogger();
 
@@ -647,7 +647,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       _log.info('getTableFieldsTypesImpl> $table');
 
       var sql =
-          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = ${DBSQLAdapter.sqlStringLiteral(table)}";
 
       var scheme = await connection.mappedResultsQuery(sql);
 
@@ -682,7 +682,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
       var sql =
-          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = ${DBSQLAdapter.sqlStringLiteral(table)}";
 
       var scheme = await connection.mappedResultsQuery(sql);
 
@@ -703,16 +703,15 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       notifyTableFieldTypes(table, fieldsTypes);
 
-      var fieldsReferencedTables = await _findFieldsReferencedTables(
+      var fieldsReferencedTables = await findFieldsReferencedTablesCached(
         connection,
         table,
         contextID: contextID,
       );
 
-      var relationshipTables = await _findRelationshipTables(
+      var relationshipTables = await findRelationshipTables(
         connection,
         table,
-        idFieldName,
         contextID: contextID,
       );
 
@@ -802,7 +801,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         ON true
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
     WHERE
-      t.relname = '$table'
+      t.relname = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND t.relkind IN ('r', 'p')
       AND pg_table_is_visible(t.oid)
       AND ix.indisvalid
@@ -844,9 +843,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     String table,
     Iterable<String> indexesNames,
   ) {
-    var names = indexesNames
-        .map((n) => "'${n.replaceAll("'", "''")}'")
-        .join(', ');
+    var names = indexesNames.map(DBSQLAdapter.sqlStringLiteral).join(', ');
     if (names.isEmpty) return <String, String?>{};
 
     var sql =
@@ -897,7 +894,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     FROM pg_constraint con
       JOIN pg_class tbl ON con.conrelid = tbl.oid
     WHERE
-      tbl.relname = '$table'
+      tbl.relname = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND pg_table_is_visible(tbl.oid);
     ''';
 
@@ -1002,7 +999,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     JOIN
       information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
     WHERE
-      constraint_type = 'PRIMARY KEY' and tc.table_name = '$table';
+      constraint_type = 'PRIMARY KEY' and tc.table_name = ${DBSQLAdapter.sqlStringLiteral(table)};
     ''';
 
     var columns = await connection.mappedResultsQuery(sql);
@@ -1075,95 +1072,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     }
   }
 
-  Future<List<TableRelationshipReference>> _findRelationshipTables(
-    PostgreSQLConnectionWrapper connection,
-    String table,
-    String idFieldName, {
-    Object? contextID,
-  }) async {
-    final tablesReferences = await _findAllTableFieldsReferences(
-      connection,
-      table,
-      contextID: contextID,
-    );
-
-    var relationships = tablesReferences
-        .map((e) {
-          var refToTables = e.values
-              .where((r) => r.targetTable == table)
-              .toList(growable: false);
-          var otherRefs = e.values
-              .where((r) => r.targetTable != table)
-              .toList(growable: false);
-
-          if (refToTables.length != 1 || otherRefs.length != 1) {
-            return null;
-          }
-
-          var refToTable = refToTables.single;
-          var otherRef = otherRefs.single;
-
-          var tableRelationshipReference = TableRelationshipReference(
-            refToTable.sourceTable,
-            refToTable.targetTable,
-            refToTable.targetField,
-            refToTable.targetFieldType,
-            refToTable.sourceField,
-            otherRef.targetTable,
-            otherRef.targetField,
-            otherRef.targetFieldType,
-            otherRef.sourceField,
-            sourceRelationshipFieldIndex: refToTable.indexName,
-            targetRelationshipFieldIndex: otherRef.indexName,
-          );
-
-          return tableRelationshipReference;
-        })
-        .nonNulls
-        .toList();
-
-    return relationships;
-  }
-
-  FutureOr<List<Map<String, TableFieldReference>>>
-  _findAllTableFieldsReferences(
-    PostgreSQLConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) async {
-    var tablesNames = await _listTablesNames(connection, contextID: contextID);
-
-    var tablesReferences = <Map<String, TableFieldReference>>[];
-
-    for (var t in tablesNames) {
-      var refs = await _findFieldsReferencedTables(
-        connection,
-        t,
-        contextID: contextID,
-      );
-      tablesReferences.add(refs);
-    }
-
-    tablesReferences = tablesReferences.where((m) {
-      return m.length > 1 &&
-          m.values.where((r) => r.targetTable == table).isNotEmpty &&
-          m.values.where((r) => r.targetTable != table).isNotEmpty;
-    }).toList();
-    return tablesReferences;
-  }
-
-  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
-      Expando();
-
-  FutureOr<List<String>> _listTablesNames(
-    PostgreSQLConnectionWrapper connection, {
-    Object? contextID,
-  }) => _listTablesNamesContextCache.putIfAbsentAsync(
-    contextID,
-    () => _listTablesNamesImpl(connection),
-  );
-
-  Future<List<String>> _listTablesNamesImpl(
+  @override
+  Future<List<String>> listTablesNamesImpl(
     PostgreSQLConnectionWrapper connection,
   ) async {
     var sql = '''
@@ -1177,55 +1087,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     return names;
   }
 
-  final TimedMap<String, Map<String, TableFieldReference>>
-  _findFieldsReferencedTablesCache =
-      TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
-
-  @override
-  TableScheme? disposeTableSchemeCache(
-    String table, {
-    bool fieldsTypes = false,
-  }) {
-    _findFieldsReferencedTablesCache.remove(table);
-    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
-  }
-
-  @override
-  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
-    _findFieldsReferencedTablesCache.clear();
-    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
-  }
-
-  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
-  _findFieldsReferencedTablesContextCache = Expando();
-
-  FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-    PostgreSQLConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) {
-    if (contextID != null) {
-      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
-      return cache[table] ??= _findFieldsReferencedTablesImpl(connection, table)
-          .then((ret) {
-            cache[table] = ret;
-            _findFieldsReferencedTablesCache[table] = ret;
-            return ret;
-          });
-    }
-
-    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
-      table,
-      () => _findFieldsReferencedTablesImpl(connection, table),
-    );
-  }
-
-  Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
-    PostgreSQLConnectionWrapper connection,
-    String table,
-  ) async {
-    var sql =
-        '''
+  /// The SQL of [findFieldsReferencedTablesImpl]: the foreign keys of
+  /// [table] (escaped as a string literal, see
+  /// [DBSQLAdapter.sqlStringLiteral]).
+  @visibleForTesting
+  static String findFieldsReferencedTablesSQL(String table) =>
+      '''
     SELECT
       o.conname AS constraint_name,
       
@@ -1280,11 +1147,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     
     WHERE
       o.contype = 'f'
-      AND m.relname = '$table'
+      AND m.relname = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND o.conrelid IN (
         SELECT oid FROM pg_class c WHERE c.relkind = 'r'
       );
     ''';
+
+  @override
+  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
+    PostgreSQLConnectionWrapper connection,
+    String table,
+  ) async {
+    var sql = findFieldsReferencedTablesSQL(table);
 
     var referenceFields = await connection.mappedResultsQuery(sql);
 
@@ -1437,19 +1311,22 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           sql.sql,
           substitutionValues: sql.parametersByPlaceholder,
         )
-        .resolveMapped((results) {
-          var count = results
-              .map((row) {
-                var count = row['count'] ?? 0;
-                return count is int
-                    ? count
-                    : int.tryParse(count.toString().trim());
-              })
-              .whereType<int>()
-              .first;
-          return count;
-        });
+        .resolveMapped(countFromResults);
   }
+
+  /// The count of a `COUNT` query's [results]: the first row's parseable
+  /// `count` column, or `0` without one (no row, as the SQLite and MySQL
+  /// adapters; a `.first` used to throw a `StateError` here).
+  @visibleForTesting
+  static int countFromResults(Iterable<Map<String, dynamic>> results) =>
+      results
+          .map((row) {
+            var count = row['count'] ?? 0;
+            return count is int ? count : int.tryParse(count.toString().trim());
+          })
+          .whereType<int>()
+          .firstOrNull ??
+      0;
 
   @override
   FutureOr<List<I>> doExistIDsSQL<I extends Object>(
@@ -1627,13 +1504,25 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       return lastInsertResult;
     }
 
-    var fixSql =
-        "SELECT setval(pg_get_serial_sequence('$table', '$idFieldName'), coalesce(max(id),0) + 1, false) FROM \"$table\"";
+    var fixSql = fixTableSequenceSQL(table, idFieldName);
 
     _log.info("Fixing table PRIMARY KEY sequence: <$fixSql>");
 
     return connection.query(fixSql).then((r) => lastInsertResult);
   }
+
+  /// The SQL that moves the ID sequence of [table] after its greatest ID
+  /// (after an auto-insert with an explicit ID, see `_fixeTableSequence`).
+  ///
+  /// The greatest ID is of the column [idFieldName] (quoted, as the table),
+  /// the column of the sequence: not a literal `id` column, that a table
+  /// with another ID column doesn't have.
+  @visibleForTesting
+  static String fixTableSequenceSQL(String table, String idFieldName) =>
+      "SELECT setval(pg_get_serial_sequence("
+      "${DBSQLAdapter.sqlStringLiteral(table)}, "
+      "${DBSQLAdapter.sqlStringLiteral(idFieldName)}), "
+      "coalesce(max(\"$idFieldName\"),0) + 1, false) FROM \"$table\"";
 
   dynamic _resolveResultID(
     List<Map<String, dynamic>> results,
@@ -1671,13 +1560,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   @override
   Future<PostgreSQLConnectionTransactionWrapper> openTransaction(
     Transaction transaction,
-  ) {
-    var contextCompleter = Completer<PostgreSQLConnectionTransactionWrapper>();
-
-    var result = executeWithPool(
-      (connection) {
-        return connection.openTransaction((connTransaction) {
-          contextCompleter.complete(connTransaction);
+  ) => openTransactionWithPool<PostgreSQLConnectionTransactionWrapper>(
+    transaction,
+    (connection, onTransactionContext) =>
+        connection.openTransaction((connTransaction) {
+          onTransactionContext(connTransaction);
 
           return transaction.transactionFuture.then(
             (res) => resolveTransactionResult(res, transaction, connection),
@@ -1686,28 +1573,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               throw e;
             },
           );
-        });
-      },
-      validator: (c) => !transaction.isAborted,
-      onError: (e, s) => transaction.notifyExecutionError(
-        e,
-        s,
-        errorResolver: resolveError,
-        debugInfo: () => transaction.toString(withExecutedOperations: false),
-      ),
-    );
+        }),
+  );
 
-    transaction.transactionResult = result;
-
-    return contextCompleter.future;
-  }
-
-  @override
-  bool get cancelTransactionResultWithError => false;
-
-  @override
-  bool get throwTransactionResultWithError => true;
-
+  /// Cancels the driver's transaction (see
+  /// [PostgreSQLConnectionTransactionWrapper.cancelTransaction]).
   @override
   bool cancelTransaction(
     Transaction transaction,
@@ -1719,15 +1589,6 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     connTransaction?.cancelTransaction();
     return true;
   }
-
-  @override
-  bool get callCloseTransactionRequired => false;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    PostgreSQLConnectionWrapper? connection,
-  ) {}
 
   @override
   String toString() {

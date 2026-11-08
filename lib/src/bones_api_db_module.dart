@@ -1,3 +1,4 @@
+import 'dart:convert' show HtmlEscape, HtmlEscapeMode;
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -345,43 +346,21 @@ class APIDBModule extends APIModule {
       return APIResponse.error(error: "Can't find table: $table");
     }
 
-    var query = Uri.decodeQueryComponent(requestedUri.query);
+    var directives = _parseSelectDirectives(
+      Uri.decodeQueryComponent(requestedUri.query),
+      eager: eager,
+      limit: limit,
+      offset: offset,
+      page: page,
+      orderDirection: orderDirection,
+    );
 
-    // See [selectQueryDirectives]. The arguments passed to this method take
-    // precedence over the query `String` directives.
-    {
-      var extracted = _extractQueryDirective(query, 'EAGER');
-      query = extracted.query;
-      if (extracted.value == 'true') eager = true;
-    }
-
-    {
-      var extracted = _extractQueryDirective(query, 'LIMIT');
-      query = extracted.query;
-      limit ??= int.tryParse(extracted.value?.trim() ?? '');
-
-      // A page of `defaultSelectLimit` by default (`LIMIT=0`: no limit).
-      limit ??= defaultSelectLimit;
-      if (limit <= 0) limit = null;
-    }
-
-    {
-      var extracted = _extractQueryDirective(query, 'OFFSET');
-      query = extracted.query;
-      offset ??= int.tryParse(extracted.value?.trim() ?? '');
-    }
-
-    {
-      var extracted = _extractQueryDirective(query, 'PAGE');
-      query = extracted.query;
-      page ??= int.tryParse(extracted.value?.trim() ?? '');
-    }
-
-    {
-      var extracted = _extractQueryDirective(query, 'ORDER');
-      query = extracted.query;
-      orderDirection ??= OrderDirection.parse(extracted.value);
-    }
+    var query = directives.query;
+    eager = directives.eager;
+    limit = directives.limit;
+    offset = directives.offset;
+    page = directives.page;
+    orderDirection = directives.orderDirection;
 
     // Resolved here (and not by the repository) so an invalid `PAGE` becomes an
     // error response instead of an uncaught `ArgumentError`:
@@ -453,7 +432,123 @@ class APIDBModule extends APIModule {
       footer: _buildFooter(),
     );
 
-    var content = [];
+    var repoName = entityRepository.name;
+
+    var content = [
+      ..._buildSelectTableHTML(
+        entityRepository,
+        entityRepositoryProviders,
+        list,
+      ),
+      ..._buildPaginationHTML(
+        repoName,
+        list,
+        query: query,
+        eager: eager,
+        limit: limit,
+        offset: offset,
+        orderDirection: orderDirection,
+      ),
+    ];
+
+    htmlDoc.content = content;
+
+    var html = htmlDoc.build();
+
+    return APIResponse.ok(html, mimeType: 'html');
+  }
+
+  /// Parses the directives of a select's [query] `String` (see
+  /// [selectQueryDirectives]), returning the [query] without them. The
+  /// arguments given (of [select]) take precedence over the directives.
+  ///
+  /// Without an explicit `LIMIT`, a page of [defaultSelectLimit] (`LIMIT=0`:
+  /// no limit, `null`). Used by [select].
+  ({
+    String query,
+    bool? eager,
+    int? limit,
+    int? offset,
+    int? page,
+    OrderDirection? orderDirection,
+  })
+  _parseSelectDirectives(
+    String query, {
+    bool? eager,
+    int? limit,
+    int? offset,
+    int? page,
+    OrderDirection? orderDirection,
+  }) {
+    {
+      var extracted = _extractQueryDirective(query, 'EAGER');
+      query = extracted.query;
+      if (extracted.value == 'true') eager = true;
+    }
+
+    {
+      var extracted = _extractIntDirective(query, 'LIMIT');
+      query = extracted.query;
+      limit ??= extracted.value;
+
+      // A page of `defaultSelectLimit` by default (`LIMIT=0`: no limit).
+      limit ??= defaultSelectLimit;
+      if (limit <= 0) limit = null;
+    }
+
+    {
+      var extracted = _extractIntDirective(query, 'OFFSET');
+      query = extracted.query;
+      offset ??= extracted.value;
+    }
+
+    {
+      var extracted = _extractIntDirective(query, 'PAGE');
+      query = extracted.query;
+      page ??= extracted.value;
+    }
+
+    {
+      var extracted = _extractQueryDirective(query, 'ORDER');
+      query = extracted.query;
+      orderDirection ??= OrderDirection.parse(extracted.value);
+    }
+
+    return (
+      query: query,
+      eager: eager,
+      limit: limit,
+      offset: offset,
+      page: page,
+      orderDirection: orderDirection,
+    );
+  }
+
+  /// As [_extractQueryDirective], with the value parsed as an `int` (`null`
+  /// if absent or not an `int`). Used for the `LIMIT`, `OFFSET` and `PAGE`
+  /// directives by [_parseSelectDirectives].
+  static ({String query, int? value}) _extractIntDirective(
+    String query,
+    String key,
+  ) {
+    var extracted = _extractQueryDirective(query, key);
+    return (
+      query: extracted.query,
+      value: int.tryParse(extracted.value?.trim() ?? ''),
+    );
+  }
+
+  /// The HTML `<table>` of the selected entities ([list]) of
+  /// [entityRepository], with links to the related entities, and to edit,
+  /// delete and insert. Used by [select].
+  List<String> _buildSelectTableHTML(
+    EntityRepository entityRepository,
+    List<EntityRepositoryProvider> entityRepositoryProviders,
+    List<Object> list,
+  ) {
+    var content = <String>[];
+
+    var entityType = entityRepository.type;
 
     var entityHandler = entityRepository.entityHandler;
 
@@ -497,29 +592,36 @@ class APIDBModule extends APIModule {
 
           content.add('<td style="text-align: center">');
 
+          // A related entity's ID (also a `String` one) is escaped as any
+          // value, in the link and its text:
+          String idLink(Object? id) =>
+              '<a href="${basePath}update/$repoName/${_escapeHTMLAttribute(id)}">'
+              '${_escapeHTML(id)}</a>';
+
           if (v2 is List) {
-            var ids = v2
-                .map((e) => '<a href="${basePath}update/$repoName/$e">$e</a>')
-                .join(' , ');
-            content.add(ids);
+            content.add(v2.map(idLink).join(' , '));
           } else {
-            content.add('<a href="${basePath}update/$repoName/$v2">$v2</a>');
+            content.add(idLink(v2));
           }
 
           content.add('</td>');
         } else {
-          content.add('<td style="text-align: center">$v2</td>');
+          content.add('<td style="text-align: center">${_escapeHTML(v2)}</td>');
         }
       }
 
       var id = entityHandler.getID(o);
 
       if (id != null) {
+        var idAttr = _escapeHTMLAttribute(id);
+
         content.add('<td style="text-align: center"> &nbsp; [ ');
 
-        content.add('<a href="../update/$repoName/$id">edit</a>');
+        content.add('<a href="../update/$repoName/$idAttr">edit</a>');
 
-        content.add(' &nbsp;|&nbsp; <a href="../delete/$repoName/$id">del</a>');
+        content.add(
+          ' &nbsp;|&nbsp; <a href="../delete/$repoName/$idAttr">del</a>',
+        );
 
         content.add(' ] &nbsp;</td>');
       }
@@ -534,10 +636,41 @@ class APIDBModule extends APIModule {
 
     content.add('</table>');
 
+    return content;
+  }
+
+  /// [value] (its `toString`) escaped as HTML text (`&`, `<`, `>`): an
+  /// entity's value (e.g. a name with `<`) would otherwise be read as HTML
+  /// (and could inject markup or scripts in the page). Used by
+  /// [_buildSelectTableHTML].
+  static String _escapeHTML(Object? value) =>
+      const HtmlEscape(HtmlEscapeMode.element).convert('$value');
+
+  /// [value] (its `toString`) escaped for an HTML attribute value between
+  /// `"` (as [_escapeHTML], also `"`): an entity's ID in a link. Used by
+  /// [_buildSelectTableHTML].
+  static String _escapeHTMLAttribute(Object? value) =>
+      const HtmlEscape(HtmlEscapeMode.attribute).convert('$value');
+
+  /// The HTML of the pagination of a select of [repoName] (when it has a
+  /// [limit]): the range of the selected entities ([list]) and the links to
+  /// the previous and next pages; and the link to this page as JSON. The
+  /// links keep the select's [query] and directives. Used by [select].
+  List<String> _buildPaginationHTML(
+    String repoName,
+    List<Object> list, {
+    required String query,
+    required bool eager,
+    required int? limit,
+    required int? offset,
+    required OrderDirection? orderDirection,
+  }) {
+    var content = <String>[];
+
     // The query `String` of a page (`OFFSET`) of this select:
     String pageQuery(int? pageOffset) => [
       if (query.isNotEmpty) Uri.encodeQueryComponent(query),
-      if (eager!) 'EAGER=true',
+      if (eager) 'EAGER=true',
       if (orderDirection != null) 'ORDER=${orderDirection.name}',
       'LIMIT=${limit ?? 0}',
       if (pageOffset != null && pageOffset > 0) 'OFFSET=$pageOffset',
@@ -568,11 +701,7 @@ class APIDBModule extends APIModule {
       '<br><div style="width: 100%; text-align: center;"><i><a href="${basePath}select/$repoName/json?${pageQuery(offset)}">JSON</a></i></div>',
     );
 
-    htmlDoc.content = content;
-
-    var html = htmlDoc.build();
-
-    return APIResponse.ok(html, mimeType: 'html');
+    return content;
   }
 
   static const _fieldsNamesOrder = [

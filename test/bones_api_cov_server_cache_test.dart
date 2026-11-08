@@ -1014,6 +1014,106 @@ void main() {
       expect(cache.toString(), contains('fileStatTimeout: 2 d'));
     });
 
+    test('max memory size cleaning: entries with alternatives', () async {
+      // Entries with compressed alternatives are stored as a `List`: the
+      // eviction sorted the raw values and threw a `TypeError` on them.
+      var cache = APIServerResponseCache(
+        maxMemorySize: 1024 * 1024,
+        fileStatTimeout: Duration(days: 2),
+      );
+
+      var inner = _FakeStaticHandler(tmpDir);
+      for (var i = 0; i < 8; ++i) {
+        var content = List.generate(30000, (j) => 'f$i:${j * 7919}').join(',');
+        inner.overrides['t$i.json'] = (request) => Response.ok(
+          utf8.encode('[$content]'),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      var handler = cache.middleware(inner.call);
+
+      for (var i = 0; i < 8; ++i) {
+        var r = await handler(_get('t$i.json'));
+        expect(r.statusCode, equals(200));
+
+        // A compressed alternative of the same entry:
+        var rGz = await handler(
+          _get('t$i.json', headers: {'accept-encoding': 'gzip'}),
+        );
+        expect(rGz.statusCode, equals(200));
+        expect(rGz.headers['content-encoding'], equals('gzip'));
+      }
+
+      expect(inner.calls, equals(8));
+      expect(cache.totalMemorySize, lessThanOrEqualTo(1024 * 1024 * 1.5));
+      expect(cache.cachedResponsesLength, lessThan(8));
+    });
+
+    test('max memory size cleaning: the most used entry is kept', () async {
+      // The eviction removes the least used entries first (it removed the
+      // most used first). Usage counts in buckets of 1000.
+      var cache = APIServerResponseCache(
+        maxMemorySize: 1024 * 1024,
+        fileStatTimeout: Duration(days: 2),
+      );
+
+      var inner = _FakeStaticHandler(tmpDir);
+      for (var i = 0; i < 5; ++i) {
+        inner.overrides['u$i.bin'] = (request) => Response.ok(
+          List<int>.filled(300 * 1024, i),
+          headers: {'content-type': 'application/octet-stream'},
+        );
+      }
+
+      var handler = cache.middleware(inner.call);
+
+      // `u0` cached and used 1000+ times:
+      for (var n = 0; n < 1001; ++n) {
+        var r = await handler(_get('u0.bin'));
+        expect(r.statusCode, equals(200));
+      }
+      expect(inner.calls, equals(1));
+
+      // Filling the cache evicts the others, not `u0`:
+      for (var i = 1; i < 5; ++i) {
+        var r = await handler(_get('u$i.bin'));
+        expect(r.statusCode, equals(200));
+      }
+      expect(cache.cachedResponsesLength, lessThan(5));
+
+      var callsBefore = inner.calls;
+      var r = await handler(_get('u0.bin'));
+      expect(r.statusCode, equals(200));
+      expect(inner.calls, equals(callsBefore), reason: '`u0` was evicted');
+    });
+
+    test('expired entries: memory size subtracted', () async {
+      var file = writeFile('e.txt', 'Hello E');
+
+      var cache = APIServerResponseCache(fileStatTimeout: Duration.zero);
+      var inner = _FakeStaticHandler(tmpDir);
+      var handler = cache.middleware(inner.call);
+
+      var r1 = await handler(_get('e.txt'));
+      expect(await _readBody(r1), equals('Hello E'));
+
+      // 200 + 304:
+      expect(cache.cachedResponsesLength, equals(2));
+      expect(cache.totalMemorySize, greaterThan(0));
+
+      file.writeAsStringSync('Hello E - modified!');
+      file.setLastModifiedSync(DateTime.now().add(Duration(seconds: 10)));
+      await Future.delayed(Duration(milliseconds: 5));
+
+      // A lookup of the modified file expires its 200 and 304 entries
+      // (without caching anything new):
+      expect(await cache.getCachedResponse(_get('e.txt')), isNull);
+
+      expect(cache.cachedResponsesLength, equals(0));
+      expect(cache.totalMemorySize, equals(0));
+    });
+
     test('multi-value headers + previous server-timing', () async {
       var cache = APIServerResponseCache();
       var inner = _FakeStaticHandler(tmpDir);

@@ -18,7 +18,6 @@ import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
-import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBSQLiteAdapter')..registerAsDbLogger();
 
@@ -609,14 +608,14 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
 
     notifyTableFieldTypes(table, fieldsTypes);
 
-    var fieldsReferencedTablesRet = _findFieldsReferencedTables(
+    var fieldsReferencedTablesRet = findFieldsReferencedTablesCached(
       connection,
       table,
       contextID: contextID,
     );
 
     return fieldsReferencedTablesRet.resolveMapped((fieldsReferencedTables) {
-      var relationshipTablesRet = _findRelationshipTables(
+      var relationshipTablesRet = findRelationshipTables(
         connection,
         table,
         contextID: contextID,
@@ -719,18 +718,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     }
   }
 
-  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
-      Expando();
-
-  FutureOr<List<String>> _listTablesNames(
-    DBSQLiteConnectionWrapper connection, {
-    Object? contextID,
-  }) => _listTablesNamesContextCache.putIfAbsentAsync(
-    contextID,
-    () => _listTablesNamesImpl(connection),
-  );
-
-  List<String> _listTablesNamesImpl(DBSQLiteConnectionWrapper connection) {
+  @override
+  List<String> listTablesNamesImpl(DBSQLiteConnectionWrapper connection) {
     var results = connection.select(
       "SELECT name FROM sqlite_master "
       "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
@@ -739,55 +728,8 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     return results.map((r) => r['name'].toString()).toList();
   }
 
-  final TimedMap<String, Map<String, TableFieldReference>>
-  _findFieldsReferencedTablesCache =
-      TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
-
   @override
-  TableScheme? disposeTableSchemeCache(
-    String table, {
-    bool fieldsTypes = false,
-  }) {
-    _findFieldsReferencedTablesCache.remove(table);
-    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
-  }
-
-  @override
-  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
-    _findFieldsReferencedTablesCache.clear();
-    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
-  }
-
-  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
-  _findFieldsReferencedTablesContextCache = Expando();
-
-  FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-    DBSQLiteConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) {
-    if (contextID != null) {
-      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
-      var cached = cache[table];
-      if (cached != null) return cached;
-
-      var ret = _findFieldsReferencedTablesImpl(connection, table);
-      cache[table] = ret;
-
-      return ret.resolveMapped((r) {
-        cache[table] = r;
-        _findFieldsReferencedTablesCache[table] = r;
-        return r;
-      });
-    }
-
-    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
-      table,
-      () => _findFieldsReferencedTablesImpl(connection, table),
-    );
-  }
-
-  FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
+  FutureOr<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
     DBSQLiteConnectionWrapper connection,
     String table,
   ) {
@@ -848,67 +790,6 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
       (mapEntries) =>
           Map<String, TableFieldReference>.fromEntries(mapEntries.nonNulls),
     );
-  }
-
-  FutureOr<List<TableRelationshipReference>> _findRelationshipTables(
-    DBSQLiteConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) {
-    var tablesNamesRet = _listTablesNames(connection, contextID: contextID);
-
-    return tablesNamesRet.resolveMapped((tablesNames) {
-      var tablesReferencesRet = tablesNames
-          .map(
-            (t) => _findFieldsReferencedTables(
-              connection,
-              t,
-              contextID: contextID,
-            ),
-          )
-          .toList()
-          .resolveAll();
-
-      return tablesReferencesRet.resolveMapped((tablesReferences) {
-        var candidates = tablesReferences.where((m) {
-          return m.length > 1 &&
-              m.values.where((r) => r.targetTable == table).isNotEmpty &&
-              m.values.where((r) => r.targetTable != table).isNotEmpty;
-        }).toList();
-
-        return candidates
-            .map((e) {
-              var refToTables = e.values
-                  .where((r) => r.targetTable == table)
-                  .toList(growable: false);
-
-              var otherRefs = e.values
-                  .where((r) => r.targetTable != table)
-                  .toList(growable: false);
-
-              if (refToTables.length != 1 || otherRefs.length != 1) {
-                return null;
-              }
-
-              var refToTable = refToTables.first;
-              var otherRef = otherRefs.first;
-
-              return TableRelationshipReference(
-                refToTable.sourceTable,
-                refToTable.targetTable,
-                refToTable.targetField,
-                refToTable.targetFieldType,
-                refToTable.sourceField,
-                otherRef.targetTable,
-                otherRef.targetField,
-                otherRef.targetFieldType,
-                otherRef.sourceField,
-              );
-            })
-            .nonNulls
-            .toList();
-      });
-    });
   }
 
   // -------------------------------------------------------------------------
@@ -1144,30 +1025,15 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     var affectedRows = connection.updatedRows;
 
     if (affectedRows == 0 && results.isEmpty) {
-      var entry = sql.parametersByPlaceholder;
-      if (!allowAutoInsert) {
-        throw StateError(
-          "Can't update not stored entity into table `$table`: $entry",
-        );
-      }
-
-      var fields = sql.namedParameters!;
-
-      return generateInsertSQL(
+      return autoInsertAfterNoopUpdate(
         transaction,
         entityName,
         table,
-        fields,
-      ).resolveMapped((insertSQL) {
-        _log.info('Update not affecting any row! Auto inserting: $insertSQL');
-        return doInsertSQL(
-          entityName,
-          table,
-          insertSQL,
-          transaction,
-          connection,
-        );
-      });
+        sql,
+        connection,
+        allowAutoInsert: allowAutoInsert,
+        logger: _log,
+      );
     }
 
     return _resolveResultID(connection, results, sql, id);
@@ -1357,30 +1223,16 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   // -------------------------------------------------------------------------
 
   @override
-  Future<DBSQLiteConnectionWrapper> openTransaction(Transaction transaction) {
-    var contextCompleter = Completer<DBSQLiteConnectionWrapper>();
+  Future<DBSQLiteConnectionWrapper> openTransaction(Transaction transaction) =>
+      openTransactionWithPool<DBSQLiteConnectionWrapper>(
+        transaction,
+        (connection, onTransactionContext) =>
+            connection.openTransaction((transactionWrap) {
+              onTransactionContext(transactionWrap);
 
-    var result = executeWithPool(
-      (connection) {
-        return connection.openTransaction((transactionWrap) {
-          contextCompleter.complete(transactionWrap);
-
-          return _runTransaction(transaction, connection);
-        });
-      },
-      validator: (c) => !transaction.isAborted,
-      onError: (e, s) => transaction.notifyExecutionError(
-        e,
-        s,
-        errorResolver: resolveError,
-        debugInfo: () => transaction.toString(withExecutedOperations: false),
-      ),
-    );
-
-    transaction.transactionResult = result;
-
-    return contextCompleter.future;
-  }
+              return _runTransaction(transaction, connection);
+            }),
+      );
 
   /// Unlike the PostgreSQL/MySQL drivers, SQLite has no `runTx` helper that
   /// commits or rolls back around a callback, so the `COMMIT`/`ROLLBACK` is
@@ -1399,32 +1251,9 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     return await resolveTransactionResult(res, transaction, connection);
   }
 
-  @override
-  bool get cancelTransactionResultWithError => false;
-
-  @override
-  bool get throwTransactionResultWithError => true;
-
-  @override
-  bool cancelTransaction(
-    Transaction transaction,
-    DBSQLiteConnectionWrapper? connection,
-    Object? error,
-    StackTrace? stackTrace,
-  ) {
-    // The `ROLLBACK` is issued by `_DBSQLiteConnectionWrapped.openTransaction`
-    // when the transaction block throws.
-    return true;
-  }
-
-  @override
-  bool get callCloseTransactionRequired => false;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    DBSQLiteConnectionWrapper? connection,
-  ) {}
+  // `cancelTransaction` is the `DBSQLAdapter` default (nothing to cancel):
+  // the `ROLLBACK` is issued by `_DBSQLiteConnectionWrapped.openTransaction`
+  // when the transaction block throws.
 
   @override
   String toString() {

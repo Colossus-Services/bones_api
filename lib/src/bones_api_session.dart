@@ -137,19 +137,25 @@ class APISessionSet {
   late final SharedMapField<String, APISession> _sharedSessionsField =
       SharedMapField(sharedSessionsID, sharedStore: sharedStore);
 
-  static const Duration _cacheTimeout = Duration(seconds: 1);
+  /// The timeout of [SharedMapField.sharedMapCached] while resolving the
+  /// [SharedMap] of sessions (in [_resolveSharedSessions]).
+  static const Duration _sharedMapCacheTimeout = Duration(seconds: 1);
 
-  static final Expando<SharedMap<String, APISession>> _sharedSessions =
+  /// Cache of the resolved [SharedMap] of sessions of each [APISessionSet],
+  /// filled by [_resolveSharedSessions]: resolving it may be asynchronous
+  /// (shared store), and it's needed by every session operation.
+  /// An [Expando] so the entry doesn't keep its [APISessionSet] alive.
+  static final Expando<SharedMap<String, APISession>> _sharedSessionsCache =
       Expando();
 
   FutureOr<SharedMap<String, APISession>> _resolveSharedSessions() {
-    var sharedSessions = _sharedSessions[this];
+    var sharedSessions = _sharedSessionsCache[this];
     if (sharedSessions != null) return sharedSessions;
 
     return _sharedSessionsField
-        .sharedMapCached(timeout: _cacheTimeout)
+        .sharedMapCached(timeout: _sharedMapCacheTimeout)
         .resolveMapped((sharedSessions) {
-          _sharedSessions[this] = sharedSessions;
+          _sharedSessionsCache[this] = sharedSessions;
           return sharedSessions;
         });
   }

@@ -120,7 +120,7 @@ abstract class APIModule with Initializable {
   final Map<String, APIRouteHandler> _routesHandlersDELETE =
       <String, APIRouteHandler>{};
 
-  final Map<String, APIRouteHandler> _routesHandlersPATH =
+  final Map<String, APIRouteHandler> _routesHandlersPATCH =
       <String, APIRouteHandler>{};
 
   final Map<String, APIRouteHandler> _routesHandlersHEAD =
@@ -133,7 +133,7 @@ abstract class APIModule with Initializable {
     ..._routesHandlersPOST.keys,
     ..._routesHandlersPUT.keys,
     ..._routesHandlersDELETE.keys,
-    ..._routesHandlersPATH.keys,
+    ..._routesHandlersPATCH.keys,
     ..._routesHandlersHEAD.keys,
   };
 
@@ -158,7 +158,7 @@ abstract class APIModule with Initializable {
       case APIRequestMethod.DELETE:
         return _routesHandlersDELETE;
       case APIRequestMethod.PATCH:
-        return _routesHandlersPATH;
+        return _routesHandlersPATCH;
       case APIRequestMethod.HEAD:
         return _routesHandlersHEAD;
       case APIRequestMethod.OPTIONS:
@@ -298,7 +298,7 @@ abstract class APIModule with Initializable {
     APIRequest apiRequest,
     String routeName,
   ) {
-    if (routeName == 'API-INFO') {
+    if (routeName == APIRoot.apiInfoRoute) {
       var info = apiInfo(apiRequest);
       return APIResponse.ok(info as T, mimeType: _mimeTypeJson);
     }
@@ -327,7 +327,7 @@ abstract class APIModule with Initializable {
   bool acceptsRequest(APIRequest apiRequest) {
     var routeName = resolveRoute(apiRequest);
 
-    if (routeName == 'API-INFO' || routeName == authenticationRoute) {
+    if (routeName == APIRoot.apiInfoRoute || routeName == authenticationRoute) {
       return true;
     } else {
       var handler = getRouteHandlerByRequest(apiRequest, routeName);
@@ -339,18 +339,23 @@ abstract class APIModule with Initializable {
   APIModuleInfo apiInfo([APIRequest? apiRequest]) =>
       APIModuleInfo(this, apiRequest);
 
-  String get authenticationRoute => 'authenticate';
+  String get authenticationRoute => APIRoot.defaultAuthenticationRoute;
 
   APISecurity? get security => _securityImpl();
 
-  APISecurity? _security;
-  bool _securityResolved = false;
+  /// Cache of the [APIRoot.security] (possibly `null`), filled by
+  /// [_securityImpl]: [security] is read on every [call].
+  APISecurity? _securityCache;
+
+  /// Whether [_securityCache] was resolved: needed because `null` is a valid
+  /// (cached) [security].
+  bool _securityCacheResolved = false;
 
   APISecurity? _securityImpl() {
-    if (_securityResolved) return _security;
-    _securityResolved = true;
+    if (_securityCacheResolved) return _securityCache;
+    _securityCacheResolved = true;
 
-    return _security = apiRoot.security;
+    return _securityCache = apiRoot.security;
   }
 
   @override
@@ -1109,7 +1114,7 @@ class APIRouteBuilder<M extends APIModule> {
       ...module._routesHandlers.values,
       ...module._routesHandlersGET.values,
       ...module._routesHandlersPOST.values,
-      ...module._routesHandlersPATH.values,
+      ...module._routesHandlersPATCH.values,
       ...module._routesHandlersPUT.values,
       ...module._routesHandlersDELETE.values,
     ].toDistinctList();

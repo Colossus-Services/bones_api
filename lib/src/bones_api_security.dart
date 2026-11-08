@@ -522,30 +522,48 @@ abstract class APISecurity {
     List<APIPermission>? previousPermissions,
   );
 
-  FutureOr<bool> disposeAuthenticationPermission(String? token) {
+  FutureOr<bool> disposeAuthenticationPermission(String? token) =>
+      _disposeFromTokenStore(token, _tokenStore.removeTokenPermissions);
+
+  FutureOr<bool> disposeAuthenticationDataAndPermission(String? token) =>
+      _disposeFromTokenStore(token, _tokenStore.removeTokenDataAndPermissions);
+
+  /// Removes [token]'s entry from the token store with [removeFromStore] and
+  /// returns whether something was removed (`false` for a `null` [token]).
+  /// Shared by the `disposeAuthentication*` methods, which only differ in
+  /// what they remove (token, data, permissions).
+  FutureOr<bool> _disposeFromTokenStore(
+    String? token,
+    FutureOr<Object?> Function(String token) removeFromStore,
+  ) {
     if (token == null) {
       return false;
     }
 
-    var prevToken = _tokenStore.removeTokenPermissions(token);
-
-    return prevToken.resolveMapped((prevToken) {
-      var disposeTokenPermissions = prevToken != null;
-      return disposeTokenPermissions;
-    });
+    return removeFromStore(token)
+        .resolveMapped((prevEntry) => prevEntry != null);
   }
 
-  FutureOr<bool> disposeAuthenticationDataAndPermission(String? token) {
+  /// Clears [credential.usernameEntity] and removes its token's entry with
+  /// [removeFromStore] (see [_disposeFromTokenStore]). Returns whether
+  /// anything was disposed. Shared by [disposeAuthenticationData] and
+  /// [disposeAuthenticationToken].
+  FutureOr<bool> _disposeCredentialFromTokenStore(
+    APICredential credential,
+    FutureOr<Object?> Function(String token) removeFromStore,
+  ) {
+    var disposeUsernameEntity = credential.usernameEntity != null;
+    credential.usernameEntity = null;
+
+    var token = credential.token;
+
     if (token == null) {
-      return false;
+      return disposeUsernameEntity;
     }
 
-    var prevToken = _tokenStore.removeTokenDataAndPermissions(token);
-
-    return prevToken.resolveMapped((prevToken) {
-      var disposeTokenDataAndPermissions = prevToken != null;
-      return disposeTokenDataAndPermissions;
-    });
+    return _disposeFromTokenStore(token, removeFromStore).resolveMapped(
+      (disposedFromStore) => disposeUsernameEntity || disposedFromStore,
+    );
   }
 
   FutureOr<Object?> getAuthenticationData(
@@ -553,41 +571,11 @@ abstract class APISecurity {
     Object? previousData,
   ) => null;
 
-  FutureOr<bool> disposeAuthenticationData(APICredential credential) {
-    var disposeUsernameEntity = credential.usernameEntity != null;
-    credential.usernameEntity = null;
+  FutureOr<bool> disposeAuthenticationData(APICredential credential) =>
+      _disposeCredentialFromTokenStore(credential, _tokenStore.removeTokenData);
 
-    var token = credential.token;
-
-    if (token == null) {
-      return disposeUsernameEntity;
-    }
-
-    var prevToken = _tokenStore.removeTokenData(token);
-
-    return prevToken.resolveMapped((prevToken) {
-      var disposeTokenData = prevToken != null;
-      return disposeUsernameEntity || disposeTokenData;
-    });
-  }
-
-  FutureOr<bool> disposeAuthenticationToken(APICredential credential) {
-    var disposeUsernameEntity = credential.usernameEntity != null;
-    credential.usernameEntity = null;
-
-    var token = credential.token;
-
-    if (token == null) {
-      return disposeUsernameEntity;
-    }
-
-    var prevToken = _tokenStore.removeToken(token);
-
-    return prevToken.resolveMapped((prevToken) {
-      var disposeTokenInfo = prevToken != null;
-      return disposeUsernameEntity || disposeTokenInfo;
-    });
-  }
+  FutureOr<bool> disposeAuthenticationToken(APICredential credential) =>
+      _disposeCredentialFromTokenStore(credential, _tokenStore.removeToken);
 
   FutureOr<APIAuthentication?> authenticateByRequest(
     APIRequest request, {
@@ -623,15 +611,13 @@ abstract class APISecurity {
             false);
 
     if (logout) {
+      // (`logout` implies `allowLogout`.)
       var allTokens =
-          allowLogout &&
-          (request.parameters.getAsBool('all') ??
-              request.parameters.getAsBool('allTokens', ignoreCase: true) ??
-              false);
+          request.parameters.getAsBool('all') ??
+          request.parameters.getAsBool('allTokens', ignoreCase: true) ??
+          false;
 
-      var credential = credentials.last;
-      request.credential = credential;
-      request.originalCredential ??= credential;
+      var credential = _setRequestCredential(request, credentials.last);
 
       return this
           .logout(credential, allTokens: allTokens, request: request)
@@ -646,9 +632,7 @@ abstract class APISecurity {
     }
 
     if (credentials.length == 1) {
-      var credential = credentials.last;
-      request.credential = credential;
-      request.originalCredential ??= credential;
+      var credential = _setRequestCredential(request, credentials.last);
 
       return authenticate(credential, request: request);
     }
@@ -667,6 +651,19 @@ abstract class APISecurity {
       request.originalCredential ??= credential;
       return auth;
     });
+  }
+
+  /// Sets [credential] as the [request] credential (and as its
+  /// `originalCredential`, if not set yet). Returns [credential].
+  /// Used by [_authenticateByRequestImpl] for the logout and the
+  /// single-credential paths.
+  static APICredential _setRequestCredential(
+    APIRequest request,
+    APICredential credential,
+  ) {
+    request.credential = credential;
+    request.originalCredential ??= credential;
+    return credential;
   }
 
   void onLogout(APICredential credential) {}
@@ -837,30 +834,22 @@ abstract class APISecurity {
     String tokenKey,
     APIToken? validToken,
   ) {
-    if (validToken != null) {
-      var username = validToken.username;
-      credential = credential.withUsername(username);
-      return _resolveRequestCredentialsImpl(request, [credential]);
-    } else {
-      return getAPIToken(tokenKey).resolveMapped((validToken) {
-        if (validToken != null) {
-          var username = validToken.username;
-          credential = credential.withUsername(username);
-          return _resolveRequestCredentialsImpl(request, [credential]);
-        } else {
-          return validateUnknownToken(
-            credential.username,
-            tokenKey,
-          ).resolveMapped((validToken) {
-            if (validToken != null) {
-              var username = validToken.username;
-              credential = credential.withUsername(username);
-            }
-            return _resolveRequestCredentialsImpl(request, [credential]);
-          });
-        }
-      });
-    }
+    // Resolves the valid token: the given one, else a known token, else
+    // `validateUnknownToken` (sync when each step is sync):
+    FutureOr<APIToken?> resolvedToken =
+        validToken ??
+        getAPIToken(tokenKey).resolveMapped(
+          (knownToken) =>
+              knownToken ?? validateUnknownToken(credential.username, tokenKey),
+        );
+
+    return resolvedToken.resolveMapped((token) {
+      // A valid token defines the credential's username:
+      var tokenCredential = token != null
+          ? credential.withUsername(token.username)
+          : credential;
+      return _resolveRequestCredentialsImpl(request, [tokenCredential]);
+    });
   }
 
   FutureOr<List<APICredential>> _resolveRequestCredentialsImpl(
@@ -926,6 +915,13 @@ abstract class APISecurity {
         .toString();
   }
 
+  /// The lower-case [APIResponse.headerXAccessToken]: the request headers
+  /// read from `dart:io` have lower-case names, so it matches in the exact
+  /// (first) pass of [APIRequest.getHeaderFirstOf], keeping the precedence
+  /// of the alternatives below.
+  static final String _headerXAccessTokenLC = APIResponse.headerXAccessToken
+      .toLowerCase();
+
   String getRequestParameterToken(APIRequest request) {
     var token = request.getParameterIgnoreCaseFirstOf(
       'token',
@@ -936,7 +932,7 @@ abstract class APISecurity {
     token ??= request.getHeaderFirstOf(
       'x-token',
       'token',
-      'x-access-token',
+      _headerXAccessTokenLC,
       'access-token',
     );
 

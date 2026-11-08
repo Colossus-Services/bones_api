@@ -689,6 +689,9 @@ void main() {
       expect(EntityRulesResolver.registerContextProvider(p3), isTrue);
 
       try {
+        expect(EntityRulesResolver.contextProviders.length, equals(3));
+        // The deprecated misspelled alias still works:
+        // ignore: deprecated_member_use_from_same_package
         expect(EntityRulesResolver.cotextProviders.length, equals(3));
 
         var context = resolver.getContextEntityResolutionRules()!;
@@ -722,7 +725,7 @@ void main() {
         EntityRulesResolver.unregisterContextProvider(p3);
       }
 
-      expect(EntityRulesResolver.cotextProviders, isEmpty);
+      expect(EntityRulesResolver.contextProviders, isEmpty);
     });
 
     test('resolved context provider', () {

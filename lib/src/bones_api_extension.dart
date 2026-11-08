@@ -241,27 +241,29 @@ extension MapGetterExtension<K, V> on Map<K, V> {
       return defaultValue;
     }
 
-    var keyStr = key.toString();
+    var match = _scanKeyIgnoreCase(key);
+    if (match == null) return defaultValue;
 
-    for (var k in keys) {
-      if (equalsIgnoreAsciiCase(keyStr, k.toString())) {
-        var value = this[k];
-        return value ?? defaultValue;
-      }
-    }
-
-    return defaultValue;
+    return this[match.$1] ?? defaultValue;
   }
 
   /// Returns the existing key that matches [key] as case-insensitive.
   K? matchKeyIgnoreCase(K key) {
     if (containsKey(key)) return key;
+    return _scanKeyIgnoreCase(key)?.$1;
+  }
 
+  /// The first key (in [keys] order) whose `toString` equals [key]'s,
+  /// ignoring ASCII case, wrapped in a record (so a `null` key can be a
+  /// match), or `null` if none. The key scan of [getIgnoreCase] and
+  /// [matchKeyIgnoreCase] (each one checks the exact [key] its own way
+  /// first: by a non-null value, or by [containsKey]).
+  (K,)? _scanKeyIgnoreCase(K key) {
     var keyStr = key.toString();
 
     for (var k in keys) {
       if (equalsIgnoreAsciiCase(keyStr, k.toString())) {
-        return k;
+        return (k,);
       }
     }
 
@@ -276,7 +278,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [bool].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   bool? getAsBool(K key, {bool? defaultValue, bool ignoreCase = false}) =>
       getParsed(
         key,
@@ -287,7 +289,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets the value of the first matching [keys], parsing as [bool].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   bool? getMultiKeyAsBool(
     List<K> keys, {
     bool? defaultValue,
@@ -301,7 +303,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [int].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   int? getAsInt(K key, {int? defaultValue, bool ignoreCase = false}) =>
       getParsed(
         key,
@@ -312,7 +314,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets the value of the first matching [keys], parsing as [int].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   int? getMultiKeyAsInt(
     List<K> keys, {
     int? defaultValue,
@@ -326,7 +328,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [double].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   double? getAsDouble(K key, {double? defaultValue, bool ignoreCase = false}) =>
       getParsed(
         key,
@@ -337,7 +339,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets the value of the first matching [keys], parsing as [double].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   double? getMultiKeyAsDouble(
     List<K> keys, {
     double? defaultValue,
@@ -351,7 +353,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing to [num] type.
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   num? getAsNum(K key, {num? defaultValue, bool ignoreCase = false}) =>
       getParsed(
         key,
@@ -362,7 +364,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets the value of the first matching [keys], parsing as [num].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   num? getMultiKeyAsNum(
     List<K> keys, {
     num? defaultValue,
@@ -376,7 +378,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [String].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   String? getAsString(K key, {String? defaultValue, bool ignoreCase = false}) =>
       getParsed(
         key,
@@ -385,9 +387,9 @@ extension MapGetterExtension<K, V> on Map<K, V> {
         ignoreCase: ignoreCase,
       );
 
-  /// Gets the value of the first matching [keys], parsing as [num].
+  /// Gets the value of the first matching [keys], parsing as [String].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
   String? getMultiKeyAsString(
     List<K> keys, {
     String? defaultValue,
@@ -401,7 +403,8 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [List].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
+  /// - [def] is the [TypeParser.parseList] default (for a value it can't parse).
   /// - [elementParser] is the parser to use for each element in the [List].
   List<E>? getAsList<E>(
     K key, {
@@ -418,7 +421,8 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [Map].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
+  /// - [def] is the [TypeParser.parseMap] default (for a value it can't parse).
   /// - [keyParser] is the parser to use for each key in the [Map].
   /// - [valueParser] is the parser to use for each value in the [Map].
   Map<K, V>? getAsMap(
@@ -442,7 +446,8 @@ extension MapGetterExtension<K, V> on Map<K, V> {
 
   /// Gets a [key] value parsing as [Set].
   ///
-  /// - [def] is the default value if the value is invalid.
+  /// - [defaultValue] is the default value if the value is absent or invalid.
+  /// - [def] is the [TypeParser.parseSet] default (for a value it can't parse).
   /// - [elementParser] is the parser to use for each element in the [Set].
   Set<E>? getAsSet<E>(
     K key, {
@@ -467,18 +472,7 @@ extension MapGetterExtension<K, V> on Map<K, V> {
     bool ignoreCase = false,
   }) {
     var value = ignoreCase ? getIgnoreCase(key) : this[key];
-
-    T? v;
-
-    if (parser != null) {
-      v = parser(value);
-    } else if (value is T?) {
-      v = value;
-    } else {
-      throw ArgumentError("Can't parse key('$key') value as `$T`: $value");
-    }
-
-    return v ?? defaultValue;
+    return _parseValue<T>(value, parser, defaultValue, () => '$key');
   }
 
   /// Same as [getParsed] but accepts multiple [keys].
@@ -488,27 +482,35 @@ extension MapGetterExtension<K, V> on Map<K, V> {
     T? defaultValue,
     bool ignoreCase = false,
   }) {
+    // The value of the first key with a (non-null) value:
     V? value;
-    if (ignoreCase) {
-      for (var k in keys) {
-        value = getIgnoreCase(k);
-        if (value != null) break;
-      }
-    } else {
-      for (var k in keys) {
-        value = this[k];
-        if (value != null) break;
-      }
+    for (var k in keys) {
+      value = ignoreCase ? getIgnoreCase(k) : this[k];
+      if (value != null) break;
     }
 
+    return _parseValue<T>(value, parser, defaultValue, () => keys.join("','"));
+  }
+
+  /// Parses [value] with [parser] (or, without a parser, accepts it if it's
+  /// already a [T]), returning [defaultValue] when the result is `null`.
+  /// Throws an [ArgumentError] (naming [keyDescription]) if [value] can't be
+  /// a [T]. The shared tail of [getParsed] and [getMultiKeyParsed].
+  static T? _parseValue<T>(
+    Object? value,
+    TypeElementParser<T>? parser,
+    T? defaultValue,
+    String Function() keyDescription,
+  ) {
     T? v;
+
     if (parser != null) {
       v = parser(value);
     } else if (value is T?) {
       v = value;
     } else {
       throw ArgumentError(
-        "Can't parse key('${keys.join("','")}') value as `$T`: $value",
+        "Can't parse key('${keyDescription()}') value as `$T`: $value",
       );
     }
 
@@ -672,15 +674,10 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
   Type? get entityType {
     var type = this.type;
 
-    Type? entityType;
-
-    if (type.isEntityReferenceBaseType) {
-      entityType = arguments0?.type;
-    } else if (isList) {
-      entityType = arguments0?.type;
-    } else {
-      entityType = type;
-    }
+    // A reference or a `List`: the element (argument #0) type.
+    var entityType = type.isEntityReferenceBaseType || isList
+        ? arguments0?.type
+        : type;
 
     return EntityHandler.isValidEntityType(entityType) ? entityType : null;
   }
@@ -717,12 +714,8 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
   }
 
   E? parseEntity<E>(Object? value) {
-    if (isEntityReferenceType) {
-      var entityType = arguments0;
-      if (entityType != null) {
-        return entityType.parse<E>(value);
-      }
-    } else if (isEntityReferenceListType) {
+    // A reference: parsed as its entity type (argument #0), when known.
+    if (isEntityReferenceType || isEntityReferenceListType) {
       var entityType = arguments0;
       if (entityType != null) {
         return entityType.parse<E>(value);
@@ -830,19 +823,12 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     }
 
     EntityReference<E> castCall<E>() {
-      EntityHandler<E>? oEntityHandler;
-      if (entityHandler != null) {
-        oEntityHandler = entityHandler is EntityHandler<E>
-            ? (entityHandler as EntityHandler<E>)
-            : entityHandler.getEntityHandler<E>(type: type);
-      }
-
       return _toEntityReferenceImpl<E>(
         o,
         id,
         type,
         typeName,
-        oEntityHandler,
+        _castEntityHandler<E>(entityHandler, type),
         entityProvider,
         entityHandlerProvider,
         entityFetcher as EntityFetcher<E>?,
@@ -851,6 +837,21 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     }
 
     return callCasted<EntityReference>(castCall) as EntityReference<T>;
+  }
+
+  /// [entityHandler] as an [EntityHandler] of [E] (the type argument
+  /// [callCasted] resolves): itself if it already is one, otherwise the
+  /// one it provides for [E] ([type]). Used by the `castCall`s of
+  /// [toEntityReference] and [toEntityReferenceList].
+  static EntityHandler<E>? _castEntityHandler<E>(
+    EntityHandler? entityHandler,
+    Type? type,
+  ) {
+    if (entityHandler == null) return null;
+
+    return entityHandler is EntityHandler<E>
+        ? entityHandler
+        : entityHandler.getEntityHandler<E>(type: type);
   }
 
   EntityReference<E> _toEntityReferenceImpl<E>(
@@ -971,18 +972,11 @@ extension TypeInfoEntityExtension<T> on TypeInfo<T> {
     }
 
     EntityReferenceList<E> castCall<E>() {
-      EntityHandler<E>? oEntityHandler;
-      if (entityHandler != null) {
-        oEntityHandler = entityHandler is EntityHandler<E>
-            ? (entityHandler as EntityHandler<E>)
-            : entityHandler.getEntityHandler<E>(type: type);
-      }
-
       return _toEntityReferenceListImpl<E>(
         o,
         type,
         typeName,
-        oEntityHandler,
+        _castEntityHandler<E>(entityHandler, type),
         entityProvider,
         entityHandlerProvider,
         entitiesFetcher as EntitiesFetcher<E>?,

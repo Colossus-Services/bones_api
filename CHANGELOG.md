@@ -1,3 +1,183 @@
+## 1.35.0
+
+API/server layer clean-up (behavior-preserving):
+
+- `APIServerWorker`: both branches of `_processAPIResponse` end in one
+  `_finishResponse`; helpers renamed to what they do (`_buildShelfResponse`,
+  `_disposeAndCompressResponse`, `_startServersAndInitializeAPIRoot`,
+  `_errorResponse`). The `CORS` headers are set once (they were set again
+  when building the headers).
+- Request payload: one `_readPayloadBytes` for text and binary payloads, one
+  `maxPayloadLength` check, done before copying the blocks (a single
+  `Uint8List` block is still used as is).
+- `APIServer.toAPIRequest`: headers and query parameters flattened by one
+  helper. New constants: `APIServer.sessionIDCookieName` (`SESSIONID`),
+  `headerServerTiming`, `headerKeepAlive`, `headerContentLength`,
+  `headerXAPIServerWorker`; `APIRoot.apiInfoRoute` (`API-INFO`) and
+  `APIRoot.defaultAuthenticationRoute` (`authenticate`).
+- `APISecurity`: one `resolveMapped` chain resolving a token's credential;
+  the `disposeAuthentication*` methods share one helper.
+- `APIRoot`: the default-module fallback shared by `acceptsRequest` and the
+  call.
+- `APIServerResponseCache`: an evicted entry is removed once (not per
+  alternative); one `GET` check in `cacheResponse`.
+- `APICronScheduler._execute` split (`_runCalls`, `_storeRunResult`).
+- `FieldsFromMap`: one lookup helper for the lower-case and simple keys.
+- Private cache fields named `*Cache`, documented, declared before their
+  users.
+
+Conditions and SQL generation clean-up (behavior-preserving, the same SQL):
+
+- `Condition`: the ordering comparisons (`>`, `>=`, `<`, `<=`) written once
+  (a private enum and a private base of the `KeyCondition{GreaterThan,...}`
+  classes; public API unchanged); `KeyCondition.encodeValue` in the base
+  class; `ConditionParameter.matchesIn` resolves its parameters once.
+- `EncodingContext.parameterValue`; `isReservedWord` by a set;
+  `ConditionSQLEncoder.qualifiedColumnSQL` and shared ID/empty-set helpers.
+- `SQLDialect.qualifiedColumnSQL`; `SQLGenerator.uniqueConstraintName`,
+  `indexName`, `foreignKeyName` and `relationshipTableName` (the names of
+  the generated indexes, constraints and relationship tables, in one place).
+- `DBSQLAdapter`: the table check (`_checkDBTableScheme`), the relationship
+  SQL generators and the `JOIN`s split into documented helpers.
+- `DBSQLMemoryAdapter`: one select matcher; shared delete helpers.
+- `APIDBModule.select`: directives, table and pagination helpers.
+- Cache fields named `*Cache` and documented.
+
+Entity model clean-up (behavior-preserving, except the fixes below):
+
+- Entity rules: `EntityResolutionRules.merge`/`fetchTypes` and
+  `EntityAccessRules` (group flattening, condition check, reversed scan)
+  through shared helpers.
+- `EntityHandler`: one scalar equality chain for `equalsValues` and
+  `equalsValuesBasic`; the comparisons through one numeric helper; a shared
+  cached field-type lookup for `GenericEntityHandler` and
+  `ClassReflectionEntityHandler`; private caches named `*Cache` and
+  documented.
+- `Transaction`: identity sets beside the operation lists, for O(1)
+  membership checks (a bulk `storeAll` was O(n²)), created once a list
+  passes 16 operations (a smaller transaction scans its list, cheaper than
+  allocating the sets). Memory `remove` in the benchmark: 4.9× faster.
+- Cascade delete, `storeAllFromJson` (named block-size constants), the seed
+  JSON helpers, the provider lookups, `IterableEntityRepository` and
+  `TransactionOperation.toString`: duplicated blocks moved into helpers.
+- `EntityReference`/`EntityReferenceList`, `TypeInfo` and `Map` getter
+  extensions, `Time`, `EntityPagination`: duplicated code merged.
+- `isEqualsIterableDeep`/`intersectsIterableDeep`: iterate instead of
+  `elementAt(i)` (O(n²) on a non-`List` `Iterable`).
+
+Adapters clean-up (behavior-preserving):
+
+- `DBObjectAdapter`: the implementation copy-pasted in the memory,
+  directory and GCS object adapters (table schemes, transactions,
+  order/pagination, ID/table names and entity JSON normalization, operation
+  execution), with the hooks `createAdapterException` (each adapter keeps
+  its exception type), `encodeBytesAsDataURL` and `adapterLogger`.
+- `DBSQLAdapter`: the schema introspection of the PostgreSQL, MySQL and
+  SQLite adapters (tables names and fields references caches, relationship
+  tables) over `listTablesNamesImpl`/`findFieldsReferencedTablesImpl`; the
+  30 s fields references cache TTL named; `openTransactionWithPool`, the
+  shared transaction defaults and `autoInsertAfterNoopUpdate`.
+- `DBEntityRepository`: one `ensureStored` implementation (hooks
+  `storeWithParentOperation`, `onEnsureStoredExisting`) and
+  `newSelectOperation`; `getEntityRepositoriesTables` (the typo
+  `getEntityRepositoresTables` kept, `@Deprecated`).
+- Cache fields named `*Cache` and documented.
+- New API (for subclasses of the adapters):
+  - `DBSQLAdapter`: `@protected` `openTransactionWithPool`,
+    `listTablesNamesImpl`, `findFieldsReferencedTablesImpl` (default: throw
+    `UnsupportedError`, for an adapter that doesn't introspect a database),
+    `listTablesNamesCached`, `findFieldsReferencedTablesCached`,
+    `findRelationshipTables`, `autoInsertAfterNoopUpdate`; the static
+    `sqlStringLiteral`.
+  - `DBSQLAdapter` defaults for what was abstract: `cancelTransaction`
+    (`true`), `closeTransaction` (nothing), `callCloseTransactionRequired`
+    (`false`), `cancelTransactionResultWithError` (`false`),
+    `throwTransactionResultWithError` (`true`), the behavior of a pooled
+    driver whose transaction callback commits or rolls back (as the
+    PostgreSQL, MySQL and SQLite adapters): a subclass that relied on them
+    being abstract now inherits these.
+  - `DBObjectAdapter`: `@protected` `executeOperation`,
+    `normalizeEntityJSON`, `normalizeObjectID`, `normalizeTableName`,
+    `getTableIDFieldName`, `applyTableOrderAndPagination`,
+    `createAdapterException`, `encodeBytesAsDataURL`, `adapterLogger`,
+    `onTransactionContextCanceled`, `onTransactionContextClosed`.
+  - The object adapters' `openTransaction` stays typed as their context
+    (synchronous); `cancelTransaction` of the MySQL/SQLite adapters stays
+    `bool`.
+- `DBSQLMemoryAdapter` keeps its own relationship-tables resolution (it
+  doesn't introspect a database).
+
+Deprecated (still working):
+
+- `EntityHandler.graterThanValue`/`graterThanOrEqualValue`: use
+  `greaterThanValue`/`greaterThanOrEqualValue`.
+- `EntityRulesResolver.cotextProviders`: use `contextProviders`.
+- `FieldsFromMap.getFieldsKeysInMap`'s `fieldLC`/`fieldSimple` (ignored).
+- `DBAdapter.getEntityRepositoresTables`: use
+  `getEntityRepositoriesTables`.
+
+Fixes:
+
+- `APIServerResponseCache`: the eviction (`maxMemorySize` reached) sorted
+  the cached values, which hold a `List` for an entry with compressed
+  alternatives: a `TypeError`. The entries are now sorted with all their
+  alternatives (by total usage and memory size).
+- `APIServerResponseCache`: the eviction removed the most used entries
+  first (usage sorted descending): now the least used first, and among
+  equally used, the largest first.
+- `APIServerResponseCache`: an expired entry (file modified) was removed
+  without subtracting its memory size from `totalMemorySize`.
+- `APIServerConfig`: the user directory (Let's Encrypt paths) fell back to
+  `Directory('~/')`, a literal `~` directory, not the home: it's resolved
+  from the environment only (`resolveUserDirectory`): `USERPROFILE` then
+  `HOME` on Windows, `HOME` then `USERPROFILE` elsewhere (other platforms,
+  e.g. Android, used to have none).
+- `APIServerConfig.normalizeHeaderValue`: the `k3` path key was ignored (a
+  value at a 4-key config path returned the default): now used.
+- `APIServer`: the JSON-decode error log printed the stack trace in place
+  of the invalid payload (a shadowed `catch` variable).
+- `IdenticalSet`: grouped elements by `hashCode`, missing an element whose
+  `hashCode` changed: now by `identityHashCode`.
+- `FieldsFromMap.getFieldsKeysInMap`: the given `fieldLC`/`fieldSimple`
+  (of one field) were used for every field: now computed per field (the
+  parameters are ignored and `@Deprecated`).
+- `Condition.parse`: an escaped quote in a single-quoted string
+  (`name == 'a\'b'`) failed to parse.
+- `SQLDialect.toString`: lists all its fields (and a missing space).
+- `APIDBModule.select`: the entities' values are HTML-escaped in its page
+  (they were written as is: a `<` or `&` broke the page, and could inject
+  markup).
+- `GenericEntityHandler.getFieldType` with `resolveFiledName`: the entity is
+  asked for the resolved field name (it was asked for the key again).
+- `EntityRepositoryProvider.populateFromSource`: `workingPath` is used to
+  resolve the source (and the variables) file.
+- `EntityRepositoryProvider.storeAllFromJson`/`storeAllFromJsonEncoded`:
+  `transaction` is used, and the `%name%` `variables` are resolved (they
+  were ignored).
+- `EntityReference.from`/`EntityReferenceList.from`: `entityHandlerProvider`
+  is forwarded.
+- `IterableEntityRepository.deleteEntity`: `transaction` is forwarded.
+- `EntityAccessRules` `==`/`hashCode`: `entityFields` compared element-wise
+  (it was identity).
+- `EntityResolutionRules` with `allEager` and `allLazy` both `true`: invalid
+  (`validate` throws `ValidateEntityRulesError`);
+  `isEagerEntityType`/`isLazyEntityType` recursed forever on it. A `merge`
+  of one side's `allEager` with the other's `allLazy` drops the conflict as
+  a same-flag one: both sides tolerant, both flags dropped; one tolerant, it
+  yields its flag; neither, it throws.
+- `DBPostgreSQLAdapter.doCountSQL`: a result without a row threw a
+  `StateError`: now `0`, as the SQLite and MySQL adapters.
+- `DBPostgreSQLAdapter`: the ID sequence fix after an update's auto-insert
+  used `max(id)`, failing for a table whose ID column isn't `id`: now the
+  table's (quoted) ID column.
+- `DBPostgreSQLAdapter`, `DBMySQLAdapter`: the schema introspection
+  queries interpolated the table (and database) names into SQL string
+  literals unescaped: a `'` in a name broke (or changed) the query. Now
+  escaped by `DBSQLAdapter.sqlStringLiteral`: the `'` doubled, and for
+  MySQL (`DBMySQLAdapter.mysqlStringLiteral`; its default `sql_mode` makes
+  `\` an escape in literals) also the `\`. The queries are otherwise the
+  same (MySQL's foreign keys query lost two trailing spaces).
+
 ## 1.34.0
 
 `null` and `[]` mean the same in a condition: an empty set for `=~`/`!~`, a

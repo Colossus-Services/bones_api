@@ -5,6 +5,20 @@ import 'package:test/test.dart';
 
 import 'bones_api_test_entities.dart';
 
+/// An object whose [hashCode] can change (a mutable key).
+class _MutableHash {
+  int hash;
+
+  _MutableHash(this.hash);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is _MutableHash && hash == other.hash;
+
+  @override
+  int get hashCode => hash;
+}
+
 void main() {
   group('Enum', () {
     test('enumFromName', () async {
@@ -78,6 +92,26 @@ void main() {
       expect(s1.isNotEmpty, isTrue);
 
       expect(s1.toList(), unorderedEquals(['b']));
+    });
+
+    test('element with a changing hashCode', () {
+      // Bucketed by `hashCode`, an element was looked up in another group
+      // after its `hashCode` changed: not found by `contains`/`remove`.
+      var s = IdenticalSet<_MutableHash>(groups: 7);
+
+      var o = _MutableHash(1);
+      expect(s.add(o), isTrue);
+
+      for (var h = 2; h <= 7; ++h) {
+        o.hash = h;
+        expect(s.contains(o), isTrue, reason: 'hash: $h');
+        expect(s.add(o), isFalse, reason: 'hash: $h');
+      }
+
+      expect(s.length, equals(1));
+      expect(s.remove(o), isTrue);
+      expect(s.isEmpty, isTrue);
+      expect(s.toList(), isEmpty);
     });
   });
 

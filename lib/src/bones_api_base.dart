@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.34.0';
+  static const String VERSION = '1.35.0';
 
   static bool _boot = false;
 
@@ -1033,7 +1033,7 @@ abstract class APIRoot with Initializable, Closable {
     // first part.
     var pathPartRoot = apiRequest.pathPartFirst;
 
-    if (pathPartRoot == 'API-INFO') {
+    if (pathPartRoot == apiInfoRoute) {
       var info = apiInfo(apiRequest);
       return APIResponse.ok(info as T, mimeType: _mimeTypeJson);
     }
@@ -1068,13 +1068,7 @@ abstract class APIRoot with Initializable, Closable {
 
   /// Returns `true` if [apiRequest] is an accepted route/call.
   bool acceptsRequest(APIRequest apiRequest) {
-    var module = getModuleByRequest(apiRequest);
-    if (module == null) {
-      var def = defaultModuleName;
-      if (def != null) {
-        module = _modules![def];
-      }
-    }
+    var module = _resolveModuleOrDefault(getModuleByRequest(apiRequest));
 
     if (module == null) {
       if (apiRequest.pathPartAt(0) == authenticationRoute ||
@@ -1096,18 +1090,26 @@ abstract class APIRoot with Initializable, Closable {
     APIModule? module,
     APIRequest request,
   ) {
-    if (module == null) {
-      var def = defaultModuleName;
-      if (def != null) {
-        module = _modules![def];
-      }
-    }
+    module = _resolveModuleOrDefault(module);
 
     if (module == null) {
       return onNoRouteForPath<T>(request);
     }
 
     return module.call(request);
+  }
+
+  /// Returns [module] (the module matched by the request path), or the
+  /// [defaultModuleName] module when no module matched.
+  /// Shared by [acceptsRequest] and [_callModule], so both resolve a request
+  /// to the same module. It takes the already matched module (not the
+  /// request) because `_callImpl` checks the authentication route between
+  /// matching and this fallback.
+  APIModule? _resolveModuleOrDefault(APIModule? module) {
+    if (module != null) return module;
+
+    var def = defaultModuleName;
+    return def != null ? _modules![def] : null;
   }
 
   FutureOr<APIResponse<T>> onNoRouteForPath<T>(APIRequest request) {
@@ -1126,22 +1128,31 @@ abstract class APIRoot with Initializable, Closable {
     return _responseNotFoundNoRouteForPath<T>(request);
   }
 
-  String get authenticationRoute => 'authenticate';
+  /// The route that returns the [APIRootInfo]/[APIModuleInfo] of an API.
+  static const String apiInfoRoute = 'API-INFO';
+
+  /// The default [authenticationRoute] (of [APIRoot] and [APIModule]).
+  static const String defaultAuthenticationRoute = 'authenticate';
+
+  String get authenticationRoute => defaultAuthenticationRoute;
 
   String? get securityModuleName => null;
 
   APIModule? get securityModule => _securityModuleImpl();
 
-  APIModule? _securityModule;
+  /// Cache of the module named [securityModuleName], resolved by
+  /// [_securityModuleImpl] (a lookup in the modules map), so that each
+  /// [securityModule] read doesn't repeat the lookup.
+  APIModule? _securityModuleCache;
 
   APIModule? _securityModuleImpl() {
-    if (_securityModule != null) return _securityModule;
+    if (_securityModuleCache != null) return _securityModuleCache;
 
     var securityModuleName = this.securityModuleName;
     if (securityModuleName != null) {
       var module = getModule(securityModuleName);
       if (module != null) {
-        return _securityModule = module;
+        return _securityModuleCache = module;
       } else {
         throw StateError(
           "Can't find security module with name: $securityModuleName",
@@ -1154,15 +1165,20 @@ abstract class APIRoot with Initializable, Closable {
 
   APISecurity? get security => _securityImpl();
 
-  APISecurity? _security;
-  bool _securityResolved = false;
+  /// Cache of the [APISecurity] of the [securityModule] (possibly `null`),
+  /// filled by [_securityImpl]: [security] is read on every call.
+  APISecurity? _securityCache;
+
+  /// Whether [_securityCache] was resolved: needed because `null` is a valid
+  /// (cached) [security].
+  bool _securityCacheResolved = false;
 
   APISecurity? _securityImpl() {
-    if (_securityResolved) return _security;
-    _securityResolved = true;
+    if (_securityCacheResolved) return _securityCache;
+    _securityCacheResolved = true;
 
     var securityModule = this.securityModule;
-    return _security = securityModule?.security;
+    return _securityCache = securityModule?.security;
   }
 
   @override
@@ -2269,10 +2285,12 @@ class APIRequest extends APIMetricSet with APIPayload {
     return idx >= 0 && idx < length ? _pathParts[idx] : '';
   }
 
-  String? _lastPathPart;
+  /// A cache of [lastPathPart]: the request's path doesn't change, and the
+  /// last path part is read on every routing of the request.
+  String? _lastPathPartCache;
 
   /// Returns the last [pathParts]. Sames as [pathPartReversed] for index `0`.
-  String get lastPathPart => _lastPathPart ??= pathPartReversed(0);
+  String get lastPathPart => _lastPathPartCache ??= pathPartReversed(0);
 
   /// Returns from [parameters] a value for [name1]. Defaults to [def] if defined.
   V? getParameter<V>(String name1, [V? def]) {
@@ -2501,9 +2519,11 @@ class APIRequest extends APIMetricSet with APIPayload {
     }
   }
 
-  String? _hostname;
+  /// Cache of [hostname], parsed from the `Host` header by [_hostnameImpl]
+  /// on first read (the headers don't change during the request).
+  String? _hostnameCache;
 
-  String get hostname => _hostname ??= _hostnameImpl();
+  String get hostname => _hostnameCache ??= _hostnameImpl();
 
   String _hostnameImpl() {
     var host = getHeader('host');
@@ -2525,9 +2545,11 @@ class APIRequest extends APIMetricSet with APIPayload {
     return host;
   }
 
-  int? _port;
+  /// Cache of [port], parsed from the `Port`/`Host` headers by [_portImpl]
+  /// on first read.
+  int? _portCache;
 
-  int get port => _port ??= _portImpl();
+  int get port => _portCache ??= _portImpl();
 
   int _portImpl() {
     var port = getHeader('port');
@@ -2553,10 +2575,13 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   String get hostnameAndPort => '$hostname:$port';
 
-  String? _requesterAddressResolved;
+  /// Cache of [requesterAddress], resolved by [_requesterAddressImpl]
+  /// (the given address, or the `X-Forwarded-For`/`Remote-Address`
+  /// headers). A `null` result isn't cached (it's re-resolved on each read).
+  String? _requesterAddressCache;
 
   String? get requesterAddress =>
-      _requesterAddressResolved ??= _requesterAddressImpl();
+      _requesterAddressCache ??= _requesterAddressImpl();
 
   String? _requesterAddressImpl() {
     if (_requesterAddress != null) return _requesterAddress;
@@ -2579,9 +2604,11 @@ class APIRequest extends APIMetricSet with APIPayload {
     return null;
   }
 
-  String? _origin;
+  /// Cache of [origin], resolved by [_originImpl] (the `Origin` header, or
+  /// built from [scheme] and [hostnameAndPort]) on first read.
+  String? _originCache;
 
-  String get origin => _origin ??= _originImpl();
+  String get origin => _originCache ??= _originImpl();
 
   String _originImpl() {
     var origin = getHeader('origin');

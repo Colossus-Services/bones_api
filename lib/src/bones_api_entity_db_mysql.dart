@@ -1,6 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:mysql1/mysql1.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
@@ -17,7 +18,6 @@ import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
-import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBMySQLAdapter')..registerAsDbLogger();
 
@@ -412,16 +412,15 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
 
       notifyTableFieldTypes(table, fieldsTypes);
 
-      var fieldsReferencedTables = await _findFieldsReferencedTables(
+      var fieldsReferencedTables = await findFieldsReferencedTablesCached(
         connection,
         table,
         contextID: contextID,
       );
 
-      var relationshipTables = await _findRelationshipTables(
+      var relationshipTables = await findRelationshipTables(
         connection,
         table,
-        idFieldName,
         contextID: contextID,
       );
 
@@ -519,78 +518,8 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     }
   }
 
-  Future<List<TableRelationshipReference>> _findRelationshipTables(
-    DBMySqlConnectionWrapper connection,
-    String table,
-    String idFieldName, {
-    Object? contextID,
-  }) async {
-    var tablesNames = await _listTablesNames(connection, contextID: contextID);
-
-    var tablesReferences = <Map<String, TableFieldReference>>[];
-
-    for (var t in tablesNames) {
-      var refs = await _findFieldsReferencedTables(
-        connection,
-        t,
-        contextID: contextID,
-      );
-      tablesReferences.add(refs);
-    }
-
-    tablesReferences = tablesReferences.where((m) {
-      return m.length > 1 &&
-          m.values.where((r) => r.targetTable == table).isNotEmpty &&
-          m.values.where((r) => r.targetTable != table).isNotEmpty;
-    }).toList();
-
-    var relationships = tablesReferences
-        .map((e) {
-          var refToTables = e.values
-              .where((r) => r.targetTable == table)
-              .toList(growable: false);
-
-          var otherRefs = e.values
-              .where((r) => r.targetTable != table)
-              .toList(growable: false);
-
-          if (refToTables.length != 1 || otherRefs.length != 1) {
-            return null;
-          }
-
-          var refToTable = refToTables.first;
-          var otherRef = otherRefs.first;
-
-          return TableRelationshipReference(
-            refToTable.sourceTable,
-            refToTable.targetTable,
-            refToTable.targetField,
-            refToTable.targetFieldType,
-            refToTable.sourceField,
-            otherRef.targetTable,
-            otherRef.targetField,
-            otherRef.targetFieldType,
-            otherRef.sourceField,
-          );
-        })
-        .nonNulls
-        .toList();
-
-    return relationships;
-  }
-
-  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
-      Expando();
-
-  FutureOr<List<String>> _listTablesNames(
-    DBMySqlConnectionWrapper connection, {
-    Object? contextID,
-  }) => _listTablesNamesContextCache.putIfAbsentAsync(
-    contextID,
-    () => _listTablesNamesImpl(connection),
-  );
-
-  Future<List<String>> _listTablesNamesImpl(
+  @override
+  Future<List<String>> listTablesNamesImpl(
     DBMySqlConnectionWrapper connection,
   ) async {
     var sql = '''
@@ -602,49 +531,6 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     var names = results.map((r) => r[0]).map((e) => '$e').toList();
 
     return names;
-  }
-
-  final TimedMap<String, Map<String, TableFieldReference>>
-  _findFieldsReferencedTablesCache =
-      TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
-
-  @override
-  TableScheme? disposeTableSchemeCache(
-    String table, {
-    bool fieldsTypes = false,
-  }) {
-    _findFieldsReferencedTablesCache.remove(table);
-    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
-  }
-
-  @override
-  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
-    _findFieldsReferencedTablesCache.clear();
-    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
-  }
-
-  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
-  _findFieldsReferencedTablesContextCache = Expando();
-
-  FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-    DBMySqlConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) {
-    if (contextID != null) {
-      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
-      return cache[table] ??= _findFieldsReferencedTablesImpl(connection, table)
-          .then((ret) {
-            cache[table] = ret;
-            _findFieldsReferencedTablesCache[table] = ret;
-            return ret;
-          });
-    }
-
-    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
-      table,
-      () => _findFieldsReferencedTablesImpl(connection, table),
-    );
   }
 
   /// The indexes of [table]: by name, its columns (in order), and the names
@@ -721,16 +607,14 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     String table,
     Iterable<String> indexesNames,
   ) {
-    var names = indexesNames
-        .map((n) => "'${n.replaceAll("'", "''")}'")
-        .join(', ');
+    var names = indexesNames.map(mysqlStringLiteral).join(', ');
     if (names.isEmpty) return <String, String?>{};
 
     var sql =
         "SELECT DISTINCT INDEX_NAME AS index_name "
         "FROM information_schema.STATISTICS "
         "WHERE TABLE_SCHEMA = DATABASE() "
-        "AND TABLE_NAME = '${table.replaceAll("'", "''")}' "
+        "AND TABLE_NAME = ${mysqlStringLiteral(table)} "
         "AND INDEX_NAME IN ($names)";
 
     return executeWithPool(
@@ -744,21 +628,39 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     );
   }
 
-  Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
-    DBMySqlConnectionWrapper connection,
+  /// [value] as a MySQL string literal ([DBSQLAdapter.sqlStringLiteral]
+  /// with `escapeBackslashes`): MySQL's default `sql_mode` treats `\` as an
+  /// escape character in literals, so a `\` must be escaped too (or `\'`
+  /// would end the literal).
+  @visibleForTesting
+  static String mysqlStringLiteral(String value) =>
+      DBSQLAdapter.sqlStringLiteral(value, escapeBackslashes: true);
+
+  /// The SQL of [findFieldsReferencedTablesImpl]: the foreign keys of
+  /// [table] in the database [databaseName] (both escaped as string
+  /// literals, see [mysqlStringLiteral]).
+  @visibleForTesting
+  static String findFieldsReferencedTablesSQL(
+    String databaseName,
     String table,
-  ) async {
-    var sql =
-        '''
-    SELECT 
+  ) =>
+      '''
+    SELECT
       CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
       REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
     FROM
       INFORMATION_SCHEMA.KEY_COLUMN_USAGE
     WHERE
-      TABLE_SCHEMA = '$databaseName' AND TABLE_NAME = '$table' 
+      TABLE_SCHEMA = ${mysqlStringLiteral(databaseName)} AND TABLE_NAME = ${mysqlStringLiteral(table)}
       AND REFERENCED_TABLE_NAME IS NOT NULL AND REFERENCED_COLUMN_NAME IS NOT NULL
     ''';
+
+  @override
+  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
+    DBMySqlConnectionWrapper connection,
+    String table,
+  ) async {
+    var sql = findFieldsReferencedTablesSQL(databaseName, table);
 
     var results = await connection.query(sql);
 
@@ -1063,32 +965,15 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         .resolveMapped((results) {
           var affectedRows = results.affectedRows;
           if (affectedRows == 0) {
-            var entry = sql.parametersByPlaceholder;
-            if (!allowAutoInsert) {
-              throw StateError(
-                "Can't update not stored entity into table `$table`: $entry",
-              );
-            }
-
-            var fields = sql.namedParameters!;
-
-            return generateInsertSQL(
+            return autoInsertAfterNoopUpdate(
               transaction,
               entityName,
               table,
-              fields,
-            ).resolveMapped((insertSQL) {
-              _log.info(
-                'Update not affecting any row! Auto inserting: $insertSQL',
-              );
-              return doInsertSQL(
-                entityName,
-                table,
-                insertSQL,
-                transaction,
-                connection,
-              );
-            });
+              sql,
+              connection,
+              allowAutoInsert: allowAutoInsert,
+              logger: _log,
+            );
           }
 
           return _resolveResultID(results, table, sql, id);
@@ -1195,61 +1080,22 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  Future<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
-    var contextCompleter = Completer<DBMySqlConnectionWrapper>();
+  Future<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) =>
+      openTransactionWithPool<DBMySqlConnectionWrapper>(
+        transaction,
+        (connection, onTransactionContext) =>
+            connection.openTransaction((transactionWrap) {
+              onTransactionContext(transactionWrap);
 
-    var result = executeWithPool(
-      (connection) {
-        return connection.openTransaction((transactionWrap) {
-          contextCompleter.complete(transactionWrap);
-
-          return transaction.transactionFuture.then(
-            (res) => resolveTransactionResult(res, transaction, connection),
-            onError: (e, s) {
-              cancelTransaction(transaction, connection, e, s);
-              throw e;
-            },
-          );
-        });
-      },
-      validator: (c) => !transaction.isAborted,
-      onError: (e, s) => transaction.notifyExecutionError(
-        e,
-        s,
-        errorResolver: resolveError,
-        debugInfo: () => transaction.toString(withExecutedOperations: false),
-      ),
-    );
-
-    transaction.transactionResult = result;
-
-    return contextCompleter.future;
-  }
-
-  @override
-  bool get cancelTransactionResultWithError => false;
-
-  @override
-  bool get throwTransactionResultWithError => true;
-
-  @override
-  bool cancelTransaction(
-    Transaction transaction,
-    DBMySqlConnectionWrapper? connection,
-    Object? error,
-    StackTrace? stackTrace,
-  ) {
-    return true;
-  }
-
-  @override
-  bool get callCloseTransactionRequired => false;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    DBMySqlConnectionWrapper? connection,
-  ) {}
+              return transaction.transactionFuture.then(
+                (res) => resolveTransactionResult(res, transaction, connection),
+                onError: (e, s) {
+                  cancelTransaction(transaction, connection, e, s);
+                  throw e;
+                },
+              );
+            }),
+      );
 
   @override
   String toString() {

@@ -984,6 +984,31 @@ void main() {
         isFalse,
       );
 
+      // `EntityReferenceList` compared by IDs (a non-null list always has
+      // IDs: resolved from its entities, `null` for an entity without ID):
+      var lNullID1 = EntityReferenceList<_Thing>.fromEntities([
+        _Thing(null, 'x'),
+      ]);
+      var lNullID2 = EntityReferenceList<_Thing>.fromEntities([
+        _Thing(null, 'y'),
+      ]);
+      expect(
+        lIDs.equalsEntitiesIDs(EntityReferenceList<_Thing>.fromIDs([1])),
+        isTrue,
+      );
+      expect(
+        lIDs.equalsEntitiesIDs(EntityReferenceList<_Thing>.fromIDs([2])),
+        isFalse,
+      );
+      expect(lIDs.equalsEntitiesIDs(lNullID1), isFalse);
+      expect(lNullID1.equalsEntitiesIDs(lIDs), isFalse);
+      expect(lNullID1.equalsEntitiesIDs(lNullID2), isTrue);
+      expect(lIDs.equalsEntitiesIDs(lNull), isFalse);
+      expect(
+        lNull.equalsEntitiesIDs(EntityReferenceList<_Thing>.asNull()),
+        isTrue,
+      );
+
       // With `T`:
       expect(l.equalsEntitiesIDs(t1), isTrue);
       expect(l.equalsEntitiesIDs(t2), isNull);

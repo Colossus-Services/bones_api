@@ -158,9 +158,17 @@ bool isEqualsIterableDeep(
   var length = it1.length;
   if (length != it2.length) return false;
 
+  // Paired iterators (one pass each): `elementAt(i)` on a non-`List`
+  // `Iterable` walks from the start every time (O(n²)).
+  var itr1 = it1.iterator;
+  var itr2 = it2.iterator;
+
   for (var i = 0; i < length; i++) {
-    var v1 = it1.elementAt(i);
-    var v2 = it2.elementAt(i);
+    itr1.moveNext();
+    itr2.moveNext();
+
+    var v1 = itr1.current;
+    var v2 = itr2.current;
 
     if (!isEqualsDeep(v1, v2, valueEquality: valueEquality)) return false;
   }
@@ -222,14 +230,13 @@ bool intersectsIterableDeep(
   if (it1 == null || it2 == null) return false;
   if (it1.isEmpty || it2.isEmpty) return false;
 
-  var length1 = it1.length;
-  var length2 = it2.length;
+  // `it2` is scanned once per `it1` element: a lazy `Iterable` is
+  // materialized once (a `List`/`Set` is already cheap to re-iterate).
+  // (`elementAt(i)` on a non-`List` walked from the start every time.)
+  var all2 = it2 is List || it2 is Set ? it2 : it2.toList(growable: false);
 
-  for (var i = 0; i < length1; i++) {
-    var v1 = it1.elementAt(i);
-
-    for (var j = 0; j < length2; ++j) {
-      var v2 = it2.elementAt(j);
+  for (var v1 in it1) {
+    for (var v2 in all2) {
       if (isEqualsDeep(v1, v2, valueEquality: valueEquality)) return true;
     }
   }

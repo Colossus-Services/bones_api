@@ -320,71 +320,35 @@ class DBRelationalEntityRepository<O extends Object>
     super.type,
   });
 
+  /// An already stored entity also has its referenced entities ensured
+  /// stored (see [ensureReferencesStored]).
   @override
-  FutureOr<dynamic> ensureStored(
-    o, {
+  FutureOr<dynamic> onEnsureStoredExisting(
+    O o,
+    Object id,
     Transaction? transaction,
-    TransactionOperation? operation,
-  }) {
-    checkNotClosed();
+  ) => ensureReferencesStored(o, transaction: transaction).resolveWithValue(id);
 
-    var id = getID(o, entityHandler: entityHandler);
-
-    if (id == null || entityHasChangedFields(o)) {
-      return _ensureStoredImpl(o, transaction, operation);
-    } else {
-      if (isTrackingEntity(o)) {
-        return ensureReferencesStored(
-          o,
-          transaction: transaction,
-        ).resolveWithValue(id);
-      }
-
-      return existsID(id, transaction: transaction).resolveMapped((exists) {
-        if (!exists) {
-          return _ensureStoredImpl(o, transaction, operation);
-        } else {
-          return ensureReferencesStored(
-            o,
-            transaction: transaction,
-          ).resolveWithValue(id);
-        }
-      });
-    }
-  }
-
-  FutureOr<dynamic> _ensureStoredImpl(
-    dynamic o,
+  @override
+  FutureOr<dynamic> storeWithParentOperation(
+    O o,
     Transaction? transaction,
     TransactionOperation? parentOperation,
-  ) {
-    if (transaction != null) {
-      var storeOp = transaction
-          .firstOperationWithEntity<TransactionOperationStore>(o);
+  ) => _storeImpl(o, transaction, parentOperation);
 
-      if (storeOp != null) {
-        return storeOp.waitFinish(parentOperation: parentOperation).then((ok) {
-          var id = getEntityID(storeOp.entity) ?? getEntityID(o);
-          if (id == null && !ok) {
-            throw RecursiveRelationshipLoopError.fromTransaction(
-              transaction,
-              storeOp,
-              parentOperation,
-              o,
-            );
-          }
-          return id;
-        });
-      }
-    }
+  /// The non-primitive fields of the entities of this repository (the ones
+  /// that may reference other entities), by field name, with their types.
+  ///
+  /// Built from the first entity's `fieldsNames` and reused for the whole
+  /// repository (all its entities have the same fields), so
+  /// [ensureReferencesStored] doesn't resolve the fields types of each
+  /// entity.
+  Map<String, TypeInfo>? _nonPrimitiveFieldsCache;
 
-    return _storeImpl(o, transaction, parentOperation);
-  }
-
-  Map<String, TypeInfo>? _nonPrimitiveFields;
-
+  /// The non-primitive fields (see [_nonPrimitiveFieldsCache]). Used by
+  /// [ensureReferencesStored].
   Map<String, TypeInfo> _getNonPrimitiveFields(O o) =>
-      _nonPrimitiveFields ??= entityHandler
+      _nonPrimitiveFieldsCache ??= entityHandler
           .fieldsNames(o)
           .map((fieldName) {
             var fieldType = entityHandler.getFieldType(
@@ -558,18 +522,10 @@ class DBRelationalEntityRepository<O extends Object>
 
     offset = resolveSelectOffset(page: page, offset: offset, limit: limit);
 
-    final resolutionRulesResolved = resolveEntityResolutionRules(
-      resolutionRules,
-    );
-
-    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
-
-    var op = TransactionOperationSelect(
-      name,
-      canPropagate,
-      operationExecutor,
+    final (op, resolutionRulesResolved) = newSelectOperation(
+      transaction,
       matcher,
-      transaction: transaction,
+      resolutionRules,
     );
 
     try {

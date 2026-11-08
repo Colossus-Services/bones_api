@@ -862,11 +862,23 @@ void main() {
       var dn = DynamicInt.fromInt(5);
       expect(identical(EntityHandler.valueToDynamicNumber(dn), dn), isTrue);
 
-      expect(EntityHandler.graterThanValue(2, 1), isTrue);
-      expect(EntityHandler.graterThanValue(1, 2), isFalse);
-      expect(EntityHandler.graterThanOrEqualValue(2, 2), isTrue);
+      expect(EntityHandler.greaterThanValue(2, 1), isTrue);
+      expect(EntityHandler.greaterThanValue(1, 2), isFalse);
+      expect(EntityHandler.greaterThanOrEqualValue(2, 2), isTrue);
+      expect(EntityHandler.greaterThanOrEqualValue(1, 2), isFalse);
       expect(EntityHandler.lessThanValue(1, '2'), isTrue);
       expect(EntityHandler.lessThanOrEqualValue(2.5, 2), isFalse);
+      expect(EntityHandler.lessThanOrEqualValue(2, 2), isTrue);
+
+      // A `null` side never matches:
+      expect(EntityHandler.greaterThanValue(null, 1), isFalse);
+      expect(EntityHandler.lessThanOrEqualValue(1, null), isFalse);
+
+      // The deprecated misspelled aliases still work:
+      // ignore: deprecated_member_use_from_same_package
+      expect(EntityHandler.graterThanValue(2, 1), isTrue);
+      // ignore: deprecated_member_use_from_same_package
+      expect(EntityHandler.graterThanOrEqualValue(1, 2), isFalse);
     });
 
     test('equalsValuesBasic', () {

@@ -65,6 +65,15 @@ void main() {
   group('ConditionParser', () {
     setUp(() {});
 
+    test(r"escaped quote in a single-quoted string (\')", () {
+      var c = Condition.parse(r"name == 'a\'b'") as KeyConditionEQ;
+      expect(c.value, equals("a'b"));
+
+      // The other escapes, as in a double-quoted string:
+      var c2 = Condition.parse(r'''name == 'a\"b\\c\nd' ''') as KeyConditionEQ;
+      expect(c2.value, equals('a"b\\c\nd'));
+    });
+
     test('key op value', () async {
       var conditionParser = ConditionParser();
 

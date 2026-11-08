@@ -549,24 +549,14 @@ class EntityPagination<O extends Object> {
 
     if (ret is! Future<List<O>>) {
       var elapsedTime = stopwatch?.elapsed ?? Duration.zero;
-      var resolvedEnd = _setPage(page, ret);
-      var entries = _pages[page]!;
-
-      _notifyLoaded(page, entries, elapsedTime, resolvedEnd);
-
-      return entries;
+      return _completePageLoad(page, ret, elapsedTime);
     }
 
     var future = ret
         .then((pageEntries) {
           var elapsedTime = stopwatch?.elapsed ?? Duration.zero;
           _loadingPages.remove(page);
-          var resolvedEnd = _setPage(page, pageEntries);
-          var entries = _pages[page]!;
-
-          _notifyLoaded(page, entries, elapsedTime, resolvedEnd);
-
-          return entries;
+          return _completePageLoad(page, pageEntries, elapsedTime);
         })
         .onError<Object>((e, s) {
           var elapsedTime = stopwatch?.elapsed ?? Duration.zero;
@@ -579,6 +569,22 @@ class EntityPagination<O extends Object> {
 
     _loadingPages[page] = future;
     return future;
+  }
+
+  /// Stores the loaded [pageEntries] of [page] and notifies it (see
+  /// [_notifyLoaded]), returning the stored entries. The success path of
+  /// [loadPage], for a sync and for an async page loader.
+  List<O> _completePageLoad(
+    int page,
+    List<O> pageEntries,
+    Duration elapsedTime,
+  ) {
+    var resolvedEnd = _setPage(page, pageEntries);
+    var entries = _pages[page]!;
+
+    _notifyLoaded(page, entries, elapsedTime, resolvedEnd);
+
+    return entries;
   }
 
   void _notifySkipped(int page, EntityPaginationSkipReason reason) {
@@ -647,9 +653,7 @@ class EntityPagination<O extends Object> {
       ++page;
     }
 
-    var finalPage = _finalPage;
-    if (finalPage != null && page > finalPage) return totalLength;
-
+    // Past the final page or the first empty one (see `_isPageKnownEmpty`):
     if (_isPageKnownEmpty(page)) return totalLength;
 
     if (maxPages != null && fetchCount >= maxPages) return totalLength;

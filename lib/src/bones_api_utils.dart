@@ -8,6 +8,10 @@ class StringUtils {
 
   static final RegExp _regexpNotLettersAndDigits = RegExp(r'[^a-zA-Z\d]+');
 
+  /// Cache of [toLowerCaseSimple] results (input -> result), filled by
+  /// [toLowerCaseSimpleCached]: the same (field) names are normalized again
+  /// and again (e.g. matching entity fields to map keys), and each call runs
+  /// a [RegExp] replace. Never cleared: meant for a bounded set of names.
   static final Map<String, String> _toLowerCaseSimpleCache = {};
 
   /// Cached version of [toLowerCaseSimple].
@@ -431,7 +435,10 @@ class IdenticalSet<O> {
     : _groups = List.filled(groups.clamp(2, 1000), null);
 
   List<O> _getGroup(Object? o) {
-    var h = o.hashCode;
+    // `identityHashCode`, not `hashCode`: elements are matched by identity,
+    // and an element whose `hashCode` changes (a mutable object) would be
+    // looked up in another group (not found by `contains`/`remove`).
+    var h = identityHashCode(o);
     var gIdx = h % _groups.length;
     var g = _groups[gIdx] ??= <O>[];
     return g;
