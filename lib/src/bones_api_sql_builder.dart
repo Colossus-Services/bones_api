@@ -258,7 +258,7 @@ class SQLDialect extends DBDialect {
   @override
   String toString() {
     return 'SQLDialect{'
-        'name: $name,'
+        'name: $name, '
         'elementQuote: $elementQuote, '
         'acceptsOutputSyntax: $acceptsOutputSyntax, '
         'acceptsReturningSyntax: $acceptsReturningSyntax, '
@@ -267,6 +267,7 @@ class SQLDialect extends DBDialect {
         'acceptsInsertDefaultValues: $acceptsInsertDefaultValues, '
         'acceptsInsertIgnore: $acceptsInsertIgnore, '
         'acceptsInsertOnConflict: $acceptsInsertOnConflict, '
+        'acceptsVarcharWithoutMaximumSize: $acceptsVarcharWithoutMaximumSize, '
         'foreignKeyCreatesImplicitIndex: $foreignKeyCreatesImplicitIndex, '
         'createIndexIfNotExists: $createIndexIfNotExists, '
         'alterTableAddConstraint: $alterTableAddConstraint, '
@@ -274,7 +275,11 @@ class SQLDialect extends DBDialect {
         'dropIndexOnTable: $dropIndexOnTable, '
         'offsetRequiresLimit: $offsetRequiresLimit, '
         'offsetMaxLimitValue: $offsetMaxLimitValue, '
-        'maxIdentifierLength: $maxIdentifierLength'
+        'maxIdentifierLength: $maxIdentifierLength, '
+        'intParameterTypeSuffix: $intParameterTypeSuffix, '
+        'maxIDsAsParameters: $maxIDsAsParameters, '
+        'regExpSyntax: ${regExpSyntax.name}, '
+        'subqueryAsDerivedTable: $subqueryAsDerivedTable'
         '}';
   }
 }
