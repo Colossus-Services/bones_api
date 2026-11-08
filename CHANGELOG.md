@@ -1,12 +1,13 @@
 ## 1.33.0
 
 The condition operators give the same results on every DB adapter (memory,
-SQLite, PostgreSQL, MySQL). Behavior changes:
+SQLite, PostgreSQL, MySQL), except the known differences below. Behavior
+changes:
 
 - SQL: a query through a to-many relationship returns each entity once (it
   returned one per matching related row): its `JOIN`s are in a subquery,
   `id IN ( SELECT id ... JOIN ... WHERE cond )`. So `countByQuery`, `limit`
-  and pagination also count each entity once. (MySQL: a derived table.)
+  and pagination also count each entity once.
 - SQL: a comparison with `null` through a relationship (`owner.level ==
   null`, `=~ null`, `=~ [x, null]`, a `null` parameter) uses an outer join:
   a missing related entity (a `null` owner, or no rows of a to-many
@@ -17,37 +18,61 @@ SQLite, PostgreSQL, MySQL). Behavior changes:
   (`owner.roles.type`) joined its relationship table to the main table
   (`user__roles__rel.role = store.id`), not to the to-one's
   (`user__roles__rel.user = user.id`): it matched the wrong rows.
-- SQL fix: a `DELETE` through a to-one relationship (`deleteByQuery(
-  'owner.email == ?')`) was invalid SQL (`DELETE ... INNER JOIN`): its
-  `JOIN`s are now in the subquery of the IDs too.
-- Memory: a to-many relationship without related entities is compared as
-  one row of `null`s (as a SQL outer join): `roles.type == null` and
-  `roles.type =~ [null]` match it, and `roles.type != null` and `!~ [null]`
-  don't (they did). `!= "admin"` and `!~ ["admin"]` still match it. Only a
-  to-many relationship (`KeyCondition.isToManyKey`, by the declared field
-  types): an empty list field (`List<String>`, `Uint8List`) is still a
-  value, not a `null`.
-- Known difference: 2 conditions over the same to-many relationship
+- SQL fix: a `DELETE` through a relationship (to-one, `deleteByQuery(
+  'owner.email == ?')`, or to-many) was invalid SQL (`DELETE ... JOIN`): its
+  `JOIN`s are now in the subquery of the IDs too (MySQL: in a derived
+  table, as a `DELETE` can't select from its own table).
+- SQL fix: a number or a decimal `String` compared with a `Decimal` field
+  (`roles.value == "1.5"`) was resolved as `null` (`IS NULL`).
+- Memory: a to-many relationship is compared one related entity at a time
+  (as a SQL join of its rows), and one without related entities as one row
+  of `null`s (as a SQL outer join):
+  - `roles.type == null` and `roles.type =~ [null]` match a user without
+    roles, and `roles.type != null` and `!~ [null]` don't (they did).
+    `!= "admin"` and `!~ ["admin"]` still match it.
+  - `roles.type == ?` with a list parameter (`[['guest']]`, `[[null]]`)
+    compares each related entity's value with it, as a field's
+    `number == ?` does (it matched nothing).
+  - Only a to-many relationship (`KeyCondition.isToManyKey`, by the
+    declared field types): an empty list field (`List<String>`,
+    `Uint8List`) is still a value, not a `null`.
+- Memory fix: `deleteByQuery` through a to-many relationship, of a table
+  without to-one references (`address`: `stores.name == ?`), deleted
+  nothing (its relationships weren't resolved, as a select does).
+- Memory: a `Decimal` field compares by value: `value == 1.5`,
+  `value =~ [1.5, 3]` and `value == ?` with a `Decimal` matched nothing (an
+  entity's map keeps it as a `String`; `EntityHandler.equalsValues*` now
+  compare a `DynamicNumber` with a number or a plain decimal `String` by
+  value).
+
+Known differences (SQL):
+
+- 2 conditions over the same to-many relationship
   (`roles.type == "admin" && roles.type == "guest"`) are, in memory, each
   any related entity, and on SQL the same joined row (so this matches
   nothing on SQL). Prefer one condition (`roles.type =~ [...]`), or `!(...)`
   (a subquery each).
-- Memory: a `Decimal` field compares by value: `value == 1.5`,
-  `value =~ [1.5, 3]` and `value == ?` with a `Decimal` matched nothing (an
-  entity's map keeps it as a `String`; `EntityHandler.equalsValues*` now
-  compare a `DynamicNumber` with a number or a numeric `String` by value).
+- 2 to-many relationships to the same table in one query
+  (`address.stores` and `address.closedStores`, both to `store`) share one
+  `JOIN`: `stores.name == "a" && closedStores.name == "b"` compares both
+  with the same row.
+- A path that reaches the main table again (`store`: `owner.address.stores
+  .name`) has a duplicated table alias: an error on SQL.
 
 - Tests: 'Operators: the same results on every adapter', on all the DB
-  adapters: ~230 conditions, each also checked through `!(...)` (its
+  adapters: ~240 conditions, each also checked through `!(...)` (its
   complement), as a sorted list (an entity selected twice fails), and
   `x == null` / `x != null` checked to split the entities. `==`, `!=`,
   `=~`, `!~`, `>`, `>=`, `<`, `<=`, `!`, `&&`, `||` and groups; a literal, a
   single value, a list, `null`, `[null]`, a list with a `null`, `[]`, a
   regexp (`/.../`, `/.../i`), and the parameters `?`, `?:name`, `/?/` and
-  `/?:name/` (also `null` and `[]`). Over text, a nullable number, a date,
-  an enum, a bool, a nullable decimal, a nullable to-one relationship (by
-  its ID, a field of it, `owner.address.city` 2 relationships away), and a
-  to-many one (`roles`, also a user without any); and `countByQuery`.
+  `/?:name/` (also `null`, `[]` and a list with `==`). Over text, a nullable
+  number, a date, an enum, a bool, a nullable decimal (also as a `String`),
+  a nullable to-one relationship (by its ID, a field of it,
+  `owner.address.city` 2 relationships away), a to-many one (`roles`, also
+  a user without any), and a to-many through a to-one (`owner.roles`). And
+  `countByQuery`, `limit`/`offset`, and `deleteByQuery` through a to-one
+  and a to-many relationship.
 
 ## 1.32.1
 

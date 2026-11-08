@@ -5592,6 +5592,41 @@ Future<bool> runAdapterTests(
         await u('roles.value !~ [3, null]', {'a'});
         await u('roles.value == ?', {'b'}, [Decimal.parse('3')]);
 
+        // A decimal as a `String`:
+        await u('roles.value == "1.5"', {'a'});
+        await u('roles.value =~ ["1.5", "3"]', {'a', 'b'});
+        await u('roles.value == ?', {'b'}, ['3']);
+        // A list parameter with `==`, through a to-many relationship (`uC`
+        // without roles) and of a field:
+        await u(
+          'roles.type == ?',
+          {'c'},
+          [
+            [null],
+          ],
+        );
+        await u(
+          'roles.type == ?',
+          {'b'},
+          [
+            ['guest'],
+          ],
+        );
+        await s(
+          'number == ?',
+          {'s2'},
+          [
+            [null],
+          ],
+        );
+        await s(
+          'number == ?',
+          {'s3'},
+          [
+            [3],
+          ],
+        );
+
         // A date:
         await u('creationTime == ?', {'b'}, [DateTime.utc(2021)]);
         await u('creationTime != ?', {'a', 'c'}, [DateTime.utc(2021)]);
@@ -5642,6 +5677,24 @@ Future<bool> runAdapterTests(
           if (count != n) failures.add('count `$q`: $count, expected $n');
         }
 
+        // Paginated once each (a to-many relationship's join):
+        for (var (limit, offset, exp) in [
+          (1, null, ['b']),
+          (2, null, ['b', 'c']),
+          (1, 1, ['c']),
+        ]) {
+          var page = await userRepo.selectByQuery(
+            'email =~ /^ox-/ && roles.type != "admin"',
+            limit: limit,
+            offset: offset,
+            orderByID: true,
+          );
+          var names = page.map((e) => userNames[e.id]).toList();
+          if (names.join(',') != exp.join(',')) {
+            failures.add('limit $limit offset $offset: $names, expected $exp');
+          }
+        }
+
         // A `DELETE` through a to-one (a `JOIN`) and a to-many relationship:
         var d1 = Store('oxd-1', 1, owner: uA);
         var d2 = Store('oxd-2', 2, owner: uB);
@@ -5667,6 +5720,41 @@ Future<bool> runAdapterTests(
         var left = await storeRepo.selectByQuery('name =~ /^oxd-/');
         if (left.isNotEmpty) {
           failures.add('delete: left ${left.map((e) => e.name).toList()}');
+        }
+
+        // A `DELETE` through a to-many relationship, of a table without
+        // to-one references (`address.stores`):
+        final addressRepo = entityRepositoryProvider.addressAPIRepository;
+        var ax1 = Address(
+          'PX',
+          'PX City',
+          'PX Street',
+          1,
+          stores: [Store('px-1', 1)],
+        );
+        var ax2 = Address(
+          'PX',
+          'PX City',
+          'PX Street',
+          2,
+          stores: [Store('px-2', 2), Store('px-3', 3)],
+        );
+        var ax1ID = (await addressRepo.store(ax1))!;
+        var ax2ID = (await addressRepo.store(ax2))!;
+        try {
+          var deleted = await addressRepo.deleteByQuery(
+            'state == "PX" && stores.name == ?',
+            parameters: ['px-3'],
+          );
+          var ids = deleted.map((e) => e.id).toList();
+          if (ids.join(',') != '$ax2ID') {
+            failures.add('delete address: $ids, expected [$ax2ID]');
+          }
+        } catch (e) {
+          failures.add('delete address: ERROR $e');
+        }
+        if ((await addressRepo.selectByID(ax1ID))?.id != ax1ID) {
+          failures.add('delete address: $ax1ID was deleted');
         }
 
         expect(failures, isEmpty, reason: failures.join('\n'));

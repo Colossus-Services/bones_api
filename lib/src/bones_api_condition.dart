@@ -1502,6 +1502,21 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   bool _isEmptyToMany(Object? keyValue, EntityHandler? entityHandler) =>
       keyValue is Iterable && keyValue.isEmpty && isToManyKey(entityHandler);
 
+  /// A cache of [isToManyKey]: the [EntityHandler] whose result is cached in
+  /// [_isToManyKeyCacheResult].
+  ///
+  /// Why: [isToManyKey] is called for every entity matched (an in-memory
+  /// select checks each row), and resolving it walks the [keys] through the
+  /// entity handlers' field types. The result depends only on the [keys]
+  /// (fixed) and the [EntityHandler] (the same for every row of a query), so
+  /// it's computed once per handler. A different handler (the same parsed
+  /// [Condition] used for another entity type, or none) recomputes it.
+  EntityHandler? _isToManyKeyCacheHandler;
+
+  /// The cached [isToManyKey] of [_isToManyKeyCacheHandler] (`null`: not
+  /// computed yet).
+  bool? _isToManyKeyCacheResult;
+
   /// If the [keys] path goes through a to-many relationship (a field
   /// declared as a list of entities or references, e.g. `roles` or
   /// `owner.roles.type`), resolved by the declared field types of
@@ -1510,9 +1525,11 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   ///
   /// A list field that is not a relationship (`List<String> tags`, a
   /// `Uint8List`) is not a to-many: its value is compared as a whole.
+  ///
+  /// Cached per [entityHandler] (see [_isToManyKeyCacheHandler]).
   bool isToManyKey(EntityHandler? entityHandler) {
-    if (identical(entityHandler, _isToManyKeyHandler)) {
-      return _isToManyKey ?? false;
+    if (identical(entityHandler, _isToManyKeyCacheHandler)) {
+      return _isToManyKeyCacheResult ?? false;
     }
 
     var toMany = false;
@@ -1531,69 +1548,46 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       handler = _resolveValueEntityHandler(type, handler);
     }
 
-    _isToManyKeyHandler = entityHandler;
-    _isToManyKey = toMany;
+    _isToManyKeyCacheHandler = entityHandler;
+    _isToManyKeyCacheResult = toMany;
     return toMany;
   }
 
-  EntityHandler? _isToManyKeyHandler;
-  bool? _isToManyKey;
-
-  /// Resolves the left side of a comparison, before it's compared with the
-  /// right side.
+  /// Matches the left side of a comparison with [compare], one value at a
+  /// time through a to-many relationship (as a SQL join of its rows).
   ///
-  /// In `roles.type == null`:
+  /// In `roles.type == "admin"`:
   /// - [keyValue] is the left side: the value of the [keys] (`roles.type`)
-  ///   in the entity being matched. Through a to-many relationship it's a
-  ///   list, one value per related entity (`[admin, guest]`).
-  /// - [value] is the right side: this condition's value (`null`), or a
-  ///   [ConditionParameter] (`?`, `?:name`) resolved with [parameters],
-  ///   [positionalParameters] and [namedParameters].
+  ///   in the entity being matched. Through a to-many relationship (see
+  ///   [isToManyKey]) it's a list, one value per related entity
+  ///   (`[admin, guest]`).
+  /// - [compare] compares one left-side value with the right side: this
+  ///   condition's [value] (`"admin"`), or its [ConditionParameter]'s value
+  ///   (`?`, `?:name`).
   ///
-  /// Returns `null` when [keyValue] is an empty list through a to-many
-  /// relationship (an entity without related entities, see
-  /// [_isEmptyToMany]), so the left side is compared as a `null` field.
-  /// Otherwise returns [keyValue] unchanged.
+  /// Through a to-many relationship, matches if [compare] matches any of its
+  /// values; without related entities (an empty list), [compare] gets a
+  /// single `null`. Otherwise (a field, also a list field), [keyValue] is
+  /// compared as a whole.
   ///
-  /// Why: on SQL, a to-many relationship is an outer join, and an entity
-  /// without related rows joins one row of `NULL`s. So `roles.type == null`
-  /// matches a user without roles, as `IS NULL` does. Without this, the
-  /// empty list on the left would be compared element by element (none),
-  /// and match nothing.
-  ///
-  /// [keyValue] is also returned unchanged when the right side ([value], or
-  /// its parameter's value) is a list: lists are compared as a whole.
+  /// Why: on SQL, a to-many relationship is an outer join, one row per
+  /// related entity, and an entity without related entities joins one row of
+  /// `NULL`s. So `roles.type == null` matches a user without roles (`IS
+  /// NULL`), and `roles.type == ?` with `['guest']` compares each role's
+  /// type with the parameter (as a field's `number == ?` does).
   ///
   /// Used by [KeyConditionEQ] (`==`). [KeyConditionNotEQ] (`!=`) and
-  /// [KeyConditionINBase] (`=~`/`!~`) handle an empty to-many the same way,
+  /// [KeyConditionINBase] (`=~`/`!~`) handle a to-many the same way,
   /// directly (see `_notEquals` and `_matchesIn`).
-  Object? _emptyToManyAsNull(
+  bool _matchesToManyOrValue(
     Object? keyValue,
     EntityHandler? entityHandler,
-    Object? parameters,
-    List? positionalParameters,
-    Map<String, Object?>? namedParameters,
+    bool Function(Object? leftValue) compare,
   ) {
-    if (!_isEmptyToMany(keyValue, entityHandler)) return keyValue;
-
-    // The right side: only known here, while matching. A parameter (`?`,
-    // `?:name`) is just a placeholder in this condition: its value comes
-    // with each query's parameters, and decides how the empty left side is
-    // compared:
-    // - `roles == ?` with `[[]]` (a list): compares the lists as a whole (the
-    //   empty list stays the left side).
-    // - `roles.type == ?` with `[null]` (not a list): compares as a `null`
-    //   field (returns `null`).
-    Object? v = value;
-    if (v is ConditionParameter) {
-      v = v.getValue(
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-      );
+    if (keyValue is Iterable && isToManyKey(entityHandler)) {
+      return keyValue.isEmpty ? compare(null) : keyValue.any(compare);
     }
-
-    return v is Iterable ? keyValue : null;
+    return compare(keyValue);
   }
 
   @override
@@ -1871,20 +1865,18 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    // A to-many relationship without related entities is a `null` field
-    // (as a SQL outer join's `NULL` row):
-    return equalsConditionValue(
-      _emptyToManyAsNull(
-        keyValue,
-        entityHandler,
-        parameters,
-        positionalParameters,
-        namedParameters,
+    // Through a to-many relationship, each related entity's value (or a
+    // `null` without any):
+    return _matchesToManyOrValue(
+      keyValue,
+      entityHandler,
+      (v) => equalsConditionValue(
+        v,
+        value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
       ),
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
     );
   }
 
@@ -1898,22 +1890,20 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    // A to-many relationship without related entities is a `null` field
-    // (as a SQL outer join's `NULL` row):
-    return equalsConditionValue(
-      _emptyToManyAsNull(
-        keyValue?.value,
-        entityHandler,
-        parameters,
-        positionalParameters,
-        namedParameters,
+    // Through a to-many relationship, each related entity's value (or a
+    // `null` without any):
+    return _matchesToManyOrValue(
+      keyValue?.value,
+      entityHandler,
+      (v) => equalsConditionValue(
+        v,
+        value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler,
       ),
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
     );
   }
 

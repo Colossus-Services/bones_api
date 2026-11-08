@@ -1814,6 +1814,18 @@ abstract class ConditionEncoder {
       }
     }
 
+    // A `DECIMAL` column (a `Decimal` field) has no `TypeParser`: a number or
+    // a decimal `String` (`roles.value == "1.5"`) would be resolved as an
+    // entity ID below (`null`, so `IS NULL`).
+    if (valueType == Decimal || valueType == DynamicNumber) {
+      if (value is DynamicNumber) return value;
+      if (value is num) return Decimal.fromNum(value);
+      if (value is String) {
+        var d = Decimal.from(value.trim());
+        if (d != null) return d;
+      }
+    }
+
     var valueTypeInfo = TypeInfo.from(valueType);
 
     var valueParser = TypeParser.parserForTypeInfo(valueTypeInfo);
