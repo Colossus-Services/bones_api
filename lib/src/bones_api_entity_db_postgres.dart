@@ -18,7 +18,6 @@ import 'bones_api_logging.dart';
 import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils.dart';
-import 'bones_api_utils_timedmap.dart';
 
 final _log = logging.Logger('DBPostgreSQLAdapter')..registerAsDbLogger();
 
@@ -703,16 +702,15 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
 
       notifyTableFieldTypes(table, fieldsTypes);
 
-      var fieldsReferencedTables = await _findFieldsReferencedTables(
+      var fieldsReferencedTables = await findFieldsReferencedTablesCached(
         connection,
         table,
         contextID: contextID,
       );
 
-      var relationshipTables = await _findRelationshipTables(
+      var relationshipTables = await findRelationshipTables(
         connection,
         table,
-        idFieldName,
         contextID: contextID,
       );
 
@@ -1075,95 +1073,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     }
   }
 
-  Future<List<TableRelationshipReference>> _findRelationshipTables(
-    PostgreSQLConnectionWrapper connection,
-    String table,
-    String idFieldName, {
-    Object? contextID,
-  }) async {
-    final tablesReferences = await _findAllTableFieldsReferences(
-      connection,
-      table,
-      contextID: contextID,
-    );
-
-    var relationships = tablesReferences
-        .map((e) {
-          var refToTables = e.values
-              .where((r) => r.targetTable == table)
-              .toList(growable: false);
-          var otherRefs = e.values
-              .where((r) => r.targetTable != table)
-              .toList(growable: false);
-
-          if (refToTables.length != 1 || otherRefs.length != 1) {
-            return null;
-          }
-
-          var refToTable = refToTables.single;
-          var otherRef = otherRefs.single;
-
-          var tableRelationshipReference = TableRelationshipReference(
-            refToTable.sourceTable,
-            refToTable.targetTable,
-            refToTable.targetField,
-            refToTable.targetFieldType,
-            refToTable.sourceField,
-            otherRef.targetTable,
-            otherRef.targetField,
-            otherRef.targetFieldType,
-            otherRef.sourceField,
-            sourceRelationshipFieldIndex: refToTable.indexName,
-            targetRelationshipFieldIndex: otherRef.indexName,
-          );
-
-          return tableRelationshipReference;
-        })
-        .nonNulls
-        .toList();
-
-    return relationships;
-  }
-
-  FutureOr<List<Map<String, TableFieldReference>>>
-  _findAllTableFieldsReferences(
-    PostgreSQLConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) async {
-    var tablesNames = await _listTablesNames(connection, contextID: contextID);
-
-    var tablesReferences = <Map<String, TableFieldReference>>[];
-
-    for (var t in tablesNames) {
-      var refs = await _findFieldsReferencedTables(
-        connection,
-        t,
-        contextID: contextID,
-      );
-      tablesReferences.add(refs);
-    }
-
-    tablesReferences = tablesReferences.where((m) {
-      return m.length > 1 &&
-          m.values.where((r) => r.targetTable == table).isNotEmpty &&
-          m.values.where((r) => r.targetTable != table).isNotEmpty;
-    }).toList();
-    return tablesReferences;
-  }
-
-  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
-      Expando();
-
-  FutureOr<List<String>> _listTablesNames(
-    PostgreSQLConnectionWrapper connection, {
-    Object? contextID,
-  }) => _listTablesNamesContextCache.putIfAbsentAsync(
-    contextID,
-    () => _listTablesNamesImpl(connection),
-  );
-
-  Future<List<String>> _listTablesNamesImpl(
+  @override
+  Future<List<String>> listTablesNamesImpl(
     PostgreSQLConnectionWrapper connection,
   ) async {
     var sql = '''
@@ -1177,50 +1088,8 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     return names;
   }
 
-  final TimedMap<String, Map<String, TableFieldReference>>
-  _findFieldsReferencedTablesCache =
-      TimedMap<String, Map<String, TableFieldReference>>(Duration(seconds: 30));
-
   @override
-  TableScheme? disposeTableSchemeCache(
-    String table, {
-    bool fieldsTypes = false,
-  }) {
-    _findFieldsReferencedTablesCache.remove(table);
-    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
-  }
-
-  @override
-  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
-    _findFieldsReferencedTablesCache.clear();
-    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
-  }
-
-  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
-  _findFieldsReferencedTablesContextCache = Expando();
-
-  FutureOr<Map<String, TableFieldReference>> _findFieldsReferencedTables(
-    PostgreSQLConnectionWrapper connection,
-    String table, {
-    Object? contextID,
-  }) {
-    if (contextID != null) {
-      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
-      return cache[table] ??= _findFieldsReferencedTablesImpl(connection, table)
-          .then((ret) {
-            cache[table] = ret;
-            _findFieldsReferencedTablesCache[table] = ret;
-            return ret;
-          });
-    }
-
-    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
-      table,
-      () => _findFieldsReferencedTablesImpl(connection, table),
-    );
-  }
-
-  Future<Map<String, TableFieldReference>> _findFieldsReferencedTablesImpl(
+  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
     PostgreSQLConnectionWrapper connection,
     String table,
   ) async {
