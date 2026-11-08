@@ -1331,13 +1331,17 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var fieldObj = _getByID(refField.targetTable, id);
 
-    if (fieldObj != null) {
-      var tableScheme2 = getTableScheme(refField.targetTable);
+    // Not in this adapter (e.g. an entity stored by another adapter, as a
+    // `Photo` in an object storage), or a missing row: keep the ID, as a SQL
+    // column does. Replacing it with `null` lost the reference: `photo ==
+    // null` matched it, and `photo =~ [id]` didn't.
+    if (fieldObj == null) return id;
 
-      if (tableScheme2 != null && tableScheme2.hasTableReferences) {
-        var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
-        fieldObj = _resolveEntityMap(fieldObj, entityHandler2, tableScheme2);
-      }
+    var tableScheme2 = getTableScheme(refField.targetTable);
+
+    if (tableScheme2 != null && tableScheme2.hasTableReferences) {
+      var entityHandler2 = getEntityHandler(tableName: tableScheme2.name);
+      fieldObj = _resolveEntityMap(fieldObj, entityHandler2, tableScheme2);
     }
 
     return fieldObj;

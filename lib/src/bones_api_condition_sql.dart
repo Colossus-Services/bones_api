@@ -1,9 +1,11 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_extension.dart';
 
 final _log = logging.Logger('ConditionSQLEncoder');
 
@@ -494,12 +496,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
             null;
   }
 
-  /// If [c]'s key is a single relationship field of the main table: a
-  /// to-one (a referenced table's column) or a to-many (a relationship
-  /// table, no column). As memory's [KeyCondition.isRelationshipKey]: its
-  /// `IN` list is a set of related IDs, without `null`s (a relationship
-  /// never has a `null` ID), so `=~ null` matches none and `!~ null` all,
-  /// as `=~ []` / `!~ []`.
+  /// If [c]'s key is a single relationship field of the main entity: its `IN`
+  /// list is a set of related IDs, without `null`s (a relationship never has
+  /// a `null` ID; see [KeyCondition.isRelationshipKey]).
+  ///
+  /// Resolved as memory's [KeyCondition.isRelationshipKey], by the field's
+  /// declared type (not by the DB scheme: a to-one may have no foreign key,
+  /// e.g. a `String` ID): an [EntityReference] / [EntityReferenceList], or
+  /// an entity type (or a `List` of one) with a table.
   FutureOr<bool> _isRelationshipKey(KeyCondition c, EncodingContext context) {
     var keys = c.keys;
     if (keys.length != 1) return false;
@@ -511,20 +515,26 @@ class ConditionSQLEncoder extends ConditionEncoder {
     if (schemeProvider == null || _isMainTableIDKey(c, context)) return false;
 
     return schemeProvider
-        .getTableScheme(context.tableNameOrEntityName)
-        .resolveMapped((tableScheme) {
-          if (tableScheme == null) return false;
+        .getFieldType(
+          key.name,
+          entityName: context.entityName,
+          tableName: context.tableName,
+        )
+        .resolveMapped((type) {
+          if (type == null) return false;
+          if (type.isEntityReferenceBaseType) return true;
 
-          // A to-one: a column referencing another table.
-          if (tableScheme.getFieldReferencedTable(key.name) != null) {
-            return true;
+          TypeInfo? entityType;
+          if (type.isListEntity) {
+            entityType = type.arguments0;
+          } else if (!type.isPrimitiveType && !type.isIterable && !type.isMap) {
+            entityType = type;
           }
+          if (entityType == null) return false;
 
-          // A to-many: no column (a relationship table, see
-          // [keyFieldToSQL]).
-          var tableFieldName = tableScheme.resolveTableFieldName(key.name);
-          return tableFieldName == null ||
-              !tableScheme.fieldsTypes.containsKey(tableFieldName);
+          return schemeProvider
+              .getTableForType(entityType)
+              .resolveMapped((table) => table != null);
         });
   }
 

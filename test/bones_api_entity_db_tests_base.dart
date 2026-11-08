@@ -5833,8 +5833,12 @@ Future<bool> runAdapterTests(
           required Object id1,
           required Object id2,
           required List<Object> entityParams,
+          List<Object>? referenceParams,
         }) async {
           var all = model.keys.toSet();
+
+          // An ID as a literal (a `String` ID quoted):
+          String lit(Object id) => id is String ? '"$id"' : '$id';
 
           Set<String> where(bool Function(Set<Object> ids) f) => {
             for (var e in model.entries)
@@ -5880,10 +5884,10 @@ Future<bool> runAdapterTests(
             ('[]', []),
             ('null', [null]),
             ('[null]', [null]),
-            ('$id1', [id1]),
-            ('[$id1]', [id1]),
-            ('[$id1, $id2]', [id1, id2]),
-            ('[$id2, null]', [id2, null]),
+            (lit(id1), [id1]),
+            ('[${lit(id1)}]', [id1]),
+            ('[${lit(id1)}, ${lit(id2)}]', [id1, id2]),
+            ('[${lit(id2)}, null]', [id2, null]),
           ];
           for (var (literal, s) in sets) {
             await check('$field =~ $literal', null, inSet(s));
@@ -5911,6 +5915,43 @@ Future<bool> runAdapterTests(
           await check('$field =~ ?', [entityParams], inSet([id1, id2]));
           await check('$field !~ ?', [entityParams], notInSet([id1, id2]));
 
+          // References as parameters (compared by their IDs):
+          if (referenceParams != null) {
+            await check('$field =~ ?', [referenceParams.first], inSet([id1]));
+            await check('$field =~ ?', [referenceParams], inSet([id1, id2]));
+            await check('$field !~ ?', [referenceParams], notInSet([id1, id2]));
+            await check('$field == ?', [
+              referenceParams.first,
+            ], where((r) => r.contains(id1)));
+          }
+
+          // A `Set` parameter:
+          await check('$field =~ ?', [
+            {id1},
+          ], inSet([id1]));
+          await check('$field !~ ?', [
+            {id1, null},
+          ], notInSet([id1]));
+
+          // `== [id]` (a single element) is `== id`:
+          await check('$field == [${lit(id1)}]', null, inSet([id1]));
+          await check('$field == ?', [
+            [id1],
+          ], inSet([id1]));
+
+          // With another condition (`&&`, `||`):
+          await check('$field =~ ? && $field !~ ?', [
+            [id1, id2],
+            [id1],
+          ], inSet([id1, id2]).intersection(notInSet([id1])));
+          await check('$field =~ ?:a || $field == null', {
+            'a': [id2],
+          }, inSet([id2]).union(none));
+          await check('$field =~ ?:a || $field =~ ?:b', {
+            'a': null,
+            'b': <Object>[],
+          }, {});
+
           // `==` / `!=`: `null` and `[]` are "without related entities":
           for (var literal in ['null', '[]']) {
             await check('$field == $literal', null, none);
@@ -5923,9 +5964,13 @@ Future<bool> runAdapterTests(
             await check('$field != ?:v', {'v': param}, some);
           }
           for (var id in [id1, id2]) {
-            await check('$field == $id', null, where((r) => r.contains(id)));
             await check(
-              '$field != $id',
+              '$field == ${lit(id)}',
+              null,
+              where((r) => r.contains(id)),
+            );
+            await check(
+              '$field != ${lit(id)}',
               null,
               where((r) => r.isEmpty || r.any((v) => v != id)),
             );
@@ -5988,6 +6033,18 @@ Future<bool> runAdapterTests(
           entityParams: [sc1, sc2],
         );
 
+        // An `EntityReferenceList` as a parameter (its IDs):
+        var bClosed = addresses['B']!.closedStores;
+        for (var (q, exp) in [
+          ('closedStores =~ ?', ['A', 'B']),
+          ('closedStores !~ ?', ['C']),
+        ]) {
+          var got = await selectAddresses(q, [bClosed]);
+          if (got.join(',') != exp.join(',')) {
+            failures.add('`$q`  [$bClosed]: $got, expected $exp');
+          }
+        }
+
         var aStores = addresses['A']!.stores;
         var bStores = addresses['B']!.stores;
         await relationship(
@@ -6009,6 +6066,7 @@ Future<bool> runAdapterTests(
             alpha,
             [],
             userInfo: UserInfo('rk-x'),
+            photo: Uint8List.fromList([82, 75, 1]),
             creationTime: DateTime.utc(2020),
           ),
           'Y': User(
@@ -6017,6 +6075,7 @@ Future<bool> runAdapterTests(
             alpha,
             [],
             userInfo: UserInfo('rk-y'),
+            photo: Uint8List.fromList([82, 75, 2]),
             creationTime: DateTime.utc(2020),
           ),
           'Z': User(
@@ -6052,6 +6111,22 @@ Future<bool> runAdapterTests(
           id1: infoX,
           id2: infoY,
           entityParams: [ux.userInfo.entity!, uy.userInfo.entity!],
+          referenceParams: [ux.userInfo, uy.userInfo],
+        );
+
+        // A to-one with a `String` ID, without a foreign key (`User.photo`):
+        var (photoX, photoY) = (ux.photo!, uy.photo!);
+        await relationship(
+          field: 'photo',
+          model: {
+            'X': {photoX.id},
+            'Y': {photoY.id},
+            'Z': {},
+          },
+          select: selectUsers,
+          id1: photoX.id,
+          id2: photoY.id,
+          entityParams: [photoX, photoY],
         );
 
         var stores = {
