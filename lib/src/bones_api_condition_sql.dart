@@ -137,40 +137,42 @@ class ConditionSQLEncoder extends ConditionEncoder {
   FutureOr<EncodingContext> encodeIDCondition(
     ConditionID c,
     EncodingContext context,
-  ) {
-    var tableName = context.tableNameOrEntityName;
-    var tableAlias = context.resolveEntityAlias(tableName);
-
-    // Never `null`: required by the constructor.
-    var tableSchemeRet = schemeProvider!.getTableScheme(tableName);
-
-    return tableSchemeRet.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
-      var idFieldName = tableScheme.idFieldName ?? 'id';
-      var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
-
-      var idKey = context.addEncodingParameter(idFieldName, c.idValue);
-      var q = sqlElementQuote;
-      // The column, not `idKey` (renamed if a query parameter has its name):
-      var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
-
-      return encodeIDValues(context, idType, idKey, tableKey, c.idValue, false);
-    });
-  }
+  ) => _encodeIDComparison(context, c.idValue, isList: false);
 
   @override
   FutureOr<EncodingContext> encodeIDConditionIN(
     ConditionIdIN c,
     EncodingContext context,
-  ) {
+  ) => _encodeIDComparison(context, c.idsValues, isList: true);
+
+  /// The shared body of [encodeIDCondition] (`#ID == x`) and
+  /// [encodeIDConditionIN] (`#ID =~ [x, y]`, [isList]): resolves the ID
+  /// column of the [context]'s table and writes its comparison with
+  /// [idValue] (see [encodeIDValues]).
+  FutureOr<EncodingContext> _encodeIDComparison(
+    EncodingContext context,
+    Object? idValue, {
+    required bool isList,
+  }) {
     var tableName = context.tableNameOrEntityName;
     var tableAlias = context.resolveEntityAlias(tableName);
 
+    return _requireTableScheme(tableName).resolveMapped((tableScheme) {
+      var idFieldName = tableScheme.idFieldName ?? 'id';
+      var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
+
+      var idKey = context.addEncodingParameter(idFieldName, idValue);
+      // The column, not `idKey` (renamed if a query parameter has its name):
+      var tableKey = qualifiedColumnSQL(tableAlias, idFieldName);
+
+      return encodeIDValues(context, idType, idKey, tableKey, idValue, isList);
+    });
+  }
+
+  /// The [TableScheme] of [tableName], or a [StateError] (logged) if there's
+  /// none. Used by the encoders that need the main table's scheme
+  /// ([_encodeIDComparison] and [keyFieldToSQL]).
+  FutureOr<TableScheme> _requireTableScheme(String tableName) {
     // Never `null`: required by the constructor.
     var tableSchemeRet = schemeProvider!.getTableScheme(tableName);
 
@@ -180,24 +182,16 @@ class ConditionSQLEncoder extends ConditionEncoder {
         _log.severe(errorMsg);
         throw StateError(errorMsg);
       }
-
-      var idFieldName = tableScheme.idFieldName ?? 'id';
-      var idType = tableScheme.fieldsTypes[idFieldName] ?? int;
-
-      var idKey = context.addEncodingParameter(idFieldName, c.idsValues);
-      var q = sqlElementQuote;
-      // The column, not `idKey` (renamed if a query parameter has its name):
-      var tableKey = '$q$tableAlias$q.$q$idFieldName$q';
-
-      return encodeIDValues(
-        context,
-        idType,
-        idKey,
-        tableKey,
-        c.idsValues,
-        true,
-      );
+      return tableScheme;
     });
+  }
+
+  /// A column qualified by its table alias, quoted with [sqlElementQuote]:
+  /// `"alias"."column"`. As `SQLDialect.qualifiedColumnSQL` (with the
+  /// dialect's quote).
+  String qualifiedColumnSQL(String tableAlias, String column) {
+    var q = sqlElementQuote;
+    return '$q$tableAlias$q.$q$column$q';
   }
 
   /// Writes the comparison of the ID column ([tableKey]) with [idValue] (`=`)
@@ -385,12 +379,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       var patternParameter = c.patternParameter;
       if (patternParameter != null) {
-        var paramValue = patternParameter.getValue(
-          parameters: context.parameters,
-          positionalParameters: context.positionalParameters,
-          namedParameters: context.namedParameters,
-          encodingParameters: context.encodingParameters,
-        );
+        var paramValue = context.parameterValue(patternParameter);
 
         (pattern, caseInsensitive) = KeyConditionRegExp.resolvePatternValue(
           paramValue,
@@ -486,14 +475,19 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var values = c.value;
     if (values is! List || values.length != 1) return false;
     var p = values.first;
-    return p is ConditionParameter &&
-        p.getValue(
-              parameters: context.parameters,
-              positionalParameters: context.positionalParameters,
-              namedParameters: context.namedParameters,
-              encodingParameters: context.encodingParameters,
-            ) ==
-            null;
+    return p is ConditionParameter && context.parameterValue(p) == null;
+  }
+
+  /// Writes the match of an empty set of values (`x =~ []`): `IN` matches
+  /// nothing (`FALSE`) and `NOT IN` everything (`TRUE`, also a `NULL`).
+  /// Used by [encodeConditionValuesWithOperator] for an empty list, and for a
+  /// relationship's list with only `null`s.
+  EncodingContext _writeEmptySetMatch(
+    EncodingContext context,
+    String operator,
+  ) {
+    context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
+    return context;
   }
 
   /// If [c]'s key is a single relationship field of the main entity: its `IN`
@@ -601,8 +595,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
         // as a list with a `null`), except for a relationship
         // ([nullsAsAbsent], below).
         if (elements.isEmpty) {
-          context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
-          return context;
+          return _writeEmptySetMatch(context, operator);
         }
 
         var nonNulls = elements
@@ -620,8 +613,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
             // A relationship's set of IDs ([_isRelationshipKey]): its `null`s
             // aren't IDs. Without any other, an empty set (as `[]`).
             if (nonNulls.isEmpty) {
-              context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
-              return context;
+              return _writeEmptySetMatch(context, operator);
             }
             value = EncodingValueList(
               value.key,
@@ -801,17 +793,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
     var keys = c.keys;
     var key0 = keys.first as ConditionKeyField;
 
-    var tableSchemeRet = schemeProvider.getTableScheme(tableName);
-
-    return tableSchemeRet.resolveMapped((tableScheme) {
-      if (tableScheme == null) {
-        var errorMsg = "Can't find `TableScheme` for entity/table: $tableName";
-        _log.severe(errorMsg);
-        throw StateError(errorMsg);
-      }
-
-      var q = sqlElementQuote;
-
+    return _requireTableScheme(tableName).resolveMapped((tableScheme) {
       var fieldName = key0.name;
       var tableFieldName = tableScheme.resolveTableFieldName(fieldName);
       var tableFieldType = tableFieldName != null
@@ -819,7 +801,10 @@ class ConditionSQLEncoder extends ConditionEncoder {
           : null;
 
       if (tableFieldType != null) {
-        return MapEntry(tableFieldType, '$q$tableAlias$q.$q$tableFieldName$q');
+        return MapEntry(
+          tableFieldType,
+          qualifiedColumnSQL(tableAlias, tableFieldName!),
+        );
       }
 
       var retFieldType = schemeProvider.getFieldType(
@@ -874,7 +859,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
           return MapEntry(
             relationshipTargetFieldType,
-            '$q$relationshipAlias$q.$q$relationshipTargetField$q',
+            qualifiedColumnSQL(relationshipAlias, relationshipTargetField),
           );
         });
       });
@@ -952,9 +937,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       final alias = context.resolveEntityAlias(targetTable);
       final type = scheme.fieldsTypes[fieldName]!;
-      final q = sqlElementQuote;
 
-      return MapEntry(type, '$q$alias$q.$q$fieldName$q');
+      return MapEntry(type, qualifiedColumnSQL(alias, fieldName));
     });
   }
 
