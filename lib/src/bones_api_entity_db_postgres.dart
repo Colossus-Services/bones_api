@@ -1,6 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' hide Time, Type;
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
@@ -1306,19 +1307,22 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
           sql.sql,
           substitutionValues: sql.parametersByPlaceholder,
         )
-        .resolveMapped((results) {
-          var count = results
-              .map((row) {
-                var count = row['count'] ?? 0;
-                return count is int
-                    ? count
-                    : int.tryParse(count.toString().trim());
-              })
-              .whereType<int>()
-              .first;
-          return count;
-        });
+        .resolveMapped(countFromResults);
   }
+
+  /// The count of a `COUNT` query's [results]: the first row's parseable
+  /// `count` column, or `0` without one (no row, as the SQLite and MySQL
+  /// adapters; a `.first` used to throw a `StateError` here).
+  @visibleForTesting
+  static int countFromResults(Iterable<Map<String, dynamic>> results) =>
+      results
+          .map((row) {
+            var count = row['count'] ?? 0;
+            return count is int ? count : int.tryParse(count.toString().trim());
+          })
+          .whereType<int>()
+          .firstOrNull ??
+      0;
 
   @override
   FutureOr<List<I>> doExistIDsSQL<I extends Object>(
