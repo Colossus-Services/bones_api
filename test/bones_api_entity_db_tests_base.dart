@@ -4915,6 +4915,28 @@ Future<bool> runAdapterTests(
           await stores('owner =~ ?', parameters: {'owner': <int>[]}),
           isEmpty,
         );
+        // Through a relationship: a JOIN (an outer one when negated), and
+        // `!( ... )`'s subquery; a missing owner is included when negated.
+        var noEmails = {'email': <String>[]};
+        expect(
+          await stores('owner.email =~ ?:email', parameters: noEmails),
+          isEmpty,
+        );
+        expect(
+          await stores('owner.email !~ ?:email', parameters: noEmails),
+          equals({'s1', 's2', 's3'}),
+        );
+        expect(
+          await stores('!(owner.email =~ ?:email)', parameters: noEmails),
+          equals({'s1', 's2', 's3'}),
+        );
+        // A to-many relationship:
+        var noRoles = {'roles': <int>[]};
+        expect(await users('roles =~ ?', parameters: noRoles), isEmpty);
+        expect(
+          await users('!(roles =~ ?)', parameters: noRoles),
+          equals({'u1', 'u2', 'u3'}),
+        );
         expect(
           await stores(
             'name == ? || number =~ ?',

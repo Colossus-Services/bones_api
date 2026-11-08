@@ -9,10 +9,14 @@
   - A `null` is still `IS NULL`: `x =~ null` (a parameter's `null`) and
     `x =~ [null]`. `resolveValueToType(null, valueAsList: true)` is now
     `[null]` (was `[]`, indistinguishable from an empty list).
+  - Note: a `deleteByQuery('x !~ ?', [[]])` now deletes every row (as
+    matched in memory); 1.31.0's `NOT IN ( null )` deleted none.
 - New tests: the empty lists' SQL (`bones_api_condition_not_test.dart`), and
   on every `SQLAdapter` (memory, SQLite, PostgreSQL, MySQL): `=~ []`,
-  `!~ []`, `!(x =~ [])`, a relationship's `owner =~ []`, in an `||`, and a
-  `null` parameter.
+  `!~ []`, `!(x =~ [])`, a reference column (`owner =~ []`), through a
+  relationship (`owner.email =~ []`, `!~ []` and `!( ... )`: the JOIN and
+  the subquery) and a to-many one (`roles =~ []`, `!(roles =~ [])`), in an
+  `||`, and a `null` parameter.
 
 ## 1.32.0
 
