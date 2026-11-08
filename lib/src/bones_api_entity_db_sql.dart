@@ -3432,6 +3432,15 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     });
   }
 
+  /// [value] (e.g. a table name) as a SQL string literal: quoted with `'`,
+  /// with its `'` doubled (the standard SQL escape), so a `'` in [value]
+  /// can't end the literal (and change the query).
+  ///
+  /// Used by the schema introspection queries, which compare names with
+  /// literals (e.g. `WHERE table_name = 'user'`).
+  static String sqlStringLiteral(String value) =>
+      "'${value.replaceAll("'", "''")}'";
+
   // -------------------------------------------------------------------------
   // Schema introspection shared by the adapters that read their schema from
   // the database (PostgreSQL, MySQL, SQLite), over [listTablesNamesImpl] and

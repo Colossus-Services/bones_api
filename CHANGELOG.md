@@ -138,6 +138,11 @@ Fixes:
 - `DBPostgreSQLAdapter`: the ID sequence fix after an update's auto-insert
   used `max(id)`, failing for a table whose ID column isn't `id`: now the
   table's (quoted) ID column.
+- `DBPostgreSQLAdapter`, `DBMySQLAdapter`: the schema introspection
+  queries interpolated the table (and database) names into SQL string
+  literals unescaped: a `'` in a name broke (or changed) the query. Now
+  escaped by `DBSQLAdapter.sqlStringLiteral` (the queries are otherwise
+  the same).
 
 ## 1.34.0
 

@@ -647,7 +647,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       _log.info('getTableFieldsTypesImpl> $table');
 
       var sql =
-          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = ${DBSQLAdapter.sqlStringLiteral(table)}";
 
       var scheme = await connection.mappedResultsQuery(sql);
 
@@ -682,7 +682,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
       //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
 
       var sql =
-          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = '$table'";
+          "SELECT column_name, data_type, column_default, is_updatable FROM information_schema.columns WHERE table_name = ${DBSQLAdapter.sqlStringLiteral(table)}";
 
       var scheme = await connection.mappedResultsQuery(sql);
 
@@ -801,7 +801,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
         ON true
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
     WHERE
-      t.relname = '$table'
+      t.relname = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND t.relkind IN ('r', 'p')
       AND pg_table_is_visible(t.oid)
       AND ix.indisvalid
@@ -843,9 +843,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     String table,
     Iterable<String> indexesNames,
   ) {
-    var names = indexesNames
-        .map((n) => "'${n.replaceAll("'", "''")}'")
-        .join(', ');
+    var names = indexesNames.map(DBSQLAdapter.sqlStringLiteral).join(', ');
     if (names.isEmpty) return <String, String?>{};
 
     var sql =
@@ -896,7 +894,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     FROM pg_constraint con
       JOIN pg_class tbl ON con.conrelid = tbl.oid
     WHERE
-      tbl.relname = '$table'
+      tbl.relname = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND pg_table_is_visible(tbl.oid);
     ''';
 
@@ -1001,7 +999,7 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     JOIN
       information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
     WHERE
-      constraint_type = 'PRIMARY KEY' and tc.table_name = '$table';
+      constraint_type = 'PRIMARY KEY' and tc.table_name = ${DBSQLAdapter.sqlStringLiteral(table)};
     ''';
 
     var columns = await connection.mappedResultsQuery(sql);
@@ -1089,13 +1087,12 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     return names;
   }
 
-  @override
-  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
-    PostgreSQLConnectionWrapper connection,
-    String table,
-  ) async {
-    var sql =
-        '''
+  /// The SQL of [findFieldsReferencedTablesImpl]: the foreign keys of
+  /// [table] (escaped as a string literal, see
+  /// [DBSQLAdapter.sqlStringLiteral]).
+  @visibleForTesting
+  static String findFieldsReferencedTablesSQL(String table) =>
+      '''
     SELECT
       o.conname AS constraint_name,
       
@@ -1150,11 +1147,18 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     
     WHERE
       o.contype = 'f'
-      AND m.relname = '$table'
+      AND m.relname = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND o.conrelid IN (
         SELECT oid FROM pg_class c WHERE c.relkind = 'r'
       );
     ''';
+
+  @override
+  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
+    PostgreSQLConnectionWrapper connection,
+    String table,
+  ) async {
+    var sql = findFieldsReferencedTablesSQL(table);
 
     var referenceFields = await connection.mappedResultsQuery(sql);
 
@@ -1515,7 +1519,9 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   /// with another ID column doesn't have.
   @visibleForTesting
   static String fixTableSequenceSQL(String table, String idFieldName) =>
-      "SELECT setval(pg_get_serial_sequence('$table', '$idFieldName'), "
+      "SELECT setval(pg_get_serial_sequence("
+      "${DBSQLAdapter.sqlStringLiteral(table)}, "
+      "${DBSQLAdapter.sqlStringLiteral(idFieldName)}), "
       "coalesce(max(\"$idFieldName\"),0) + 1, false) FROM \"$table\"";
 
   dynamic _resolveResultID(

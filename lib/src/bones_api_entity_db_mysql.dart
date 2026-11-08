@@ -1,6 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:mysql1/mysql1.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart' show Decimal, DynamicInt;
@@ -606,16 +607,14 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     String table,
     Iterable<String> indexesNames,
   ) {
-    var names = indexesNames
-        .map((n) => "'${n.replaceAll("'", "''")}'")
-        .join(', ');
+    var names = indexesNames.map(DBSQLAdapter.sqlStringLiteral).join(', ');
     if (names.isEmpty) return <String, String?>{};
 
     var sql =
         "SELECT DISTINCT INDEX_NAME AS index_name "
         "FROM information_schema.STATISTICS "
         "WHERE TABLE_SCHEMA = DATABASE() "
-        "AND TABLE_NAME = '${table.replaceAll("'", "''")}' "
+        "AND TABLE_NAME = ${DBSQLAdapter.sqlStringLiteral(table)} "
         "AND INDEX_NAME IN ($names)";
 
     return executeWithPool(
@@ -629,22 +628,31 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
     );
   }
 
-  @override
-  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
-    DBMySqlConnectionWrapper connection,
+  /// The SQL of [findFieldsReferencedTablesImpl]: the foreign keys of
+  /// [table] in the database [databaseName] (both escaped as string
+  /// literals, see [DBSQLAdapter.sqlStringLiteral]).
+  @visibleForTesting
+  static String findFieldsReferencedTablesSQL(
+    String databaseName,
     String table,
-  ) async {
-    var sql =
-        '''
-    SELECT 
+  ) =>
+      '''
+    SELECT
       CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
       REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
     FROM
       INFORMATION_SCHEMA.KEY_COLUMN_USAGE
     WHERE
-      TABLE_SCHEMA = '$databaseName' AND TABLE_NAME = '$table' 
+      TABLE_SCHEMA = ${DBSQLAdapter.sqlStringLiteral(databaseName)} AND TABLE_NAME = ${DBSQLAdapter.sqlStringLiteral(table)}
       AND REFERENCED_TABLE_NAME IS NOT NULL AND REFERENCED_COLUMN_NAME IS NOT NULL
     ''';
+
+  @override
+  Future<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
+    DBMySqlConnectionWrapper connection,
+    String table,
+  ) async {
+    var sql = findFieldsReferencedTablesSQL(databaseName, table);
 
     var results = await connection.query(sql);
 
