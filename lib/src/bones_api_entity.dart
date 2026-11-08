@@ -13,8 +13,7 @@ import 'package:statistics/statistics.dart'
         DynamicInt,
         DynamicNumber,
         IterableMapEntryExtension,
-        NumericTypeExtension,
-        IterableExtension;
+        NumericTypeExtension;
 import 'package:swiss_knife/swiss_knife.dart' show EventStream, DataURLBase64;
 
 import 'bones_api_base.dart';
@@ -567,9 +566,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     entities.map((o) => MapEntry(getIDFromMap(o), o)),
   );
 
-  Type? _idType;
+  /// Cache of [idType]: the [Type] of the ID field, fixed per entity type
+  /// and looked up on every ID parse/compare.
+  Type? _idTypeCache;
 
-  Type idType([O? o]) => _idType ??= getFieldType(
+  Type idType([O? o]) => _idTypeCache ??= getFieldType(
     o,
     idFieldName(o),
     resolveFiledName: false,
@@ -581,15 +582,24 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   Map<String, TypeInfo> fieldsTypes([O? o]);
 
-  Map<String, TypeInfo>? _fieldsWithTypeList;
+  // The `fieldsWith*` caches below hold filtered views of [fieldsTypes].
+  // The fields of an entity type are fixed, so each filter runs once.
 
-  Map<String, TypeInfo> fieldsWithTypeList([O? o]) => _fieldsWithTypeList ??=
-      fieldsWithType((_, fieldType) => fieldType.isList, o);
+  /// Cache of [fieldsWithTypeList]: the fields of a `List` type.
+  Map<String, TypeInfo>? _fieldsWithTypeListCache;
 
-  Map<String, TypeInfo>? _fieldsWithTypeEntity;
+  Map<String, TypeInfo> fieldsWithTypeList([O? o]) =>
+      _fieldsWithTypeListCache ??= fieldsWithType(
+        (_, fieldType) => fieldType.isList,
+        o,
+      );
+
+  /// Cache of [fieldsWithTypeEntity]: the fields holding an entity
+  /// (not an [EntityReference]).
+  Map<String, TypeInfo>? _fieldsWithTypeEntityCache;
 
   Map<String, TypeInfo> fieldsWithTypeEntity([O? o]) =>
-      _fieldsWithTypeEntity ??= fieldsWithType(
+      _fieldsWithTypeEntityCache ??= fieldsWithType(
         (_, fieldType) =>
             !fieldType.isBasicType &&
             !fieldType.isEntityReferenceListType &&
@@ -598,10 +608,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         o,
       );
 
-  Map<String, TypeInfo>? _fieldsWithTypeEntityOrReference;
+  /// Cache of [fieldsWithTypeEntityOrReference]: the fields holding an
+  /// entity or an [EntityReference].
+  Map<String, TypeInfo>? _fieldsWithTypeEntityOrReferenceCache;
 
   Map<String, TypeInfo> fieldsWithTypeEntityOrReference([O? o]) =>
-      _fieldsWithTypeEntityOrReference ??= fieldsWithType(
+      _fieldsWithTypeEntityOrReferenceCache ??= fieldsWithType(
         (_, fieldType) =>
             (!fieldType.isBasicType &&
                 !fieldType.isEntityReferenceListType &&
@@ -611,56 +623,68 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         o,
       );
 
-  Map<String, TypeInfo>? _fieldsWithEntityReference;
+  /// Cache of [fieldsWithEntityReference]: the fields of an
+  /// [EntityReference] type.
+  Map<String, TypeInfo>? _fieldsWithEntityReferenceCache;
 
   Map<String, TypeInfo> fieldsWithEntityReference([O? o]) =>
-      _fieldsWithEntityReference ??= Map<String, TypeInfo>.unmodifiable(
+      _fieldsWithEntityReferenceCache ??= Map<String, TypeInfo>.unmodifiable(
         fieldsWithTypeEntityOrReference(o).entries
             .where((e) => e.value.isEntityReferenceType)
             .toMapFromEntries(),
       );
 
-  Map<String, TypeInfo>? _fieldsWithTypeListEntity;
+  /// Cache of [fieldsWithTypeListEntity]: the fields of a list of entities.
+  Map<String, TypeInfo>? _fieldsWithTypeListEntityCache;
 
   Map<String, TypeInfo> fieldsWithTypeListEntity([O? o]) =>
-      _fieldsWithTypeListEntity ??= fieldsWithType(
+      _fieldsWithTypeListEntityCache ??= fieldsWithType(
         (_, fieldType) => fieldType.isValidListEntityType,
         o,
       );
 
-  Map<String, TypeInfo>? _fieldsWithTypeListEntityReference;
+  /// Cache of [fieldsWithTypeListEntityOrReference]: the (non-hidden) fields
+  /// of a list of entities or an [EntityReferenceList].
+  Map<String, TypeInfo>? _fieldsWithTypeListEntityOrReferenceCache;
 
   Map<String, TypeInfo> fieldsWithTypeListEntityOrReference([O? o]) =>
-      _fieldsWithTypeListEntityReference ??= fieldsWithTypeAndAnnotations((
-        fieldName,
-        fieldType,
-        fieldAnnotations,
-      ) {
-        if (!fieldType.isValidListEntityOrReferenceType) {
-          return false;
-        }
+      _fieldsWithTypeListEntityOrReferenceCache ??=
+          fieldsWithTypeAndAnnotations((
+            fieldName,
+            fieldType,
+            fieldAnnotations,
+          ) {
+            if (!fieldType.isValidListEntityOrReferenceType) {
+              return false;
+            }
 
-        if (fieldAnnotations != null && fieldAnnotations.isNotEmpty) {
-          var hidden = fieldAnnotations.hasHidden;
-          return !hidden;
-        }
+            if (fieldAnnotations != null && fieldAnnotations.isNotEmpty) {
+              var hidden = fieldAnnotations.hasHidden;
+              return !hidden;
+            }
 
-        return true;
-      }, o);
+            return true;
+          }, o);
 
-  Map<String, TypeInfo>? _fieldsWithEntityReferenceList;
+  /// Cache of [fieldsWithEntityReferenceList]: the (non-hidden) fields of an
+  /// [EntityReferenceList] type.
+  Map<String, TypeInfo>? _fieldsWithEntityReferenceListCache;
 
   Map<String, TypeInfo> fieldsWithEntityReferenceList([O? o]) =>
-      _fieldsWithEntityReferenceList ??= Map<String, TypeInfo>.unmodifiable(
-        fieldsWithTypeListEntityOrReference(o).entries
-            .where((e) => e.value.isEntityReferenceListType)
-            .toMapFromEntries(),
-      );
+      _fieldsWithEntityReferenceListCache ??=
+          Map<String, TypeInfo>.unmodifiable(
+            fieldsWithTypeListEntityOrReference(o).entries
+                .where((e) => e.value.isEntityReferenceListType)
+                .toMapFromEntries(),
+          );
 
-  Map<String, List<EntityAnnotation>>? _fieldsEntityAnnotations;
+  /// Cache of [fieldsEntityAnnotations] (also filled by subclasses):
+  /// field name -> its unmodifiable [EntityAnnotation]s. Built once (fixed
+  /// fields; a reflection lookup per field).
+  Map<String, List<EntityAnnotation>>? _fieldsEntityAnnotationsCache;
 
   Map<String, List<EntityAnnotation>> fieldsEntityAnnotations() =>
-      _fieldsEntityAnnotations ??=
+      _fieldsEntityAnnotationsCache ??=
           Map<String, List<EntityAnnotation>>.unmodifiable(
             (getAllFieldsEntityAnnotations() ?? {})
                 .map<String, List<EntityAnnotation>>(
@@ -1031,33 +1055,26 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     JsonEntityCache entityCache,
     EntityResolutionRulesResolved resolutionRulesResolved,
   ) {
-    if (type.isList && type.hasArguments) {
-      var elementType = type.arguments.first;
-      var valEntityHandler = _resolveEntityHandler(
-        elementType,
-        entityProvider,
-        entityHandlerProvider,
-        entityRepositoryProvider,
-      );
+    final isTypedList = type.isList && type.hasArguments;
 
-      return _resolveListValueByType<T>(
-        valEntityHandler,
-        value,
-        elementType,
-        entityProvider,
-        entityCache,
-        resolutionRulesResolved,
-      );
-    } else if (type.isEntityReferenceListType) {
-      var elementType = type.arguments.first;
+    if (!isTypedList && !type.isEntityReferenceListType) {
+      return type.parseEntity<T>(value);
+    }
 
-      var valEntityHandler = _resolveEntityHandler(
-        elementType,
-        entityProvider,
-        entityHandlerProvider,
-        entityRepositoryProvider,
-      );
+    // A typed `List<E>` or an `EntityReferenceList<E>`: resolve the elements
+    // through `E`'s handler.
+    var elementType = type.arguments.first;
 
+    var valEntityHandler = _resolveEntityHandler(
+      elementType,
+      entityProvider,
+      entityHandlerProvider,
+      entityRepositoryProvider,
+    );
+
+    if (!isTypedList) {
+      // An `EntityReferenceList` of a lazy (not eager) type keeps the
+      // references, without loading the entities:
       var eagerEntityType = resolutionRulesResolved.isEagerEntityType(
         elementType.type,
       );
@@ -1069,18 +1086,16 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
           entityCache: entityCache,
         ) as T;
       }
-
-      return _resolveListValueByType<T>(
-        valEntityHandler,
-        value,
-        elementType,
-        entityProvider,
-        entityCache,
-        resolutionRulesResolved,
-      );
-    } else {
-      return type.parseEntity<T>(value);
     }
+
+    return _resolveListValueByType<T>(
+      valEntityHandler,
+      value,
+      elementType,
+      entityProvider,
+      entityCache,
+      resolutionRulesResolved,
+    );
   }
 
   FutureOr<T?> _resolveMapByType<T>(
@@ -1267,36 +1282,28 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       }
     }
 
+    // Without the element type's handler, this handler resolves the
+    // elements (and the list isn't cast to the element type):
+    final EntityHandler resolver = valEntityHandler ?? this;
+
+    var listFutures = TypeParser.parseList(
+      value,
+      elementParser: (e) => resolver.resolveValueByType(
+        elementType,
+        e,
+        entityProvider: entityProvider,
+        entityCache: entityCache,
+        resolutionRules: resolutionRulesResolved,
+      ),
+    );
+
+    if (listFutures == null) return null;
+
     if (valEntityHandler != null) {
-      var listFutures = TypeParser.parseList(
-        value,
-        elementParser: (e) => valEntityHandler.resolveValueByType(
-          elementType,
-          e,
-          entityProvider: entityProvider,
-          entityCache: entityCache,
-          resolutionRules: resolutionRulesResolved,
-        ),
-      );
-
-      if (listFutures == null) return null;
-
       return listFutures.resolveAll().resolveMapped((l) {
         return valEntityHandler.castList(l, elementType.type)! as T;
       });
     } else {
-      var listFutures = TypeParser.parseList(
-        value,
-        elementParser: (e) => resolveValueByType(
-          elementType,
-          e,
-          entityProvider: entityProvider,
-          entityCache: entityCache,
-          resolutionRules: resolutionRulesResolved,
-        ),
-      );
-
-      if (listFutures == null) return null;
       return listFutures.resolveAll().resolveMapped((l) => l as T);
     }
   }
@@ -1575,10 +1582,13 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       }
     }
 
-    EntityHandler? valEntityHandler = type == entityType ? this : null;
-    if (valEntityHandler != null) return valEntityHandler;
+    if (type == entityType) return this;
 
-    if (valEntityHandler == null && entityRepositoryProvider != null) {
+    // Each step below returns as soon as it resolves a handler, so the next
+    // step is reached only while the handler is still unresolved.
+    EntityHandler? valEntityHandler;
+
+    if (entityRepositoryProvider != null) {
       var entityRepository = entityRepositoryProvider.getEntityRepositoryByType(
         entityType,
       );
@@ -1586,7 +1596,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       if (valEntityHandler != null) return valEntityHandler;
     }
 
-    if (valEntityHandler == null && entityHandlerProvider != null) {
+    if (entityHandlerProvider != null) {
       valEntityHandler = entityHandlerProvider.getEntityHandler(
         type: entityType,
       );
@@ -1602,42 +1612,60 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return valEntityHandler;
   }
 
-  Map<String, int>? _fieldsNamesIndexes;
+  /// Cache of [fieldsNamesIndexes]: field name -> index in [fieldsNames].
+  /// The fields of an entity type are fixed, so it's built once.
+  Map<String, int>? _fieldsNamesIndexesCache;
 
-  Map<String, int> fieldsNamesIndexes([O? o]) {
-    if (_fieldsNamesIndexes == null) {
-      var fieldsNames = this.fieldsNames(o);
-      _fieldsNamesIndexes = buildFieldsNamesIndexes(fieldsNames);
-    }
-    return _fieldsNamesIndexes!;
-  }
+  Map<String, int> fieldsNamesIndexes([O? o]) =>
+      _fieldsNamesIndexesCache ??= buildFieldsNamesIndexes(fieldsNames(o));
 
-  List<String>? _fieldsNamesLC;
+  /// Cache of [fieldsNamesLC]: the [fieldsNames] in lower case, used for
+  /// case-insensitive field lookups. Built once (fixed fields).
+  List<String>? _fieldsNamesLCCache;
 
-  List<String> fieldsNamesLC([O? o]) {
-    if (_fieldsNamesLC == null) {
-      var fieldsNames = this.fieldsNames(o);
-      _fieldsNamesLC = buildFieldsNamesLC(fieldsNames);
-    }
-    return _fieldsNamesLC!;
-  }
+  List<String> fieldsNamesLC([O? o]) =>
+      _fieldsNamesLCCache ??= buildFieldsNamesLC(fieldsNames(o));
 
-  List<String>? _fieldsNamesSimple;
+  /// Cache of [fieldsNamesSimple]: the [fieldsNames] as simple keys
+  /// (`fieldToSimpleKey`), used for lenient field lookups. Built once (fixed
+  /// fields).
+  List<String>? _fieldsNamesSimpleCache;
 
-  List<String> fieldsNamesSimple([O? o]) {
-    if (_fieldsNamesSimple == null) {
-      var fieldsNames = this.fieldsNames(o);
-      _fieldsNamesSimple = buildFieldsNamesSimple(fieldsNames);
-    }
-    return _fieldsNamesSimple!;
-  }
+  List<String> fieldsNamesSimple([O? o]) =>
+      _fieldsNamesSimpleCache ??= buildFieldsNamesSimple(fieldsNames(o));
 
   TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false});
 
-  Map<String, TypeInfo>? _fieldsTypes;
+  /// Returns the [TypeInfo] of field [key] from [_fieldsTypesCache] (`null`
+  /// if not cached yet or not found). With [resolveFiledName], a [key] not
+  /// found as is gets resolved against [fieldsNames] (case/format lenient).
+  ///
+  /// The first lookup step of [getFieldType] in [GenericEntityHandler] and
+  /// [ClassReflectionEntityHandler]; each one then falls back to its own
+  /// source (the entity instance, or the reflection).
+  TypeInfo? _getCachedFieldType(String key, bool resolveFiledName) {
+    final fieldsTypes = _fieldsTypesCache;
+    if (fieldsTypes == null) return null;
+
+    var fieldType = fieldsTypes[key];
+
+    if (fieldType == null && resolveFiledName) {
+      var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
+      if (resolvedFieldName != null) {
+        fieldType = fieldsTypes[resolvedFieldName];
+      }
+    }
+
+    return fieldType;
+  }
+
+  /// Cache of [getFieldsTypes] (also filled by subclasses' [fieldsTypes]):
+  /// field name -> [TypeInfo]. Resolving each field type can be expensive
+  /// (reflection), and the fields of an entity type are fixed.
+  Map<String, TypeInfo>? _fieldsTypesCache;
 
   Map<String, TypeInfo> getFieldsTypes([O? o]) {
-    return _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
+    return _fieldsTypesCache ??= Map<String, TypeInfo>.unmodifiable(
       Map<String, TypeInfo>.fromEntries(
         fieldsNames(o).map(
           (key) => MapEntry<String, TypeInfo>(
@@ -1649,10 +1677,12 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     );
   }
 
-  Map<String, TypeInfo>? _fieldsEnumTypes;
+  /// Cache of [getFieldsEnumTypes]: the fields whose type is a registered
+  /// enum. Built once (fixed fields; a reflection lookup per field).
+  Map<String, TypeInfo>? _fieldsEnumTypesCache;
 
   Map<String, TypeInfo> getFieldsEnumTypes([O? o]) {
-    var enumFields = _fieldsEnumTypes;
+    var enumFields = _fieldsEnumTypesCache;
     if (enumFields != null) return enumFields;
 
     final reflectionFactory = ReflectionFactory();
@@ -1664,13 +1694,17 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         )
         .toMapFromEntries();
 
-    return _fieldsEnumTypes = Map<String, TypeInfo>.unmodifiable(mapEnumFields);
+    return _fieldsEnumTypesCache = Map<String, TypeInfo>.unmodifiable(
+      mapEnumFields,
+    );
   }
 
-  Map<String, TypeInfo>? _fieldsEntityTypes;
+  /// Cache of [getFieldsEntityTypes]: the (non-enum) fields that hold a
+  /// single entity (or reference). Built once (fixed fields).
+  Map<String, TypeInfo>? _fieldsEntityTypesCache;
 
   Map<String, TypeInfo> getFieldsEntityTypes([O? o]) {
-    var entityFields = _fieldsEntityTypes;
+    var entityFields = _fieldsEntityTypesCache;
     if (entityFields != null) return entityFields;
 
     var enumFields = getFieldsEnumTypes(o);
@@ -1692,15 +1726,17 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         .nonNulls
         .toMapFromEntries();
 
-    return _fieldsEntityTypes = Map<String, TypeInfo>.unmodifiable(
+    return _fieldsEntityTypesCache = Map<String, TypeInfo>.unmodifiable(
       mapEntityFields,
     );
   }
 
-  Map<String, TypeInfo>? _fieldsListEntityTypes;
+  /// Cache of [getFieldsListEntityTypes]: the (non-enum) fields that hold a
+  /// list of entities (or references). Built once (fixed fields).
+  Map<String, TypeInfo>? _fieldsListEntityTypesCache;
 
   Map<String, TypeInfo> getFieldsListEntityTypes([O? o]) {
-    var listEntityFields = _fieldsListEntityTypes;
+    var listEntityFields = _fieldsListEntityTypesCache;
     if (listEntityFields != null) return listEntityFields;
 
     var enumFields = getFieldsEnumTypes(o);
@@ -1722,7 +1758,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         .nonNulls
         .toMapFromEntries();
 
-    return _fieldsListEntityTypes = Map<String, TypeInfo>.unmodifiable(
+    return _fieldsListEntityTypesCache = Map<String, TypeInfo>.unmodifiable(
       mapListEntityFields,
     );
   }
@@ -2089,31 +2125,11 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
     if (value1 == value2) return true;
 
-    equals = equalsValuesDateTime(value1, value2);
+    equals = _equalsValuesScalar(value1, value2);
     if (equals != null) return equals;
 
-    equals = equalsValuesTime(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesDynamicNumber(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesPrimitive(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesEnum(value1, value2);
-    if (equals != null) return equals;
-
-    var collection1 =
-        TypeParser.isCollectionValue(value1) ||
-        value1.isEntityReferenceList ||
-        value1 is Uint8List ||
-        value1 is Int8List;
-    var collection2 =
-        TypeParser.isCollectionValue(value2) ||
-        value2.isEntityReferenceList ||
-        value2 is Uint8List ||
-        value2 is Int8List;
+    var collection1 = _isCollectionLike(value1);
+    var collection2 = _isCollectionLike(value2);
 
     if (collection1 && collection2) {
       return isEqualsDeep(value1, value2, valueEquality: equalsValues);
@@ -2152,6 +2168,27 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     return false;
   }
 
+  /// Compares [value1] and [value2] as scalar values, trying in order:
+  /// [DateTime], [Time], [DynamicNumber], primitive and [Enum] equality.
+  /// Returns the first decided result, or `null` if none applies.
+  ///
+  /// The shared chain of [equalsValues] and [equalsValuesBasic] (which run
+  /// their own checks before and after it).
+  static bool? _equalsValuesScalar(Object value1, Object value2) =>
+      equalsValuesDateTime(value1, value2) ??
+      equalsValuesTime(value1, value2) ??
+      equalsValuesDynamicNumber(value1, value2) ??
+      equalsValuesPrimitive(value1, value2) ??
+      equalsValuesEnum(value1, value2);
+
+  /// Returns `true` if [value] is compared element-wise by [equalsValues]:
+  /// a collection, an [EntityReferenceList] or a byte list.
+  static bool _isCollectionLike(Object value) =>
+      TypeParser.isCollectionValue(value) ||
+      value.isEntityReferenceList ||
+      value is Uint8List ||
+      value is Int8List;
+
   static DynamicNumber valueToDynamicNumber(
     Object? value, {
     DynamicNumber? def,
@@ -2182,48 +2219,59 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   // A `null` in a comparison (`>`, `>=`, `<`, `<=`) doesn't match (as SQL's
   // unknown, `NULL`): not an error.
 
-  static bool graterThanValue(
+  static bool greaterThanValue(
     Object? value1,
     Object? value2, {
     EntityHandler? entityHandler,
-  }) {
-    if (value1 == null || value2 == null) return false;
-    var n1 = valueToDynamicNumber(value1);
-    var n2 = valueToDynamicNumber(value2);
-    return n1 > n2;
-  }
+  }) => _compareAsNumbers(value1, value2, (n1, n2) => n1 > n2);
 
-  static bool graterThanOrEqualValue(
+  static bool greaterThanOrEqualValue(
     Object? value1,
     Object? value2, {
     EntityHandler? entityHandler,
-  }) {
-    if (value1 == null || value2 == null) return false;
-    var n1 = valueToDynamicNumber(value1);
-    var n2 = valueToDynamicNumber(value2);
-    return n1 >= n2;
-  }
+  }) => _compareAsNumbers(value1, value2, (n1, n2) => n1 >= n2);
 
   static bool lessThanValue(
     Object? value1,
     Object? value2, {
     EntityHandler? entityHandler,
-  }) {
-    if (value1 == null || value2 == null) return false;
-    var n1 = valueToDynamicNumber(value1);
-    var n2 = valueToDynamicNumber(value2);
-    return n1 < n2;
-  }
+  }) => _compareAsNumbers(value1, value2, (n1, n2) => n1 < n2);
 
   static bool lessThanOrEqualValue(
     Object? value1,
     Object? value2, {
     EntityHandler? entityHandler,
-  }) {
+  }) => _compareAsNumbers(value1, value2, (n1, n2) => n1 <= n2);
+
+  /// Deprecated misspelling of [greaterThanValue].
+  @Deprecated('Use `greaterThanValue`')
+  static bool graterThanValue(
+    Object? value1,
+    Object? value2, {
+    EntityHandler? entityHandler,
+  }) => greaterThanValue(value1, value2, entityHandler: entityHandler);
+
+  /// Deprecated misspelling of [greaterThanOrEqualValue].
+  @Deprecated('Use `greaterThanOrEqualValue`')
+  static bool graterThanOrEqualValue(
+    Object? value1,
+    Object? value2, {
+    EntityHandler? entityHandler,
+  }) => greaterThanOrEqualValue(value1, value2, entityHandler: entityHandler);
+
+  /// Applies the comparison [op] to [value1] and [value2] converted to
+  /// [DynamicNumber] (see [valueToDynamicNumber]). A `null` side is `false`
+  /// (see above). Shared by [greaterThanValue], [greaterThanOrEqualValue],
+  /// [lessThanValue] and [lessThanOrEqualValue].
+  static bool _compareAsNumbers(
+    Object? value1,
+    Object? value2,
+    bool Function(DynamicNumber n1, DynamicNumber n2) op,
+  ) {
     if (value1 == null || value2 == null) return false;
     var n1 = valueToDynamicNumber(value1);
     var n2 = valueToDynamicNumber(value2);
-    return n1 <= n2;
+    return op(n1, n2);
   }
 
   static bool equalsValuesBasic(
@@ -2235,19 +2283,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     if (value2 == null) return false;
     if (identical(value1, value2) || value1 == value2) return true;
 
-    var equals = equalsValuesDateTime(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesTime(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesDynamicNumber(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesPrimitive(value1, value2);
-    if (equals != null) return equals;
-
-    equals = equalsValuesEnum(value1, value2);
+    var equals = _equalsValuesScalar(value1, value2);
     if (equals != null) return equals;
 
     equals = equalsValuesCollection(
@@ -2274,25 +2310,8 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
       return value2.equalsEntityID(value1);
     }
 
-    var reflectionFactory = ReflectionFactory();
-
-    EntityHandler? entityHandler1 = value1.isPrimitiveValue
-        ? null
-        : reflectionFactory
-                  .getRegisterClassReflection(value1.runtimeType)
-                  ?.entityHandler ??
-              EntityHandlerProvider.globalProvider.getEntityHandler(
-                obj: value1,
-              );
-
-    EntityHandler? entityHandler2 = value2.isPrimitiveValue
-        ? null
-        : reflectionFactory
-                  .getRegisterClassReflection(value2.runtimeType)
-                  ?.entityHandler ??
-              EntityHandlerProvider.globalProvider.getEntityHandler(
-                obj: value2,
-              );
+    var entityHandler1 = _entityHandlerForValue(value1);
+    var entityHandler2 = _entityHandlerForValue(value2);
 
     if (entityHandler1 != null) {
       var id1 = entityHandler1.getID(value1);
@@ -2316,6 +2335,18 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
     }
 
     return equalsValuesEntityMap(value1, value2, entityHandler: entityHandler);
+  }
+
+  /// The [EntityHandler] of [value]'s type (its registered reflection's
+  /// handler, or the global provider's one), or `null` for a primitive value
+  /// (never an entity). Used by [equalsValuesEntity] for each side.
+  static EntityHandler? _entityHandlerForValue(Object value) {
+    if (value.isPrimitiveValue) return null;
+
+    return ReflectionFactory()
+            .getRegisterClassReflection(value.runtimeType)
+            ?.entityHandler ??
+        EntityHandlerProvider.globalProvider.getEntityHandler(obj: value);
   }
 
   /// Equals by ID: a `null` ID (no ID, or not resolved) is never equal (the
@@ -2679,7 +2710,7 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
         entityCache: entityCache,
         resolutionRules: resolutionRules,
       ).resolveMapped((o) {
-        entityCache.cacheEntity(o, getID);
+        entityCache.cacheEntity(o, _getIDFunction);
         return o;
       });
     });
@@ -2867,63 +2898,64 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     }
   }
 
-  String? _idFieldsName;
+  // A [GenericEntityHandler] can't reflect on [O]: the caches below are
+  // filled by [inspectObject] from the first entity instance seen (or one
+  // created by [createDefault]).
+
+  /// Cache of [idFieldName] (the ID field's name), filled by
+  /// [inspectObject].
+  String? _idFieldNameCache;
+
+  /// Cache of [fieldsNames], filled by [inspectObject].
+  List<String>? _fieldsNamesCache;
 
   @override
-  String idFieldName([O? o]) {
-    var idFieldsName = _idFieldsName;
-
-    if (idFieldsName == null) {
-      inspectObject(o);
-      idFieldsName = _idFieldsName;
-
-      if (idFieldsName == null) {
-        throw StateError(
-          "`idFieldsName` Not populated yet for type `$type`! "
-          "No Entity instance presented to this EntityHandler yet.",
-        );
-      }
-    }
-
-    return idFieldsName;
-  }
-
-  List<String>? _fieldsNames;
+  String idFieldName([O? o]) => _inspectedOrThrow(
+    o,
+    () => _idFieldNameCache,
+    () =>
+        "`idFieldsName` Not populated yet for type `$type`! "
+        "No Entity instance presented to this EntityHandler yet.",
+  );
 
   @override
-  List<String> fieldsNames([O? o]) {
-    var fieldsNames = _fieldsNames;
-
-    if (fieldsNames == null) {
-      inspectObject(o);
-      fieldsNames = _fieldsNames;
-    }
-
-    if (fieldsNames == null) {
-      throw StateError(
+  List<String> fieldsNames([O? o]) => _inspectedOrThrow(
+    o,
+    () => _fieldsNamesCache,
+    () =>
         "`fieldsNames` Not populated yet! No Entity instance presented to this EntityHandler yet. Type: $type",
-      );
-    }
-
-    return fieldsNames;
-  }
+  );
 
   @override
-  Map<String, TypeInfo> fieldsTypes([O? o]) {
-    var fieldsTypes = _fieldsTypes;
-
-    if (fieldsTypes == null) {
-      inspectObject(o);
-      fieldsTypes = _fieldsTypes;
-    }
-
-    if (fieldsTypes == null) {
-      throw StateError(
+  Map<String, TypeInfo> fieldsTypes([O? o]) => _inspectedOrThrow(
+    o,
+    () => _fieldsTypesCache,
+    () =>
         "`fieldsTypes` Not populated yet! No Entity instance presented to this EntityHandler yet. Type: $type",
-      );
+  );
+
+  /// Returns the cached value read by [readCache], calling [inspectObject]
+  /// with [o] first when it's not cached yet. Throws a [StateError] with
+  /// [errorMessage] if it's still not available (no entity instance seen).
+  ///
+  /// Used by [idFieldName], [fieldsNames] and [fieldsTypes], whose values
+  /// only exist after an entity was inspected (see [inspectObject]).
+  T _inspectedOrThrow<T extends Object>(
+    O? o,
+    T? Function() readCache,
+    String Function() errorMessage,
+  ) {
+    var value = readCache();
+    if (value != null) return value;
+
+    inspectObject(o);
+
+    value = readCache();
+    if (value == null) {
+      throw StateError(errorMessage());
     }
 
-    return fieldsTypes;
+    return value;
   }
 
   @override
@@ -2936,20 +2968,20 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
       }
     }
 
-    if (o != null && _idFieldsName == null) {
-      _idFieldsName = o.idFieldName;
+    if (o != null && _idFieldNameCache == null) {
+      _idFieldNameCache = o.idFieldName;
 
-      final fieldsNames = _fieldsNames ??= List<String>.unmodifiable(
+      final fieldsNames = _fieldsNamesCache ??= List<String>.unmodifiable(
         o.fieldsNames,
       );
 
-      _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
+      _fieldsTypesCache ??= Map<String, TypeInfo>.unmodifiable(
         Map<String, TypeInfo>.fromEntries(
           fieldsNames.map((f) => MapEntry(f, o!.getFieldType(f)!)),
         ),
       );
 
-      _fieldsEntityAnnotations ??=
+      _fieldsEntityAnnotationsCache ??=
           Map<String, List<EntityAnnotation>>.unmodifiable(
             Map<String, List<EntityAnnotation>>.fromEntries(
               fieldsNames.map((f) {
@@ -3015,19 +3047,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false}) {
     inspectObject(o);
 
-    TypeInfo? fieldType;
-
-    final fieldsTypes = _fieldsTypes;
-    if (fieldsTypes != null) {
-      fieldType = fieldsTypes[key];
-
-      if (fieldType == null && resolveFiledName) {
-        var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
-        if (resolvedFieldName != null) {
-          fieldType = fieldsTypes[resolvedFieldName];
-        }
-      }
-    }
+    var fieldType = _getCachedFieldType(key, resolveFiledName);
 
     if (fieldType == null && o != null) {
       fieldType = o.getFieldType(key);
@@ -3035,7 +3055,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
       if (fieldType == null && resolveFiledName) {
         var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
         if (resolvedFieldName != null) {
-          fieldType = o.getFieldType(key);
+          fieldType = o.getFieldType(resolvedFieldName);
         }
       }
     }
@@ -3069,7 +3089,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     if (o != null) {
       return o.getFieldEntityAnnotations(key);
     } else {
-      return _fieldsEntityAnnotations?[key];
+      return _fieldsEntityAnnotationsCache?[key];
     }
   }
 
@@ -3119,10 +3139,12 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   ClassReflection<O> reflectionWithObject([O? o]) =>
       o == null ? reflection : reflection.withObject(o);
 
-  List<ClassReflectionEntityHandler>? _siblingsEntityHandlers;
+  /// Cache of [siblingsEntityHandlers]: the handlers of the sibling classes
+  /// (same reflection bundle), fixed after the reflection is registered.
+  List<ClassReflectionEntityHandler>? _siblingsEntityHandlersCache;
 
   List<ClassReflectionEntityHandler> siblingsEntityHandlers() =>
-      _siblingsEntityHandlers ??=
+      _siblingsEntityHandlersCache ??=
           List<ClassReflectionEntityHandler>.unmodifiable(
             reflection.siblingsClassReflection().map((c) => c.entityHandler),
           );
@@ -3172,15 +3194,16 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   @override
   V? getField<V>(O o, String key) => reflection.getField<V?>(key, o);
 
-  /// The ID field (see [idFieldName]), without an object.
-  FieldReflection<O, dynamic>? _idField;
+  /// Cache of the ID field reflection (see [idFieldName]), without an
+  /// object: avoids a field lookup by name on every [getID].
+  FieldReflection<O, dynamic>? _idFieldCache;
 
   /// The same value as `getField(o, idFieldName(o))`, read through the ID
-  /// field kept in [_idField]: an entity is cached by its ID each time one is
-  /// decoded or loaded.
+  /// field kept in [_idFieldCache]: an entity is cached by its ID each time
+  /// one is decoded or loaded.
   @override
   V? getID<V>(O o) {
-    var idField = _idField ??= reflection.getStaticInstance().field(
+    var idField = _idFieldCache ??= reflection.getStaticInstance().field(
       idFieldName(o),
     );
     if (idField == null) return super.getID<V>(o);
@@ -3193,19 +3216,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   @override
   TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false}) {
-    TypeInfo? fieldType;
-
-    final fieldsTypes = _fieldsTypes;
-    if (fieldsTypes != null) {
-      fieldType = fieldsTypes[key];
-
-      if (fieldType == null && resolveFiledName) {
-        var resolvedFieldName = this.resolveFiledName(fieldsNames(), key);
-        if (resolvedFieldName != null) {
-          fieldType = fieldsTypes[resolvedFieldName];
-        }
-      }
-    }
+    var fieldType = _getCachedFieldType(key, resolveFiledName);
 
     if (fieldType == null) {
       var field = reflection.field(key, o);
@@ -3236,12 +3247,13 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   List<EntityAnnotation>? getFieldEntityAnnotations(O? o, String key) =>
       getFieldAnnotations(o, key)?.whereType<EntityAnnotation>().toList();
 
-  List<EntityIndex>? _entityIndexes;
+  /// Cache of [getEntityIndexes]: the class annotations are fixed.
+  List<EntityIndex>? _entityIndexesCache;
 
   /// The [EntityIndex] annotations of the entity's class.
   @override
   List<EntityIndex> getEntityIndexes() =>
-      _entityIndexes ??= List<EntityIndex>.unmodifiable(
+      _entityIndexesCache ??= List<EntityIndex>.unmodifiable(
         reflection.classAnnotations.whereType<EntityIndex>(),
       );
 
@@ -3321,20 +3333,21 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     return reflection.fromJson(json);
   }
 
-  String? _idFieldsName;
+  /// Cache of [idFieldName]: found once by [findIdFieldName] (a scan of the
+  /// class fields), defaulting to `id`.
+  String? _idFieldNameCache;
 
   @override
   String idFieldName([O? o]) {
-    if (_idFieldsName == null) {
-      // Just to populate:
-      if (_fieldsNames == null) {
-        fieldsNames(o);
-      }
+    var idFieldName = _idFieldNameCache;
+    if (idFieldName != null) return idFieldName;
 
-      var fieldName = findIdFieldName(o);
-      _idFieldsName = fieldName ?? 'id';
+    // Just to populate:
+    if (_fieldsNamesCache == null) {
+      fieldsNames(o);
     }
-    return _idFieldsName!;
+
+    return _idFieldNameCache = findIdFieldName(o) ?? 'id';
   }
 
   String? findIdFieldName([O? o]) {
@@ -3389,15 +3402,17 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     return null;
   }
 
-  List<String>? _fieldsNames;
+  /// Cache of [fieldsNames]: the keys of [fieldsTypes] (fixed per class).
+  List<String>? _fieldsNamesCache;
 
   @override
   List<String> fieldsNames([O? o]) =>
-      _fieldsNames ??= List.unmodifiable(fieldsTypes(o).keys);
+      _fieldsNamesCache ??= List.unmodifiable(fieldsTypes(o).keys);
 
   @override
   Map<String, TypeInfo> fieldsTypes([O? o]) {
-    return _fieldsTypes ??= Map<String, TypeInfo>.unmodifiable(
+    // Shares the base `_fieldsTypesCache` (also used by `getFieldsTypes`).
+    return _fieldsTypesCache ??= Map<String, TypeInfo>.unmodifiable(
       Map<String, TypeInfo>.fromEntries(
         reflectionWithObject(o).fieldsNames.map((f) {
           var field = reflection.field(f, o);
@@ -3409,19 +3424,25 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     );
   }
 
-  Map<String, Map<String, TypeInfo>>? _constructors;
+  /// Cache of [constructors]: constructor name -> its parameters' types.
+  /// Fixed per class, and a full reflection scan to build.
+  Map<String, Map<String, TypeInfo>>? _constructorsCache;
 
   @override
   Map<String, Map<String, TypeInfo>>? constructors([O? o]) {
-    return _constructors ??= Map<String, Map<String, TypeInfo>>.unmodifiable(
-      reflectionWithObject(o).allConstructors().map((c) {
-        var name = c.name;
-        var args = c.allParameters
-            .map((p) => MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo))
-            .toMapFromEntries();
-        return MapEntry(name, Map<String, TypeInfo>.unmodifiable(args));
-      }).toMapFromEntries(),
-    );
+    return _constructorsCache ??=
+        Map<String, Map<String, TypeInfo>>.unmodifiable(
+          reflectionWithObject(o).allConstructors().map((c) {
+            var name = c.name;
+            var args = c.allParameters
+                .map(
+                  (p) =>
+                      MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo),
+                )
+                .toMapFromEntries();
+            return MapEntry(name, Map<String, TypeInfo>.unmodifiable(args));
+          }).toMapFromEntries(),
+        );
   }
 
   @override
@@ -4209,7 +4230,10 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         repositoryProvider: EntityRepositoryProvider.globalProvider,
       );
 
-  static EntityRepository<O>? _resolveRepositoryProvider<O extends Object>(
+  /// Resolves the [EntityRepository] of [O] (or [obj]/[type]) asking, in
+  /// order: [entityRepository]'s provider, [repositoryProvider] and
+  /// [entityHandler]. Used by the cascade delete.
+  static EntityRepository<O>? _resolveEntityRepository<O extends Object>(
     EntityHandler? entityHandler,
     EntityRepository<O>? entityRepository,
     EntityRepositoryProvider? repositoryProvider, {
@@ -4227,7 +4251,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
     EntityRepository<O>? entityRepository,
     EntityRepositoryProvider? repositoryProvider,
   }) async {
-    entityRepository ??= _resolveRepositoryProvider<O>(
+    entityRepository ??= _resolveEntityRepository<O>(
       entityHandler,
       entityRepository,
       repositoryProvider,
@@ -4277,7 +4301,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
         entityHandler?.getEntityHandler<O>(obj: obj, type: type);
     if (eh != null && eh.type == obj.genericType) return eh;
 
-    var er = _resolveRepositoryProvider<O>(
+    var er = _resolveEntityRepository<O>(
       entityHandler,
       entityRepository,
       repositoryProvider,
@@ -4364,37 +4388,16 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
 
             if (entities == null || entities.isEmpty) continue;
 
-            EntityRepository<Object>? tEntityRepository;
-            EntityHandler<Object>? tEntityHandler;
-
-            for (var e in entities) {
-              tEntityRepository ??= _resolveRepositoryProvider(
-                entityHandler,
-                entityRepository,
-                repositoryProvider,
-                obj: e,
-                type: fieldType,
-              );
-
-              tEntityHandler ??= _resolveEntityHandler(
-                entityHandler,
-                tEntityRepository,
-                repositoryProvider,
-                obj: e,
-                type: fieldType,
-              );
-
-              preDeleteCalls.add(
-                () => _deleteCascadeGenericImpl<Object>(
-                  e,
-                  transaction,
-                  tEntityHandler,
-                  tEntityRepository,
-                  repositoryProvider,
-                  deleted,
-                ),
-              );
-            }
+            _addSubEntitiesDeleteCalls(
+              entities,
+              fieldType,
+              entityHandler,
+              entityRepository,
+              repositoryProvider,
+              transaction,
+              deleted,
+              preDeleteCalls,
+            );
 
             fieldValue.set(null);
 
@@ -4415,37 +4418,17 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
           continue;
         }
 
-        EntityRepository<Object>? tEntityRepository;
-        EntityHandler<Object>? tEntityHandler;
-
-        for (var e in fieldValues.nonNulls) {
-          tEntityRepository ??= _resolveRepositoryProvider(
-            entityHandler,
-            entityRepository,
-            repositoryProvider,
-            obj: e,
-            type: tType,
-          );
-
-          tEntityHandler ??= _resolveEntityHandler(
-            entityHandler,
-            tEntityRepository,
-            repositoryProvider,
-            obj: e,
-            type: tType,
-          );
-
-          preDeleteCalls.add(
-            () => _deleteCascadeGenericImpl<Object>(
-              e,
-              transaction,
-              tEntityHandler,
-              tEntityRepository,
-              repositoryProvider,
-              deleted,
-            ),
-          );
-        }
+        _addSubEntitiesDeleteCalls(
+          // `whereType<Object>()`: the non-null values, typed.
+          fieldValues.whereType<Object>(),
+          tType,
+          entityHandler,
+          entityRepository,
+          repositoryProvider,
+          transaction,
+          deleted,
+          preDeleteCalls,
+        );
 
         var fieldValuesEmpty = fieldValues.toList()..clear();
         entityHandler.setField<dynamic>(
@@ -4506,6 +4489,57 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
     return delOk;
   }
 
+  /// Adds to [preDeleteCalls] a cascade delete of each one of [entities]
+  /// (the elements of a list field of [entityType]), used by
+  /// [_deleteCascadeGenericImpl] for an [EntityReferenceList] field and for
+  /// a `List` of entities field.
+  ///
+  /// The sub-entities' repository and handler are resolved once (with the
+  /// first entity) and shared by all the calls: the locals below are
+  /// captured by the closures, in one scope.
+  static void _addSubEntitiesDeleteCalls(
+    Iterable<Object> entities,
+    Type entityType,
+    EntityHandler entityHandler,
+    EntityRepository<Object> entityRepository,
+    EntityRepositoryProvider? repositoryProvider,
+    Transaction transaction,
+    List<Object> deleted,
+    List<Future<bool> Function()> preDeleteCalls,
+  ) {
+    EntityRepository<Object>? tEntityRepository;
+    EntityHandler<Object>? tEntityHandler;
+
+    for (var e in entities) {
+      tEntityRepository ??= _resolveEntityRepository(
+        entityHandler,
+        entityRepository,
+        repositoryProvider,
+        obj: e,
+        type: entityType,
+      );
+
+      tEntityHandler ??= _resolveEntityHandler(
+        entityHandler,
+        tEntityRepository,
+        repositoryProvider,
+        obj: e,
+        type: entityType,
+      );
+
+      preDeleteCalls.add(
+        () => _deleteCascadeGenericImpl<Object>(
+          e,
+          transaction,
+          tEntityHandler,
+          tEntityRepository,
+          repositoryProvider,
+          deleted,
+        ),
+      );
+    }
+  }
+
   static bool _deleteSubEntityImpl<O extends Object>(
     EntityHandler<O> entityHandler,
     EntityRepository<O> entityRepository,
@@ -4519,7 +4553,7 @@ abstract class EntityStorage<O extends Object> extends EntityAccessor<O> {
     List<Future<bool> Function()> preDeleteCalls,
     List<Future<bool> Function()> posDeleteCalls,
   ) {
-    var tEntityRepository = _resolveRepositoryProvider(
+    var tEntityRepository = _resolveEntityRepository(
       entityHandler,
       entityRepository,
       repositoryProvider,
@@ -4699,46 +4733,49 @@ class EntityRepositoryProvider
     Type? type,
     String? name,
   }) {
-    if (!isClosed) {
-      var entityRepository = _entityRepositories[O];
-      if (entityRepository != null && !entityRepository.isClosed) {
-        return entityRepository as EntityRepository<O>;
+    if (isClosed) return null;
+
+    var entityRepository = _openRepositoryOrNull<O>(_entityRepositories[O]);
+    if (entityRepository != null) return entityRepository;
+
+    Type? objType;
+
+    if (obj != null) {
+      objType = obj.runtimeType;
+      if (objType != O) {
+        entityRepository = _openRepositoryOrNull<O>(
+          _entityRepositories[objType],
+        );
+        if (entityRepository != null) return entityRepository;
       }
+    }
 
-      Type? objType;
+    if (type != null && type != O && type != objType) {
+      entityRepository = _openRepositoryOrNull<O>(_entityRepositories[type]);
+      if (entityRepository != null) return entityRepository;
+    }
 
-      if (obj != null) {
-        objType = obj.runtimeType;
-        if (objType != O) {
-          entityRepository = _entityRepositories[objType];
-          if (entityRepository != null && !entityRepository.isClosed) {
-            return entityRepository as EntityRepository<O>;
-          }
-        }
-      }
+    if (name != null) {
+      var nameSimplified = EntityAccessor.simplifiedName(name);
 
-      if (type != null && type != O && type != objType) {
-        entityRepository = _entityRepositories[type];
-        if (entityRepository != null && !entityRepository.isClosed) {
-          return entityRepository as EntityRepository<O>;
-        }
-      }
-
-      if (name != null) {
-        var nameSimplified = EntityAccessor.simplifiedName(name);
-
-        entityRepository = _entityRepositories.values
+      return _openRepositoryOrNull<O>(
+        _entityRepositories.values
             .where((e) => e.name == name || e.nameSimplified == nameSimplified)
-            .firstOrNull;
-
-        if (entityRepository != null && !entityRepository.isClosed) {
-          return entityRepository as EntityRepository<O>;
-        }
-      }
+            .firstOrNull,
+      );
     }
 
     return null;
   }
+
+  /// Returns [entityRepository] as an [EntityRepository] of [O], or `null`
+  /// if it's `null` or closed. Used by the local lookups
+  /// ([_getLocalEntityRepository], [_getLocalEntityRepositoryByType]).
+  static EntityRepository<O>? _openRepositoryOrNull<O extends Object>(
+    EntityRepository? entityRepository,
+  ) => entityRepository != null && !entityRepository.isClosed
+      ? entityRepository as EntityRepository<O>
+      : null;
 
   EntityRepository<O>? getEntityRepositoryByTypeInfo<O extends Object>(
     TypeInfo typeInfo,
@@ -4773,12 +4810,7 @@ class EntityRepositoryProvider
   ) {
     if (isClosed) return null;
 
-    var entityRepository = _entityRepositories[type];
-    if (entityRepository != null && !entityRepository.isClosed) {
-      return entityRepository as EntityRepository<O>;
-    }
-
-    return null;
+    return _openRepositoryOrNull<O>(_entityRepositories[type]);
   }
 
   final Set<EntityRepositoryProvider> _knownEntityRepositoryProviders =
@@ -4825,11 +4857,8 @@ class EntityRepositoryProvider
     allRepositories ??= <Type, EntityRepository>{};
     traversedProviders ??= <EntityRepositoryProvider>{};
 
-    if (traversedProviders.contains(this)) {
-      return allRepositories;
-    }
-
-    traversedProviders.add(this);
+    // Already traversed (a cycle among known providers): nothing to add.
+    if (!traversedProviders.add(this)) return allRepositories;
 
     for (var e in _entityRepositories.entries) {
       allRepositories.putIfAbsent(e.key, () => e.value);
@@ -4864,23 +4893,15 @@ extension IterableEntityRepositoryProviderExtension
     EntityHandlerProvider? entityHandlerProvider,
     bool removeClosedProviders = false,
     Set<EntityRepositoryProvider>? traversed,
-  }) {
-    var self = this;
-    if (self is! List<EntityRepositoryProvider> &&
-        self is! Set<EntityRepositoryProvider>) {
-      self = self.toList(growable: false);
-    }
-
-    return self._getEntityRepositoryImpl<T>(
-      obj: obj,
-      type: type,
-      name: name,
-      entityRepositoryProvider: entityRepositoryProvider,
-      entityHandlerProvider: entityHandlerProvider,
-      removeClosedProviders: removeClosedProviders,
-      traversed: traversed,
-    );
-  }
+  }) => _asReiterable()._getEntityRepositoryImpl<T>(
+    obj: obj,
+    type: type,
+    name: name,
+    entityRepositoryProvider: entityRepositoryProvider,
+    entityHandlerProvider: entityHandlerProvider,
+    removeClosedProviders: removeClosedProviders,
+    traversed: traversed,
+  );
 
   EntityRepository<T>? getEntityRepositoryByTypeInfo<T extends Object>(
     TypeInfo typeInfo, {
@@ -4888,18 +4909,13 @@ extension IterableEntityRepositoryProviderExtension
     EntityHandlerProvider? entityHandlerProvider,
     bool removeClosedProviders = false,
     Set<EntityRepositoryProvider>? traversed,
-  }) {
-    var entityType = typeInfo.entityType;
-    if (entityType == null) return null;
-
-    return getEntityRepositoryByType<T>(
-      entityType,
-      entityRepositoryProvider: entityRepositoryProvider,
-      entityHandlerProvider: entityHandlerProvider,
-      removeClosedProviders: removeClosedProviders,
-      traversed: traversed,
-    );
-  }
+  }) => _asReiterable()._getEntityRepositoryByTypeInfoImpl<T>(
+    typeInfo,
+    entityRepositoryProvider: entityRepositoryProvider,
+    entityHandlerProvider: entityHandlerProvider,
+    removeClosedProviders: removeClosedProviders,
+    traversed: traversed,
+  );
 
   EntityRepository<T>? getEntityRepositoryByType<T extends Object>(
     Type type, {
@@ -4907,36 +4923,36 @@ extension IterableEntityRepositoryProviderExtension
     EntityHandlerProvider? entityHandlerProvider,
     bool removeClosedProviders = false,
     Set<EntityRepositoryProvider>? traversed,
-  }) {
-    var self = this;
-    if (self is! List<EntityRepositoryProvider> &&
-        self is! Set<EntityRepositoryProvider>) {
-      self = self.toList(growable: false);
-    }
-
-    return self._getEntityRepositoryByTypeImpl<T>(
-      type,
-      entityRepositoryProvider: entityRepositoryProvider,
-      entityHandlerProvider: entityHandlerProvider,
-      removeClosedProviders: removeClosedProviders,
-      traversed: traversed,
-    );
-  }
+  }) => _asReiterable()._getEntityRepositoryByTypeImpl<T>(
+    type,
+    entityRepositoryProvider: entityRepositoryProvider,
+    entityHandlerProvider: entityHandlerProvider,
+    removeClosedProviders: removeClosedProviders,
+    traversed: traversed,
+  );
 
   Map<Type, EntityRepository> allRepositories({
     Map<Type, EntityRepository>? allRepositories,
     Set<EntityRepositoryProvider>? traversedProviders,
-  }) {
-    var self = this;
-    if (self is! List<EntityRepositoryProvider> &&
-        self is! Set<EntityRepositoryProvider>) {
-      self = self.toList(growable: false);
-    }
+  }) => _asReiterable()._allRepositoriesImpl(
+    allRepositories: allRepositories,
+    traversedProviders: traversedProviders,
+  );
 
-    return self._allRepositoriesImpl(
-      allRepositories: allRepositories,
-      traversedProviders: traversedProviders,
-    );
+  /// Returns this [Iterable] if it's a [List] or a [Set], otherwise a
+  /// (fixed-length) [List] copy of it.
+  ///
+  /// The lookups (`_lookupEntityRepository`, `_allRepositoriesImpl`) read
+  /// [length] and [first] and then iterate again: a lazy [Iterable] (e.g. a
+  /// `where`/`map` view) would be re-evaluated on each pass. A [List]/[Set]
+  /// is also kept as is so `removeClosedProviders` can remove from it.
+  Iterable<EntityRepositoryProvider> _asReiterable() {
+    var self = this;
+    if (self is List<EntityRepositoryProvider> ||
+        self is Set<EntityRepositoryProvider>) {
+      return self;
+    }
+    return self.toList(growable: false);
   }
 }
 
@@ -5071,7 +5087,7 @@ extension _IterableEntityRepositoryProviderExtension
       return ask(first);
     }
 
-    var notClosed = _whereNotClosed(this, length, removeClosedProviders);
+    var notClosed = _whereNotClosed(length, removeClosedProviders);
 
     var entityRepositories = notClosed
         .map(ask)
@@ -5107,12 +5123,14 @@ extension _IterableEntityRepositoryProviderExtension
     removeClosedProviders: removeClosedProviders,
   );
 
+  /// The providers not closed. With [removeClosedProviders], the closed ones
+  /// are also removed from this [List]/[Set] (when any, comparing with the
+  /// original [length]). Used by [_lookupEntityRepository].
   Iterable<EntityRepositoryProvider> _whereNotClosed(
-    Iterable<EntityRepositoryProvider> self,
     int length,
     bool removeClosedProviders,
   ) {
-    var notClosed = self.where((e) => !e.isClosed);
+    var notClosed = where((e) => !e.isClosed);
 
     if (removeClosedProviders) {
       notClosed = notClosed.toList(growable: false);
@@ -5252,17 +5270,7 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     if (json == null) return <String, List<Object>>{};
 
     var map = (json as Map).map((key, value) {
-      return MapEntry(
-        key.toString(),
-        (value as Iterable)
-            .map(
-              (e) => (e as Map).map(
-                (key, value) =>
-                    MapEntry<String, dynamic>(key.toString(), value as dynamic),
-              ),
-            )
-            .toList(),
-      );
+      return MapEntry(key.toString(), _toEntitiesJson(value as Iterable));
     });
 
     return storeAllFromJson(
@@ -5280,6 +5288,12 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     Map<String, dynamic>? variables,
   }) async {
     var results = <String, List<Object>>{};
+
+    // The `%name%` placeholders in the entries (see
+    // `resolveEntitySourceValueVariables`):
+    if (variables != null && variables.isNotEmpty) {
+      entries = resolveEntitiesSourceVariables(entries, variables);
+    }
 
     var allRepositoriesBuildOrder = allRepositories().values.toList(
       growable: false,
@@ -5344,6 +5358,7 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
       try {
         var os = await entityRepository.storeAllFromJson(
           typeEntries,
+          transaction: transaction,
           resolutionRules: resolutionRules,
         );
         results[typeName] = os;
@@ -5371,16 +5386,15 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     EntityResolutionRules? resolutionRules,
     Object? variables,
   }) {
-    var sourceMap = resolveEntitiesSource(source);
-    var variablesMap = resolveSource(variables);
+    var sourceMap = resolveEntitiesSource(source, workingPath: workingPath);
+    var variablesMap = resolveSource(variables, workingPath: workingPath);
 
     return sourceMap.resolveOther(variablesMap, (sourceMap, variablesMap) {
-      sourceMap = resolveEntitiesSourceVariables(sourceMap, variablesMap);
-
       _log.info(
         'Populating adapter ($this) [entries: ${sourceMap.length}; variables: ${variablesMap.length}]...$_logSectionOpen',
       );
 
+      // `storeAllFromJson` resolves the `variables` in the entries:
       return storeAllFromJson(
         sourceMap,
         resolutionRules: resolutionRules,
@@ -5438,35 +5452,35 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     }
 
     if (value is String) {
+      // A `%name%` placeholder: the variable value (the placeholder itself
+      // if the variable isn't defined).
       if (value.startsWith('%') && value.endsWith('%')) {
         var varName = value.substring(1, value.length - 1);
-        var varValue = variables[varName] ?? value;
-        return varValue;
-      } else {
-        return value;
+        return variables[varName] ?? value;
       }
-    } else if (value is num || value is bool) {
-      return value;
+    } else if (value is Map<String, dynamic>) {
+      // Kept apart from a generic `Map` so the result stays typed as a
+      // `Map<String, dynamic>`:
+      return value.map(
+        (k, v) => MapEntry<String, dynamic>(
+          k,
+          resolveEntitySourceValueVariables(k, v, variables),
+        ),
+      );
     } else if (value is Map) {
-      if (value is Map<String, dynamic>) {
-        return value.map((k, v) {
-          var val = resolveEntitySourceValueVariables(k, v, variables);
-          return MapEntry<String, dynamic>(k, val);
-        });
-      } else {
-        return value.map((k, v) {
-          var val = resolveEntitySourceValueVariables(k, v, variables);
-          return MapEntry(k, val);
-        });
-      }
+      return value.map(
+        (k, v) =>
+            MapEntry(k, resolveEntitySourceValueVariables(k, v, variables)),
+      );
     } else if (value is List) {
-      return value.map((e) {
-        var val = resolveEntitySourceValueVariables(key, e, variables);
-        return val;
-      }).toList();
-    } else {
-      return value;
+      return value
+          .map((e) => resolveEntitySourceValueVariables(key, e, variables))
+          .toList();
     }
+
+    // Any other value (a plain `String`, a `num`, a `bool`...) has no
+    // variable to resolve:
+    return value;
   }
 
   FutureOr<Map<String, Iterable<Map<String, dynamic>>>> resolveEntitiesSource(
@@ -5476,19 +5490,22 @@ extension EntityRepositoryProviderExtension on EntityRepositoryProvider {
     return json.map((k, v) {
       var key = k.toString();
       var values = v is Iterable ? v : [v];
-
-      var entities = values
-          .map(
-            (e) => (e as Map).map(
-              (key, value) =>
-                  MapEntry<String, dynamic>(key.toString(), value as dynamic),
-            ),
-          )
-          .toList();
-
-      return MapEntry(key, entities);
+      return MapEntry(key, _toEntitiesJson(values));
     });
   });
+
+  /// Converts each element of [values] (a decoded JSON object, a [Map]) to
+  /// a `Map<String, dynamic>` (keys as [String]s). Used to coerce the
+  /// decoded seed JSON by [storeAllFromJsonEncoded] and
+  /// [resolveEntitiesSource].
+  static List<Map<String, dynamic>> _toEntitiesJson(Iterable values) => values
+      .map(
+        (e) => (e as Map).map(
+          (key, value) =>
+              MapEntry<String, dynamic>(key.toString(), value as dynamic),
+        ),
+      )
+      .toList();
 
   FutureOr<Map<String, dynamic>> resolveSource(
     Object? source, {
@@ -5799,30 +5816,27 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
     parent: provider,
   );
 
+  /// Up to this many JSON entries, [storeAllFromJson] creates and stores
+  /// them all at once; above it, in blocks of [_storeAllFromJsonBlockSize]
+  /// (logging the progress of a long population).
+  static const int _storeAllFromJsonSingleBlockMaxLength = 100;
+
+  /// The block size of a [storeAllFromJson] above
+  /// [_storeAllFromJsonSingleBlockMaxLength] entries: bounds the entities
+  /// created (and held) before each `storeAll`.
+  static const int _storeAllFromJsonBlockSize = 50;
+
   FutureOr<List<O>> _storeAllFromJsonImpl(
     Iterable<Map<String, dynamic>> entitiesJson,
     Transaction? transaction,
     EntityResolutionRules? resolutionRules,
   ) => Transaction.executeBlock((transaction) {
-    if (entitiesJson.length <= 100) {
-      var osAsync = entitiesJson
-          .map(
-            (e) => createFromMap(
-              e,
-              entityCache: transaction,
-              entityProvider: provider,
-              resolutionRules: resolutionRules,
-            ),
-          )
-          .resolveAll();
-
-      return osAsync.resolveMapped((os) {
-        return storeAll(os, transaction: transaction).resolveWithValue(os);
-      });
+    if (entitiesJson.length <= _storeAllFromJsonSingleBlockMaxLength) {
+      return _createAndStoreAll(entitiesJson, transaction, resolutionRules);
     }
 
     var entitiesJsonBlocks = entitiesJson
-        .splitBeforeIndexed((i, e) => i % 50 == 0)
+        .splitBeforeIndexed((i, e) => i % _storeAllFromJsonBlockSize == 0)
         .toList();
 
     final entitiesJsonLength = entitiesJson.length;
@@ -5849,25 +5863,40 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
             'Populating `$name`...  $count / $entitiesJsonLength (${progress.toStringAsFixed(2)}%) -- ${elapsedTime.toHumanReadable()} / ${estimatedTime.toHumanReadable()}',
           );
 
-          var osAsync = entitiesBlock
-              .map(
-                (e) => createFromMap(
-                  e,
-                  entityCache: transaction,
-                  entityProvider: provider,
-                  resolutionRules: resolutionRules,
-                ),
-              )
-              .resolveAll();
-
-          return osAsync.resolveMapped((os) {
-            return storeAll(os, transaction: transaction).resolveWithValue(os);
-          });
+          return _createAndStoreAll(
+            entitiesBlock,
+            transaction,
+            resolutionRules,
+          );
         })
         .resolveMapped((results) {
           return results.expand((l) => l).toList();
         });
   }, transaction: transaction);
+
+  /// Creates the entities of [entitiesJson] (see [createFromMap]) and then
+  /// stores them all in [transaction], returning them. Used by
+  /// [_storeAllFromJsonImpl] for all the entries at once, or for each block.
+  FutureOr<List<O>> _createAndStoreAll(
+    Iterable<Map<String, dynamic>> entitiesJson,
+    Transaction transaction,
+    EntityResolutionRules? resolutionRules,
+  ) {
+    var osAsync = entitiesJson
+        .map(
+          (e) => createFromMap(
+            e,
+            entityCache: transaction,
+            entityProvider: provider,
+            resolutionRules: resolutionRules,
+          ),
+        )
+        .resolveAll();
+
+    return osAsync.resolveMapped((os) {
+      return storeAll(os, transaction: transaction).resolveWithValue(os);
+    });
+  }
 
   FutureOr<O> storeFromJson(
     Map<String, dynamic> json, {
@@ -5911,24 +5940,26 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
       return ret.then(
         (o) => o,
         onError: (e, s) {
-          _log.severe(
-            "Error creating `${entityHandler.type}` from fields Map: $fields",
-            e,
-            s,
-          );
-
+          _logCreateFromMapError(fields, e, s);
           throw e;
         },
       );
     } catch (e, s) {
-      _log.severe(
-        "Error creating `${entityHandler.type}` from fields Map: $fields",
-        e,
-        s,
-      );
+      _logCreateFromMapError(fields, e, s);
       rethrow;
     }
   }
+
+  /// Logs an error of [createFromMap] (sync or async) with the [fields].
+  void _logCreateFromMapError(
+    Map<String, dynamic> fields,
+    Object error,
+    StackTrace stackTrace,
+  ) => _log.severe(
+    "Error creating `${entityHandler.type}` from fields Map: $fields",
+    error,
+    stackTrace,
+  );
 
   @override
   Object? getEntityID(O o) => entityHandler.getID(o);
@@ -6031,13 +6062,7 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
 
     var fields = getEntityFields(o);
 
-    var changed = fields.entries.where((e) {
-      var key = e.key;
-      var val = e.value;
-      var prevVal = prevFields[key];
-      var eq = entityHandler.equalsFieldValues(key, val, prevVal);
-      return !eq;
-    });
+    var changed = fields.entries.where((e) => _isFieldChanged(e, prevFields));
 
     var changedFields = changed.map((e) => e.key).toList();
     return changedFields;
@@ -6051,15 +6076,19 @@ abstract class EntityRepository<O extends Object> extends EntityAccessor<O>
 
     var fields = getEntityFields(o);
 
-    var changed = fields.entries.any((e) {
-      var key = e.key;
-      var val = e.value;
-      var prevVal = prevFields[key];
-      var eq = entityHandler.equalsFieldValues(key, val, prevVal);
-      return !eq;
-    });
+    return fields.entries.any((e) => _isFieldChanged(e, prevFields));
+  }
 
-    return changed;
+  /// Returns `true` if the [field] value differs from its tracked value in
+  /// [prevFields] (see [EntityHandler.equalsFieldValues]). The per-field
+  /// predicate of [getEntityChangedFields] and [entityHasChangedFields].
+  bool _isFieldChanged(
+    MapEntry<String, Object?> field,
+    Map<String, Object?> prevFields,
+  ) {
+    var key = field.key;
+    var prevVal = prevFields[key];
+    return !entityHandler.equalsFieldValues(key, field.value, prevVal);
   }
 
   @override
@@ -6527,7 +6556,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   /// Returns the `Transaction` that are open.
   static List<Transaction> get openInstances => _openInstances.toList();
 
+  /// The operations, in the order they were added (an operation's `id` is
+  /// its position). See [_operationsSetCache].
   final List<TransactionOperation> _operations = <TransactionOperation>[];
+
+  /// Cache of the [_operations] as an identity set (kept in sync by
+  /// [addOperation] and [dispose]), for O(1) membership checks:
+  /// `_operations.contains` on every [addOperation] made a bulk store
+  /// (`storeAll`, thousands of operations) O(n²).
+  /// ([TransactionOperation] doesn't override `==`: identity is the same
+  /// equality `List.contains` used.)
+  final Set<TransactionOperation> _operationsSetCache =
+      Set<TransactionOperation>.identity();
 
   List<TransactionOperation> get operations =>
       UnmodifiableListView(_operations);
@@ -6554,8 +6594,17 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   /// Returns the executor of this transaction.
   Object? get executor => mainOperation?.executor;
 
+  /// The executed operations, in execution order.
+  /// See [_executedOperationsSetCache].
   final List<TransactionOperation> _executedOperations =
       <TransactionOperation>[];
+
+  /// Cache of the [_executedOperations] as an identity set (kept in sync
+  /// by [_markOperationExecuted] and [dispose]), for O(1) membership
+  /// checks: `_executedOperations.contains` on every executed operation made
+  /// a bulk store O(n²).
+  final Set<TransactionOperation> _executedOperationsSetCache =
+      Set<TransactionOperation>.identity();
 
   /// Returns the list of [operations] that were fully executed.
   List<TransactionOperation> get executedOperations =>
@@ -6732,12 +6781,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       return false;
     }
 
-    if (!_operations.contains(op)) {
+    if (!_operationsSetCache.contains(op)) {
       throw StateError("Operation not in transaction: $op");
     }
 
     if (notExecuted == 1) {
-      return !_executedOperations.contains(op);
+      return !_executedOperationsSetCache.contains(op);
     } else {
       return _executedOperations.last == op;
     }
@@ -6871,7 +6920,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   Object? get result => _result;
 
   void addOperation(TransactionOperation op) {
-    if (_operations.contains(op)) {
+    if (_operationsSetCache.contains(op)) {
       throw StateError("Operation already in transaction: $op");
     }
 
@@ -6894,6 +6943,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     _operations.add(op);
+    _operationsSetCache.add(op);
     op.id = _operations.length;
   }
 
@@ -6940,7 +6990,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     Object? result,
     bool allowAutoCommit,
   ) {
-    if (_executedOperations.contains(op)) {
+    if (_executedOperationsSetCache.contains(op)) {
       throw StateError("Operation already executed in transaction: $op");
     }
 
@@ -6951,6 +7001,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     op._endTime = DateTime.now();
 
     _executedOperations.add(op);
+    _executedOperationsSetCache.add(op);
 
     if (!_aborted) {
       _lastResult = result;
@@ -7001,13 +7052,13 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       );
     }
 
-    if (!_operations.contains(operation)) {
+    if (!_operationsSetCache.contains(operation)) {
       throw StateError(
         "Operation not in transaction:\n-- Operation> $operation\n-- $this",
       );
     }
 
-    if (_executedOperations.contains(operation)) {
+    if (_executedOperationsSetCache.contains(operation)) {
       return true;
     }
 
@@ -7039,12 +7090,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         return true;
       }
 
-      if (_executedOperations.contains(operation)) {
+      if (_executedOperationsSetCache.contains(operation)) {
         return true;
       }
     }
 
-    return _executedOperations.contains(operation);
+    return _executedOperationsSetCache.contains(operation);
   }
 
   FutureOr<Object?> _doAutoCommit() {
@@ -7338,7 +7389,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     _abortError = abortError;
     _aborted = true;
 
-    for (var op in _operations.whereNotIn(_executedOperations)) {
+    for (var op in _operations.where(
+      (op) => !_executedOperationsSetCache.contains(op),
+    )) {
       finishOperationVoid(op, null, allowAutoCommit: false);
     }
 
@@ -7732,7 +7785,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _executionsFutures.clear();
     _executedOperations.clear();
+    _executedOperationsSetCache.clear();
     _operations.clear();
+    _operationsSetCache.clear();
 
     clearCachedEntities();
 
@@ -7967,6 +8022,17 @@ abstract class TransactionOperation implements RecursiveToString {
 
   String get _executedStatus => isExecuted ? '(executed)' : '';
 
+  /// The common head of the subclasses' [toStringSimple] and [toString]:
+  /// `<className><executed>[#<id>@#<transaction id>:<type>@<repository><target>]`.
+  /// - [className]: only [TransactionOperationSubTransaction] shows its own.
+  /// - [target]: a suffix after the repository name (e.g. the value
+  ///   repository of [TransactionOperationSelectRelationships]).
+  String _describe({
+    String className = 'TransactionOperation',
+    String target = '',
+  }) =>
+      '$className$_executedStatus[#$id@#${transaction.id}:${type.name}@$repositoryName$target]';
+
   @override
   String toString({Set<Object>? processedObjects});
 }
@@ -7988,9 +8054,11 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
          transaction: parentTransaction,
        );
 
+  String get _describeSubTransaction =>
+      _describe(className: 'TransactionOperationSubTransaction');
+
   @override
-  String toStringSimple() =>
-      'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->$durationMsInfo';
+  String toStringSimple() => '$_describeSubTransaction->$durationMsInfo';
 
   @override
   String toString({
@@ -7999,7 +8067,7 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
     processedObjects,
     this,
     () =>
-        'TransactionOperationSubTransaction$_executedStatus[#$id@#${transaction.id}:subTransaction@$repositoryName]->${subTransaction.toString(compact: true)}$durationMsInfo',
+        '$_describeSubTransaction->${subTransaction.toString(compact: true)}$durationMsInfo',
   )!;
 }
 
@@ -8021,18 +8089,16 @@ class TransactionOperationSelect<O> extends TransactionOperation {
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
-  String toString({
-    Set<Object>? processedObjects,
-  }) => RecursiveToString.recursiveToString(
-    processedObjects,
-    this,
-    () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:select@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
-  )!;
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+        processedObjects,
+        this,
+        () =>
+            '${_describe()}{matcher: $matcher$_commandToString}$durationMsInfo',
+      )!;
 }
 
 class TransactionOperationCount<O> extends TransactionOperation {
@@ -8047,18 +8113,16 @@ class TransactionOperationCount<O> extends TransactionOperation {
   }) : super(TransactionOperationType.count, repositoryName, false, executor);
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
-  String toString({
-    Set<Object>? processedObjects,
-  }) => RecursiveToString.recursiveToString(
-    processedObjects,
-    this,
-    () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:count@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
-  )!;
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+        processedObjects,
+        this,
+        () =>
+            '${_describe()}{matcher: $matcher$_commandToString}$durationMsInfo',
+      )!;
 }
 
 abstract class TransactionOperationWithEntity<O> extends TransactionOperation {
@@ -8105,18 +8169,15 @@ class TransactionOperationStore<O> extends TransactionOperationSaveEntity<O> {
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
-  String toString({
-    Set<Object>? processedObjects,
-  }) => RecursiveToString.recursiveToString(
-    processedObjects,
-    this,
-    () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:store@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
-  )!;
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+        processedObjects,
+        this,
+        () => '${_describe()}{entity: $entity$_commandToString}$durationMsInfo',
+      )!;
 }
 
 class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
@@ -8136,18 +8197,15 @@ class TransactionOperationUpdate<O> extends TransactionOperationSaveEntity<O> {
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
-  String toString({
-    Set<Object>? processedObjects,
-  }) => RecursiveToString.recursiveToString(
-    processedObjects,
-    this,
-    () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:update@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
-  )!;
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+        processedObjects,
+        this,
+        () => '${_describe()}{entity: $entity$_commandToString}$durationMsInfo',
+      )!;
 }
 
 class TransactionOperationStoreRelationship<O, E>
@@ -8176,8 +8234,7 @@ class TransactionOperationStoreRelationship<O, E>
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
   String toString({
@@ -8186,7 +8243,7 @@ class TransactionOperationStoreRelationship<O, E>
     processedObjects,
     this,
     () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:storeRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo',
+        '${_describe()}{entity: $entity, other: $others$_commandToString}$durationMsInfo',
   )!;
 }
 
@@ -8210,8 +8267,7 @@ class TransactionOperationConstrainRelationship<O, E>
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
   String toString({
@@ -8220,7 +8276,7 @@ class TransactionOperationConstrainRelationship<O, E>
     processedObjects,
     this,
     () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:constrainRelationship@$repositoryName]{entity: $entity, other: $others$_commandToString}$durationMsInfo',
+        '${_describe()}{entity: $entity, other: $others$_commandToString}$durationMsInfo',
   )!;
 }
 
@@ -8241,18 +8297,15 @@ class TransactionOperationSelectRelationship<O>
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
-  String toString({
-    Set<Object>? processedObjects,
-  }) => RecursiveToString.recursiveToString(
-    processedObjects,
-    this,
-    () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationship@$repositoryName]{entity: $entity$_commandToString}$durationMsInfo',
-  )!;
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+        processedObjects,
+        this,
+        () => '${_describe()}{entity: $entity$_commandToString}$durationMsInfo',
+      )!;
 }
 
 class TransactionOperationSelectRelationships<O> extends TransactionOperation {
@@ -8275,7 +8328,7 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
 
   @override
   String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]$durationMsInfo';
+      '${_describe(target: '->$valueRepositoryName')}$durationMsInfo';
 
   @override
   String toString({
@@ -8284,7 +8337,7 @@ class TransactionOperationSelectRelationships<O> extends TransactionOperation {
     processedObjects,
     this,
     () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:selectRelationships@$repositoryName->$valueRepositoryName]{entities: $entities$_commandToString}$durationMsInfo',
+        '${_describe(target: '->$valueRepositoryName')}{entities: $entities$_commandToString}$durationMsInfo',
   )!;
 }
 
@@ -8306,18 +8359,16 @@ class TransactionOperationDelete<O> extends TransactionOperation {
        );
 
   @override
-  String toStringSimple() =>
-      'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]$durationMsInfo';
+  String toStringSimple() => '${_describe()}$durationMsInfo';
 
   @override
-  String toString({
-    Set<Object>? processedObjects,
-  }) => RecursiveToString.recursiveToString(
-    processedObjects,
-    this,
-    () =>
-        'TransactionOperation$_executedStatus[#$id@#${transaction.id}:delete@$repositoryName]{matcher: $matcher$_commandToString}$durationMsInfo',
-  )!;
+  String toString({Set<Object>? processedObjects}) =>
+      RecursiveToString.recursiveToString(
+        processedObjects,
+        this,
+        () =>
+            '${_describe()}{matcher: $matcher$_commandToString}$durationMsInfo',
+      )!;
 }
 
 enum TransactionOperationType {
@@ -8334,30 +8385,10 @@ enum TransactionOperationType {
 }
 
 extension TransactionOperationTypeExtension on TransactionOperationType {
-  String get name {
-    switch (this) {
-      case TransactionOperationType.subTransaction:
-        return 'subTransaction';
-      case TransactionOperationType.select:
-        return 'select';
-      case TransactionOperationType.count:
-        return 'count';
-      case TransactionOperationType.store:
-        return 'store';
-      case TransactionOperationType.storeRelationship:
-        return 'storeRelationship';
-      case TransactionOperationType.constrainRelationship:
-        return 'constrainRelationship';
-      case TransactionOperationType.selectRelationship:
-        return 'selectRelationship';
-      case TransactionOperationType.selectRelationships:
-        return 'selectRelationships';
-      case TransactionOperationType.update:
-        return 'update';
-      case TransactionOperationType.delete:
-        return 'delete';
-    }
-  }
+  /// The same as [Enum.name] (each value's name is its identifier). Kept as
+  /// public API; a call on a [TransactionOperationType] value resolves to
+  /// [Enum.name] anyway (an instance member wins over an extension's).
+  String get name => (this as Enum).name;
 
   /// `true` for an operation that only reads.
   bool get isRead => switch (this) {
@@ -8482,6 +8513,11 @@ abstract class IterableEntityRepository<O extends Object>
         fieldsListEntity.length - fieldsListEntityRef.length;
     if (fieldsListEntityNoRef > 0) return true;
 
+    // From here, every entity field is a reference field (`EntityReference`
+    // or `EntityReferenceList`), and there's at least one:
+    // - Only `EntityReferenceList` fields: `false` (the operation doesn't
+    //   propagate for them).
+    // - Any `EntityReference` field: `true` (it can hold a loaded entity).
     if (fieldsEntityRef.isEmpty && fieldsListEntityRef.isNotEmpty) return false;
 
     return true;
@@ -8501,16 +8537,35 @@ abstract class IterableEntityRepository<O extends Object>
       return iterable().length;
     }
 
-    return iterable().where((o) {
-      return matcher.matchesEntity(
-        o,
-        entityHandler: entityHandler,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-      );
-    }).length;
+    return iterable()
+        .where(
+          (o) => _matchesEntity(
+            matcher,
+            o,
+            parameters,
+            positionalParameters,
+            namedParameters,
+          ),
+        )
+        .length;
   }
+
+  /// [matcher].`matchesEntity` for [o] with this [entityHandler]: the
+  /// entity predicate of the [iterable] scans, shared by [count] and
+  /// [matches] (used by the selects and deletes).
+  bool _matchesEntity(
+    EntityMatcher<dynamic> matcher,
+    O o,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) => matcher.matchesEntity(
+    o,
+    entityHandler: entityHandler,
+    parameters: parameters,
+    positionalParameters: positionalParameters,
+    namedParameters: namedParameters,
+  );
 
   @override
   Object? getEntityID(O o) => getID(o, entityHandler: entityHandler);
@@ -8761,11 +8816,7 @@ abstract class IterableEntityRepository<O extends Object>
   }) {
     checkNotClosed();
 
-    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
-
-    if (!fieldType.isListEntityOrReference) {
-      throw StateError("Field `$field` not a `List` entity type: $fieldType");
-    }
+    fieldType = _relationshipFieldType(o, field, fieldType);
 
     var op = TransactionOperationStoreRelationship(
       name,
@@ -8792,6 +8843,20 @@ abstract class IterableEntityRepository<O extends Object>
     });
   }
 
+  /// Returns [fieldType] (or [field]'s type, when `null`), which must be a
+  /// list of entities (or an [EntityReferenceList]): throws a [StateError]
+  /// otherwise. The shared validation of [setRelationship] and
+  /// [selectRelationship].
+  TypeInfo _relationshipFieldType(O? o, String field, TypeInfo? fieldType) {
+    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
+
+    if (!fieldType.isListEntityOrReference) {
+      throw StateError("Field `$field` not a `List` entity type: $fieldType");
+    }
+
+    return fieldType;
+  }
+
   FutureOr<bool> putRelationship(
     Object oId,
     Type valuesType,
@@ -8808,11 +8873,7 @@ abstract class IterableEntityRepository<O extends Object>
   }) {
     checkNotClosed();
 
-    fieldType ??= entityHandler.getFieldType(o, field, resolveFiledName: true)!;
-
-    if (!fieldType.isListEntityOrReference) {
-      throw StateError("Field `$field` not a `List` entity type: $fieldType");
-    }
+    fieldType = _relationshipFieldType(o, field, fieldType);
 
     oId ??= getID(o!, entityHandler: entityHandler)!;
 
@@ -9000,7 +9061,7 @@ abstract class IterableEntityRepository<O extends Object>
 
   @override
   FutureOr<O?> deleteEntity(O o, {Transaction? transaction}) =>
-      deleteByID(getEntityID(o));
+      deleteByID(getEntityID(o), transaction: transaction);
 
   @override
   FutureOr<O?> tryDeleteEntity(O o, {Transaction? transaction}) =>
@@ -9043,15 +9104,15 @@ abstract class IterableEntityRepository<O extends Object>
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
-    var itr = iterable().where((o) {
-      return matcher.matchesEntity(
+    var itr = iterable().where(
+      (o) => _matchesEntity(
+        matcher,
         o,
-        entityHandler: entityHandler,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-      );
-    });
+        parameters,
+        positionalParameters,
+        namedParameters,
+      ),
+    );
 
     return _applyOrderAndPagination(
       itr,
