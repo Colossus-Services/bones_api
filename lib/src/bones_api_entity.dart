@@ -568,9 +568,9 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   /// Cache of [idType]: the [Type] of the ID field, fixed per entity type
   /// and looked up on every ID parse/compare.
-  Type? _idTypeCache;
+  Type? _idType;
 
-  Type idType([O? o]) => _idTypeCache ??= getFieldType(
+  Type idType([O? o]) => _idType ??= getFieldType(
     o,
     idFieldName(o),
     resolveFiledName: false,
@@ -586,20 +586,17 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
   // The fields of an entity type are fixed, so each filter runs once.
 
   /// Cache of [fieldsWithTypeList]: the fields of a `List` type.
-  Map<String, TypeInfo>? _fieldsWithTypeListCache;
+  Map<String, TypeInfo>? _fieldsWithTypeList;
 
-  Map<String, TypeInfo> fieldsWithTypeList([O? o]) =>
-      _fieldsWithTypeListCache ??= fieldsWithType(
-        (_, fieldType) => fieldType.isList,
-        o,
-      );
+  Map<String, TypeInfo> fieldsWithTypeList([O? o]) => _fieldsWithTypeList ??=
+      fieldsWithType((_, fieldType) => fieldType.isList, o);
 
   /// Cache of [fieldsWithTypeEntity]: the fields holding an entity
   /// (not an [EntityReference]).
-  Map<String, TypeInfo>? _fieldsWithTypeEntityCache;
+  Map<String, TypeInfo>? _fieldsWithTypeEntity;
 
   Map<String, TypeInfo> fieldsWithTypeEntity([O? o]) =>
-      _fieldsWithTypeEntityCache ??= fieldsWithType(
+      _fieldsWithTypeEntity ??= fieldsWithType(
         (_, fieldType) =>
             !fieldType.isBasicType &&
             !fieldType.isEntityReferenceListType &&
@@ -610,10 +607,10 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   /// Cache of [fieldsWithTypeEntityOrReference]: the fields holding an
   /// entity or an [EntityReference].
-  Map<String, TypeInfo>? _fieldsWithTypeEntityOrReferenceCache;
+  Map<String, TypeInfo>? _fieldsWithTypeEntityOrReference;
 
   Map<String, TypeInfo> fieldsWithTypeEntityOrReference([O? o]) =>
-      _fieldsWithTypeEntityOrReferenceCache ??= fieldsWithType(
+      _fieldsWithTypeEntityOrReference ??= fieldsWithType(
         (_, fieldType) =>
             (!fieldType.isBasicType &&
                 !fieldType.isEntityReferenceListType &&
@@ -625,20 +622,20 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   /// Cache of [fieldsWithEntityReference]: the fields of an
   /// [EntityReference] type.
-  Map<String, TypeInfo>? _fieldsWithEntityReferenceCache;
+  Map<String, TypeInfo>? _fieldsWithEntityReference;
 
   Map<String, TypeInfo> fieldsWithEntityReference([O? o]) =>
-      _fieldsWithEntityReferenceCache ??= Map<String, TypeInfo>.unmodifiable(
+      _fieldsWithEntityReference ??= Map<String, TypeInfo>.unmodifiable(
         fieldsWithTypeEntityOrReference(o).entries
             .where((e) => e.value.isEntityReferenceType)
             .toMapFromEntries(),
       );
 
   /// Cache of [fieldsWithTypeListEntity]: the fields of a list of entities.
-  Map<String, TypeInfo>? _fieldsWithTypeListEntityCache;
+  Map<String, TypeInfo>? _fieldsWithTypeListEntity;
 
   Map<String, TypeInfo> fieldsWithTypeListEntity([O? o]) =>
-      _fieldsWithTypeListEntityCache ??= fieldsWithType(
+      _fieldsWithTypeListEntity ??= fieldsWithType(
         (_, fieldType) => fieldType.isValidListEntityType,
         o,
       );
@@ -668,23 +665,22 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   /// Cache of [fieldsWithEntityReferenceList]: the (non-hidden) fields of an
   /// [EntityReferenceList] type.
-  Map<String, TypeInfo>? _fieldsWithEntityReferenceListCache;
+  Map<String, TypeInfo>? _fieldsWithEntityReferenceList;
 
   Map<String, TypeInfo> fieldsWithEntityReferenceList([O? o]) =>
-      _fieldsWithEntityReferenceListCache ??=
-          Map<String, TypeInfo>.unmodifiable(
-            fieldsWithTypeListEntityOrReference(o).entries
-                .where((e) => e.value.isEntityReferenceListType)
-                .toMapFromEntries(),
-          );
+      _fieldsWithEntityReferenceList ??= Map<String, TypeInfo>.unmodifiable(
+        fieldsWithTypeListEntityOrReference(o).entries
+            .where((e) => e.value.isEntityReferenceListType)
+            .toMapFromEntries(),
+      );
 
   /// Cache of [fieldsEntityAnnotations] (also filled by subclasses):
   /// field name -> its unmodifiable [EntityAnnotation]s. Built once (fixed
   /// fields; a reflection lookup per field).
-  Map<String, List<EntityAnnotation>>? _fieldsEntityAnnotationsCache;
+  Map<String, List<EntityAnnotation>>? _fieldsEntityAnnotations;
 
   Map<String, List<EntityAnnotation>> fieldsEntityAnnotations() =>
-      _fieldsEntityAnnotationsCache ??=
+      _fieldsEntityAnnotations ??=
           Map<String, List<EntityAnnotation>>.unmodifiable(
             (getAllFieldsEntityAnnotations() ?? {})
                 .map<String, List<EntityAnnotation>>(
@@ -1614,25 +1610,25 @@ abstract class EntityHandler<O> with FieldsFromMap, EntityRulesResolver {
 
   /// Cache of [fieldsNamesIndexes]: field name -> index in [fieldsNames].
   /// The fields of an entity type are fixed, so it's built once.
-  Map<String, int>? _fieldsNamesIndexesCache;
+  Map<String, int>? _fieldsNamesIndexes;
 
   Map<String, int> fieldsNamesIndexes([O? o]) =>
-      _fieldsNamesIndexesCache ??= buildFieldsNamesIndexes(fieldsNames(o));
+      _fieldsNamesIndexes ??= buildFieldsNamesIndexes(fieldsNames(o));
 
   /// Cache of [fieldsNamesLC]: the [fieldsNames] in lower case, used for
   /// case-insensitive field lookups. Built once (fixed fields).
-  List<String>? _fieldsNamesLCCache;
+  List<String>? _fieldsNamesLC;
 
   List<String> fieldsNamesLC([O? o]) =>
-      _fieldsNamesLCCache ??= buildFieldsNamesLC(fieldsNames(o));
+      _fieldsNamesLC ??= buildFieldsNamesLC(fieldsNames(o));
 
   /// Cache of [fieldsNamesSimple]: the [fieldsNames] as simple keys
   /// (`fieldToSimpleKey`), used for lenient field lookups. Built once (fixed
   /// fields).
-  List<String>? _fieldsNamesSimpleCache;
+  List<String>? _fieldsNamesSimple;
 
   List<String> fieldsNamesSimple([O? o]) =>
-      _fieldsNamesSimpleCache ??= buildFieldsNamesSimple(fieldsNames(o));
+      _fieldsNamesSimple ??= buildFieldsNamesSimple(fieldsNames(o));
 
   TypeInfo? getFieldType(O? o, String key, {bool resolveFiledName = false});
 
@@ -2907,7 +2903,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   String? _idFieldNameCache;
 
   /// Cache of [fieldsNames], filled by [inspectObject].
-  List<String>? _fieldsNamesCache;
+  List<String>? _fieldsNames;
 
   @override
   String idFieldName([O? o]) => _inspectedOrThrow(
@@ -2921,7 +2917,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
   @override
   List<String> fieldsNames([O? o]) => _inspectedOrThrow(
     o,
-    () => _fieldsNamesCache,
+    () => _fieldsNames,
     () =>
         "`fieldsNames` Not populated yet! No Entity instance presented to this EntityHandler yet. Type: $type",
   );
@@ -2971,7 +2967,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     if (o != null && _idFieldNameCache == null) {
       _idFieldNameCache = o.idFieldName;
 
-      final fieldsNames = _fieldsNamesCache ??= List<String>.unmodifiable(
+      final fieldsNames = _fieldsNames ??= List<String>.unmodifiable(
         o.fieldsNames,
       );
 
@@ -2981,7 +2977,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
         ),
       );
 
-      _fieldsEntityAnnotationsCache ??=
+      _fieldsEntityAnnotations ??=
           Map<String, List<EntityAnnotation>>.unmodifiable(
             Map<String, List<EntityAnnotation>>.fromEntries(
               fieldsNames.map((f) {
@@ -3089,7 +3085,7 @@ class GenericEntityHandler<O extends Entity> extends EntityHandler<O> {
     if (o != null) {
       return o.getFieldEntityAnnotations(key);
     } else {
-      return _fieldsEntityAnnotationsCache?[key];
+      return _fieldsEntityAnnotations?[key];
     }
   }
 
@@ -3141,10 +3137,10 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   /// Cache of [siblingsEntityHandlers]: the handlers of the sibling classes
   /// (same reflection bundle), fixed after the reflection is registered.
-  List<ClassReflectionEntityHandler>? _siblingsEntityHandlersCache;
+  List<ClassReflectionEntityHandler>? _siblingsEntityHandlers;
 
   List<ClassReflectionEntityHandler> siblingsEntityHandlers() =>
-      _siblingsEntityHandlersCache ??=
+      _siblingsEntityHandlers ??=
           List<ClassReflectionEntityHandler>.unmodifiable(
             reflection.siblingsClassReflection().map((c) => c.entityHandler),
           );
@@ -3343,7 +3339,7 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
     if (idFieldName != null) return idFieldName;
 
     // Just to populate:
-    if (_fieldsNamesCache == null) {
+    if (_fieldsNames == null) {
       fieldsNames(o);
     }
 
@@ -3403,11 +3399,11 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
   }
 
   /// Cache of [fieldsNames]: the keys of [fieldsTypes] (fixed per class).
-  List<String>? _fieldsNamesCache;
+  List<String>? _fieldsNames;
 
   @override
   List<String> fieldsNames([O? o]) =>
-      _fieldsNamesCache ??= List.unmodifiable(fieldsTypes(o).keys);
+      _fieldsNames ??= List.unmodifiable(fieldsTypes(o).keys);
 
   @override
   Map<String, TypeInfo> fieldsTypes([O? o]) {
@@ -3426,23 +3422,19 @@ class ClassReflectionEntityHandler<O> extends EntityHandler<O> {
 
   /// Cache of [constructors]: constructor name -> its parameters' types.
   /// Fixed per class, and a full reflection scan to build.
-  Map<String, Map<String, TypeInfo>>? _constructorsCache;
+  Map<String, Map<String, TypeInfo>>? _constructors;
 
   @override
   Map<String, Map<String, TypeInfo>>? constructors([O? o]) {
-    return _constructorsCache ??=
-        Map<String, Map<String, TypeInfo>>.unmodifiable(
-          reflectionWithObject(o).allConstructors().map((c) {
-            var name = c.name;
-            var args = c.allParameters
-                .map(
-                  (p) =>
-                      MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo),
-                )
-                .toMapFromEntries();
-            return MapEntry(name, Map<String, TypeInfo>.unmodifiable(args));
-          }).toMapFromEntries(),
-        );
+    return _constructors ??= Map<String, Map<String, TypeInfo>>.unmodifiable(
+      reflectionWithObject(o).allConstructors().map((c) {
+        var name = c.name;
+        var args = c.allParameters
+            .map((p) => MapEntry<String, TypeInfo>(p.jsonName, p.type.typeInfo))
+            .toMapFromEntries();
+        return MapEntry(name, Map<String, TypeInfo>.unmodifiable(args));
+      }).toMapFromEntries(),
+    );
   }
 
   @override

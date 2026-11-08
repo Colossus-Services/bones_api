@@ -1,3 +1,14 @@
+## 1.35.1
+
+- Private fields that only memoize a public getter or method of the same
+  name (`String? _origin; String get origin => _origin ??= ...`) take that
+  name again, as before 1.35.0 renamed them to `*Cache`: 27 fields (e.g.
+  `_hostname`, `_port`, `_origin`, `_lastPathPart`, `_fieldsNames`,
+  `_fieldsWithTypeEntity`, `_totalRules`, `_tablesVersions`), and
+  `APIRequest._requesterAddressResolved` (its getter's name is taken by the
+  given address). Caches filled by a private helper or a differently named
+  member keep `*Cache`. Behavior unchanged (private names only).
+
 ## 1.35.0
 
 API/server layer clean-up (behavior-preserving):

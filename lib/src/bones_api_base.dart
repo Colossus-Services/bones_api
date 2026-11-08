@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.35.0';
+  static const String VERSION = '1.35.1';
 
   static bool _boot = false;
 
@@ -2287,10 +2287,10 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// A cache of [lastPathPart]: the request's path doesn't change, and the
   /// last path part is read on every routing of the request.
-  String? _lastPathPartCache;
+  String? _lastPathPart;
 
   /// Returns the last [pathParts]. Sames as [pathPartReversed] for index `0`.
-  String get lastPathPart => _lastPathPartCache ??= pathPartReversed(0);
+  String get lastPathPart => _lastPathPart ??= pathPartReversed(0);
 
   /// Returns from [parameters] a value for [name1]. Defaults to [def] if defined.
   V? getParameter<V>(String name1, [V? def]) {
@@ -2521,9 +2521,9 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// Cache of [hostname], parsed from the `Host` header by [_hostnameImpl]
   /// on first read (the headers don't change during the request).
-  String? _hostnameCache;
+  String? _hostname;
 
-  String get hostname => _hostnameCache ??= _hostnameImpl();
+  String get hostname => _hostname ??= _hostnameImpl();
 
   String _hostnameImpl() {
     var host = getHeader('host');
@@ -2547,9 +2547,9 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// Cache of [port], parsed from the `Port`/`Host` headers by [_portImpl]
   /// on first read.
-  int? _portCache;
+  int? _port;
 
-  int get port => _portCache ??= _portImpl();
+  int get port => _port ??= _portImpl();
 
   int _portImpl() {
     var port = getHeader('port');
@@ -2578,10 +2578,10 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// Cache of [requesterAddress], resolved by [_requesterAddressImpl]
   /// (the given address, or the `X-Forwarded-For`/`Remote-Address`
   /// headers). A `null` result isn't cached (it's re-resolved on each read).
-  String? _requesterAddressCache;
+  String? _requesterAddressResolved;
 
   String? get requesterAddress =>
-      _requesterAddressCache ??= _requesterAddressImpl();
+      _requesterAddressResolved ??= _requesterAddressImpl();
 
   String? _requesterAddressImpl() {
     if (_requesterAddress != null) return _requesterAddress;
@@ -2606,9 +2606,9 @@ class APIRequest extends APIMetricSet with APIPayload {
 
   /// Cache of [origin], resolved by [_originImpl] (the `Origin` header, or
   /// built from [scheme] and [hostnameAndPort]) on first read.
-  String? _originCache;
+  String? _origin;
 
-  String get origin => _originCache ??= _originImpl();
+  String get origin => _origin ??= _originImpl();
 
   String _originImpl() {
     var origin = getHeader('origin');

@@ -238,8 +238,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       <String, MapHistory<Object, Map<String, dynamic>>>{};
 
   void _onTablesModification() {
-    _tablesVersionsCache = null;
-    _tablesIndexesVersionsCache = null;
+    _tablesVersions = null;
+    _tablesIndexesVersions = null;
   }
 
   /// A cache of [tablesVersions], filled on its first call and reset by
@@ -248,10 +248,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   /// Why: each new connection ([DBSQLMemoryAdapterContext]) snapshots the
   /// versions (to roll the tables back to them), usually more often than
   /// the tables change: the map isn't rebuilt for each one.
-  Map<String, int>? _tablesVersionsCache;
+  Map<String, int>? _tablesVersions;
 
   Map<String, int> get tablesVersions =>
-      _tablesVersionsCache ??= UnmodifiableMapView(
+      _tablesVersions ??= UnmodifiableMapView(
         _tables.map((table, map) => MapEntry(table, map.version)),
       );
 
@@ -616,11 +616,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       <String, Map<String, MapHistory<Object, Set<Object>>>>{};
 
   /// A cache of [tablesIndexesVersions], filled on its first call and reset
-  /// by [_onTablesModification]. As [_tablesVersionsCache].
-  Map<String, Map<String, int>>? _tablesIndexesVersionsCache;
+  /// by [_onTablesModification]. As [_tablesVersions].
+  Map<String, Map<String, int>>? _tablesIndexesVersions;
 
   Map<String, Map<String, int>> get tablesIndexesVersions =>
-      _tablesIndexesVersionsCache ??= UnmodifiableMapView(
+      _tablesIndexesVersions ??= UnmodifiableMapView(
         _tablesIndexes.map(
           (table, fieldIndex) => MapEntry(
             table,
