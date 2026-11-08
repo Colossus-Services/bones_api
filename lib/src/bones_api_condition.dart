@@ -1497,9 +1497,52 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   @override
   bool get isInner => !isNegated && super.isInner;
 
-  /// Returns `null` for an empty [keyValue] (a to-many relationship without
-  /// related entities), so it's compared as a `null` field; otherwise
-  /// returns [keyValue] unchanged.
+  /// If [keyValue] is an empty list reached through a to-many relationship
+  /// (see [isToManyKey]): an entity without related entities.
+  bool _isEmptyToMany(Object? keyValue, EntityHandler? entityHandler) =>
+      keyValue is Iterable && keyValue.isEmpty && isToManyKey(entityHandler);
+
+  /// If the [keys] path goes through a to-many relationship (a field
+  /// declared as a list of entities or references, e.g. `roles` or
+  /// `owner.roles.type`), resolved by the declared field types of
+  /// [entityHandler]'s entity (not by the values: a to-many without related
+  /// entities is an empty list, as an empty list field).
+  ///
+  /// A list field that is not a relationship (`List<String> tags`, a
+  /// `Uint8List`) is not a to-many: its value is compared as a whole.
+  bool isToManyKey(EntityHandler? entityHandler) {
+    if (identical(entityHandler, _isToManyKeyHandler)) {
+      return _isToManyKey ?? false;
+    }
+
+    var toMany = false;
+    var handler = entityHandler;
+    for (var key in keys) {
+      if (handler == null || key is! ConditionKeyField) break;
+
+      var type = handler.getFieldType(null, key.name, resolveFiledName: true);
+      if (type == null) break;
+
+      if (type.isListEntityOrReference) {
+        toMany = true;
+        break;
+      }
+
+      handler = _resolveValueEntityHandler(type, handler);
+    }
+
+    _isToManyKeyHandler = entityHandler;
+    _isToManyKey = toMany;
+    return toMany;
+  }
+
+  EntityHandler? _isToManyKeyHandler;
+  bool? _isToManyKey;
+
+  /// Returns `null` for an entity without related entities through a
+  /// to-many relationship (an empty [keyValue], see [_isEmptyToMany]), so
+  /// it's compared as a `null` field; otherwise returns [keyValue]
+  /// unchanged.
   ///
   /// Why: on SQL, a to-many relationship is an outer join, and an entity
   /// without related rows joins one row of `NULL`s. So
@@ -1507,22 +1550,22 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   /// Without this, the empty list would be compared element by element
   /// (none), and match nothing.
   ///
-  /// [keyValue] is returned unchanged when the compared [value] (or its
+  /// [keyValue] is also returned unchanged when the compared [value] (or its
   /// [ConditionParameter]'s value, resolved with [parameters],
-  /// [positionalParameters] and [namedParameters]) is a list, so a list
-  /// field still compares as a whole: `tags == []` matches an empty
-  /// `tags`.
+  /// [positionalParameters] and [namedParameters]) is a list: lists are
+  /// compared as a whole.
   ///
   /// Used by [KeyConditionEQ] (`==`). [KeyConditionNotEQ] (`!=`) and
-  /// [KeyConditionINBase] (`=~`/`!~`) handle an empty list the same way,
+  /// [KeyConditionINBase] (`=~`/`!~`) handle an empty to-many the same way,
   /// directly (see `_notEquals` and `_matchesIn`).
   Object? _emptyToManyAsNull(
     Object? keyValue,
+    EntityHandler? entityHandler,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
   ) {
-    if (keyValue is! Iterable || keyValue.isNotEmpty) return keyValue;
+    if (!_isEmptyToMany(keyValue, entityHandler)) return keyValue;
 
     Object? v = value;
     if (v is ConditionParameter) {
@@ -1816,6 +1859,7 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     return equalsConditionValue(
       _emptyToManyAsNull(
         keyValue,
+        entityHandler,
         parameters,
         positionalParameters,
         namedParameters,
@@ -1842,6 +1886,7 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     return equalsConditionValue(
       _emptyToManyAsNull(
         keyValue?.value,
+        entityHandler,
         parameters,
         positionalParameters,
         namedParameters,
@@ -1888,6 +1933,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     return _notEquals(
       keyValue,
       null,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -1907,6 +1953,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     return _notEquals(
       keyValue?.value,
       keyValue,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -1914,11 +1961,13 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   }
 
   /// The values of a to-many relationship are compared one by one (as a SQL
-  /// join of its rows): any of them not equal; without any, as a `NULL` row
-  /// (not equal to a value, but not `!= null`).
+  /// join of its rows): any of them not equal; without any (see
+  /// [_isEmptyToMany]), as a `NULL` row (not equal to a value, but not
+  /// `!= null`).
   bool _notEquals(
     Object? keyValue,
     KeyConditionValue? keyConditionValue,
+    EntityHandler? entityHandler,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
@@ -1934,7 +1983,8 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     );
 
     if (keyValue is Iterable && value is! Iterable) {
-      return keyValue.isEmpty ? notEquals(null) : keyValue.any(notEquals);
+      if (_isEmptyToMany(keyValue, entityHandler)) return notEquals(null);
+      return keyValue.isEmpty || keyValue.any(notEquals);
     }
 
     return notEquals(keyValue);
@@ -2209,6 +2259,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 
     return _matchesIn(
       keyValue,
+      _isEmptyToMany(keyValue, entityHandler),
       parameters,
       positionalParameters,
       namedParameters,
@@ -2228,6 +2279,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 
     return _matchesIn(
       keyValue?.value,
+      _isEmptyToMany(keyValue?.value, entityHandler),
       parameters,
       positionalParameters,
       namedParameters,
@@ -2237,10 +2289,11 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 
   /// The values of a to-many relationship are compared one by one (as a SQL
   /// join of its rows), with [not] (`NOT IN`): any of them not in. Without
-  /// any, as a `NULL` row (in a list with a `null`; also `NOT IN` a list
-  /// without one).
+  /// any ([emptyToMany], see [_isEmptyToMany]), as a `NULL` row (in a list
+  /// with a `null`; also `NOT IN` a list without one).
   bool _matchesIn(
     Object? keyValue,
+    bool emptyToMany,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
@@ -2255,12 +2308,10 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
       entityHandler: entityHandler,
     );
 
-    if (keyValue is Iterable && keyValue.isEmpty) {
-      return inValues(null) != not;
-    }
+    if (emptyToMany) return inValues(null) != not;
 
     if (not && keyValue is Iterable) {
-      return keyValue.any((v) => !inValues(v));
+      return keyValue.isEmpty || keyValue.any((v) => !inValues(v));
     }
 
     return inValues(keyValue) != not;

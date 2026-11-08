@@ -13,10 +13,25 @@ SQLite, PostgreSQL, MySQL). Behavior changes:
   relationship) is a `null` field, so it matches, as in memory, and as `!=`
   and `!~` already did (since 1.32.0). It was an inner join: `== null`
   missed it while `!= x` matched it.
+- SQL fix: a to-many relationship through a to-one one
+  (`owner.roles.type`) joined its relationship table to the main table
+  (`user__roles__rel.role = store.id`), not to the to-one's
+  (`user__roles__rel.user = user.id`): it matched the wrong rows.
+- SQL fix: a `DELETE` through a to-one relationship (`deleteByQuery(
+  'owner.email == ?')`) was invalid SQL (`DELETE ... INNER JOIN`): its
+  `JOIN`s are now in the subquery of the IDs too.
 - Memory: a to-many relationship without related entities is compared as
   one row of `null`s (as a SQL outer join): `roles.type == null` and
   `roles.type =~ [null]` match it, and `roles.type != null` and `!~ [null]`
-  don't (they did). `!= "admin"` and `!~ ["admin"]` still match it.
+  don't (they did). `!= "admin"` and `!~ ["admin"]` still match it. Only a
+  to-many relationship (`KeyCondition.isToManyKey`, by the declared field
+  types): an empty list field (`List<String>`, `Uint8List`) is still a
+  value, not a `null`.
+- Known difference: 2 conditions over the same to-many relationship
+  (`roles.type == "admin" && roles.type == "guest"`) are, in memory, each
+  any related entity, and on SQL the same joined row (so this matches
+  nothing on SQL). Prefer one condition (`roles.type =~ [...]`), or `!(...)`
+  (a subquery each).
 - Memory: a `Decimal` field compares by value: `value == 1.5`,
   `value =~ [1.5, 3]` and `value == ?` with a `Decimal` matched nothing (an
   entity's map keeps it as a `String`; `EntityHandler.equalsValues*` now

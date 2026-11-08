@@ -5437,6 +5437,27 @@ Future<bool> runAdapterTests(
         await nullSplit(selectStores, allStores, 'owner.address.city', {'s2'});
         await s('owner.address.city =~ null', {'s2'});
 
+        // A to-many relationship through a to-one one (`owner.roles`): `s2`
+        // has no owner, `s4`'s owner (`uC`) no roles.
+        await s('owner.roles.type == "guest"', {'s3', 's5'});
+        await s('owner.roles.type == "admin"', {'s1'});
+        await s('owner.roles.type != "admin"', {'s2', 's3', 's4', 's5'});
+        await s('owner.roles.type =~ ["admin", "unknown"]', {'s1', 's3', 's5'});
+        await s('owner.roles.type =~ /^gu/', {'s3', 's5'});
+        await s('owner.roles.type !~ /^(admin|guest)\$/', {
+          's2',
+          's3',
+          's4',
+          's5',
+        });
+        await s('owner.roles.enabled == false', {'s3', 's5'});
+        await nullSplit(selectStores, allStores, 'owner.roles.type', {
+          's2',
+          's4',
+        });
+        await s('owner.roles.type =~ ?:t', {}, {'t': <String>[]});
+        await s('owner.roles.type !~ ?:t', allStores, {'t': <String>[]});
+
         // Each entity's own `null`s:
         await nullSplit(selectStores, allStores, 'name', {});
         await nullSplit(selectStores, allStores, 'number', {'s2'});
@@ -5619,6 +5640,33 @@ Future<bool> runAdapterTests(
         ]) {
           var count = await userRepo.countByQuery('email =~ /^ox-/ && ($q)');
           if (count != n) failures.add('count `$q`: $count, expected $n');
+        }
+
+        // A `DELETE` through a to-one (a `JOIN`) and a to-many relationship:
+        var d1 = Store('oxd-1', 1, owner: uA);
+        var d2 = Store('oxd-2', 2, owner: uB);
+        var d3 = Store('oxd-3', 3);
+        var dIDs = [
+          for (var d in [d1, d2, d3]) (await storeRepo.store(d))!,
+        ];
+        for (var (q, params, exp) in [
+          ('name =~ /^oxd-/ && owner.email == ?', [eb], [dIDs[1]]),
+          ('name =~ /^oxd-/ && owner.roles.type == "admin"', null, [dIDs[0]]),
+          ('name =~ /^oxd-/ && owner.level == null', null, [dIDs[2]]),
+        ]) {
+          try {
+            var deleted = await storeRepo.deleteByQuery(q, parameters: params);
+            var ids = deleted.map((e) => e.id).toList();
+            if (ids.join(',') != exp.join(',')) {
+              failures.add('delete `$q`: $ids, expected $exp');
+            }
+          } catch (e) {
+            failures.add('delete `$q`: ERROR $e');
+          }
+        }
+        var left = await storeRepo.selectByQuery('name =~ /^oxd-/');
+        if (left.isNotEmpty) {
+          failures.add('delete: left ${left.map((e) => e.name).toList()}');
         }
 
         expect(failures, isEmpty, reason: failures.join('\n'));

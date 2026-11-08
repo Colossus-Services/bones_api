@@ -3375,6 +3375,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     int? offset,
     bool? orderByID,
     OrderDirection? orderDirection,
+    bool forDelete = false,
     required String Function(String from, EncodingContext context) sqlBuilder,
   }) {
     if (matcher is! Condition) {
@@ -3398,16 +3399,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     return retEncodedSQL.resolveMapped((encodedSQL) {
       var conditionSQL = encodedSQL.outputString;
 
+      // The `JOIN`s in a subquery of the matching IDs:
+      // - A to-many relationship's `JOIN` repeats an entity for each matching
+      //   related row: each entity is selected once (as in memory; also
+      //   counted and paginated once).
+      // - A `DELETE` can't have `JOIN`s (also of a to-one relationship).
+      var joinsInSubquery =
+          encodedSQL.relationshipTables.isNotEmpty ||
+          (forDelete && encodedSQL.fieldsReferencedTables.isNotEmpty);
+
       String from;
-      if (encodedSQL.relationshipTables.isNotEmpty &&
-          conditionSQL.trim().isNotEmpty) {
-        // A to-many relationship's `JOIN` repeats an entity for each matching
-        // related row: the matching IDs, in a subquery, select each entity
-        // once (as in memory; also counted and paginated once).
-        conditionSQL = _relationshipsSubqueryConditionSQL(
+      if (joinsInSubquery && conditionSQL.trim().isNotEmpty) {
+        conditionSQL = _joinsSubqueryConditionSQL(
           table,
           encodedSQL,
           conditionSQL,
+          derivedTable: forDelete && dialect.subqueryAsDerivedTable,
         );
         from = '${_fromSQLMainTable(table, encodedSQL)} WHERE $conditionSQL';
       } else {
@@ -3439,14 +3446,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
   }
 
   /// `alias.id IN ( SELECT alias.id FROM ... JOIN ... WHERE cond )`: the
-  /// [conditionSQL] of [table] through a to-many relationship, as the IDs of
-  /// its entities (each once). With [SQLDialect.subqueryAsDerivedTable] (a
-  /// MySQL `DELETE` can't select from its own table), in a derived table.
-  String _relationshipsSubqueryConditionSQL(
+  /// [conditionSQL] of [table] through other tables, as the IDs of its
+  /// entities (each once). With [derivedTable] (a MySQL `DELETE` can't
+  /// select from its own table, [SQLDialect.subqueryAsDerivedTable]), in a
+  /// derived table.
+  String _joinsSubqueryConditionSQL(
     String table,
     EncodingContext encodedSQL,
-    String conditionSQL,
-  ) {
+    String conditionSQL, {
+    required bool derivedTable,
+  }) {
     var q = dialect.elementQuote;
     var tableAlias = _conditionSQLGenerator.resolveEntityAlias(
       encodedSQL,
@@ -3458,7 +3467,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         'SELECT $q$tableAlias$q.$q$idField$q ${_fromSQL(table, encodedSQL)} '
         'WHERE $conditionSQL';
 
-    if (dialect.subqueryAsDerivedTable) {
+    if (derivedTable) {
       subquery =
           'SELECT ${q}rel_ids$q.$q$idField$q FROM ( $subquery ) '
           'as ${q}rel_ids$q';
@@ -3560,10 +3569,22 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         var relTable = relationship.relationshipTable;
         var relTableAlias = encodedSQL.resolveEntityAlias(relTable);
 
+        // The near side (the table of the relationship field): the main
+        // table, or a table joined before it (a to-many relationship of a
+        // to-one one: `owner.roles.type`), and the far side, [targetTable].
+        var nearIsSource = relationship.targetTable == targetTable;
+        var nearTable = nearIsSource
+            ? relationship.sourceTable
+            : relationship.targetTable;
+        var nearTableAlias = _conditionSQLGenerator.resolveEntityAlias(
+          encodedSQL,
+          nearTable,
+        );
+
         String sourceTableField;
         String sourceRelationshipField;
 
-        if (relationship.sourceTable == table) {
+        if (nearIsSource) {
           sourceTableField = relationship.sourceField;
           sourceRelationshipField = relationship.sourceRelationshipField;
         } else {
@@ -3594,7 +3615,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         join.write(' = ');
 
         join.write(q);
-        join.write(tableAlias);
+        join.write(nearTableAlias);
         join.write(q);
         join.write('.');
         join.write(q);
@@ -3649,7 +3670,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
         joins.add((
           defs: [relTableAlias, targetTableAlias],
-          refs: [tableAlias],
+          refs: [nearTableAlias],
           join: join.toString(),
         ));
       }
@@ -3720,6 +3741,7 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
       parameters: parameters,
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
+      forDelete: true,
       sqlBuilder: (String from, EncodingContext context) {
         var tableAlias = context.resolveEntityAlias(table);
 
