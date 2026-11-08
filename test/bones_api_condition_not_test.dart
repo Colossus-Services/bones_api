@@ -653,6 +653,71 @@ void main() {
       expect(matches('tags != "a"', ['a']), isFalse);
       expect(matches('tags != "a"', ['a', 'b']), isTrue);
     });
+
+    test('`==` / `!=` a list: compared as a whole (not `[x]` as `x`)', () {
+      // A literal:
+      expect(matches('tags == ["a"]', ['a']), isTrue);
+      expect(matches('tags == ["a"]', ['a', 'b']), isFalse);
+      expect(matches('tags != ["a"]', ['a', 'b']), isTrue);
+      expect(matches('tags == ["a", "b"]', ['a', 'b']), isTrue);
+
+      // A parameter:
+      expect(
+        matches(
+          'tags == ?',
+          ['a', 'b'],
+          [
+            ['a'],
+          ],
+        ),
+        isFalse,
+      );
+      expect(
+        matches(
+          'tags == ?',
+          ['a', 'b'],
+          [
+            ['a', 'b'],
+          ],
+        ),
+        isTrue,
+      );
+      expect(
+        matches(
+          'tags != ?',
+          ['a', 'b'],
+          [
+            ['a', 'b'],
+          ],
+        ),
+        isFalse,
+      );
+
+      // A binary field:
+      var data = Uint8List.fromList([7, 8, 9]);
+      expect(
+        matches('tags == ?', data, [
+          Uint8List.fromList([7, 8, 9]),
+        ]),
+        isTrue,
+      );
+      expect(
+        matches('tags == ?', data, [
+          Uint8List.fromList([7]),
+        ]),
+        isFalse,
+      );
+      expect(
+        matches('tags != ?', data, [
+          Uint8List.fromList([7, 8, 9]),
+        ]),
+        isFalse,
+      );
+
+      // `[]` is still `null` (`IS NULL`): an empty list is not `null`.
+      expect(matches('tags == []', <String>[]), isFalse);
+      expect(matches('tags == []', null), isTrue);
+    });
   });
 }
 

@@ -30,13 +30,22 @@ relationship field:
   of enums or of other classes); on SQL not by the DB's foreign keys (a
   to-one may have none, e.g. `User.photo`, a `String` ID).
 - `==`/`!=` with a single-element list is with its element, as SQL
-  already did: `store == [7]` is `store == 7` (memory matched none).
-- `==`/`!=`/`=~`/`!~` with an `EntityReference` (or an
-  `EntityReferenceList`) as a parameter compare its ID(s) (they matched
-  none; SQL: `IS NULL`).
+  already did: `store == [7]` is `store == 7` (memory matched none). Not
+  for a list or binary field (a `List<String>`, a `Uint8List`): it's
+  compared with the list as a whole (`tags == ["a"]` doesn't match
+  `["a", "b"]`).
+- An `EntityReference` (or an `EntityReferenceList`) as a parameter is
+  compared by its ID(s), with `=~`/`!~` (also of a path ending in a
+  reference: `owner.userInfo =~ ?`) and with `==`/`!=` (a reference, or a
+  reference list with up to 1 ID: as `== [1, 3]`, more IDs aren't a
+  single value). They matched none (SQL: `IS NULL`).
 - `== []` is `IS NULL` also for a list or binary field (an empty
   `List<String>`, an empty `Uint8List`, is not `== []`). A missing named
   parameter (`x =~ ?:a` without `a`) is a `null`: an empty set.
+- Memory: a path through a to-one not resolved (only its ID: an entity
+  stored by another adapter, or a missing row) is its ID for the ID field
+  (`photo.id`) and a `null` for other fields (`photo.data`), as a SQL outer
+  join; it failed.
 - Fix: `store == ?` with `[]` (a to-one entity) failed resolving `[]` as an
   entity's ID (memory). A list as a single entity's value: `[]` is `null`,
   `[x]` is `x`.
@@ -50,15 +59,9 @@ relationship field:
   failed resolving it as an entity.
 - `KeyConditionINBase.valuesAsList(null)` is `[]` (it was `[null]`).
 
-Known differences (unchanged):
+Tests:
 
-- 2 to-many relationships in one condition (`closedStores =~ [1] &&
-  stores =~ [2]`) fail on SQL (one relationship table is joined): see
-  1.33.0.
-- Matching entity objects (not a DB adapter: `Condition.matchesEntity`)
-  doesn't unpack an `EntityReferenceList` field to its IDs.
-
-- Tests: 'Relationship operators: by ID, on every adapter', on all the DB
+- 'Relationship operators: by ID, on every adapter', on all the DB
   adapters, with the expected results computed from a model (each entity's
   set of related IDs), each also checked through `!(...)`: `=~`/`!~` with
   `[]`, `null`, `[null]`, an ID, `[id]`, `[id1, id2]`, `[id, null]` (as
@@ -68,10 +71,24 @@ Known differences (unchanged):
   and `&&`/`||` combinations. Over a to-many `EntityReferenceList`
   (`Address.closedStores`), a to-many `List` (`Address.stores`), a to-one
   entity (`Store.owner`), a to-one `EntityReference` (`User.userInfo`), and
-  a to-one with a `String` ID without a foreign key (`User.photo`). And in 'Operators: the same results
-  on every adapter': `=~ null`, `!~ null`, `=~ [null]`, `== []`, `!= []`
-  and their parameters, over text, numbers, a to-one's and a to-many's
-  fields.
+  a to-one with a `String` ID without a foreign key (`User.photo`); a path
+  ending in a reference (`owner.userInfo`) with references as parameters;
+  and a to-many's `countByQuery` and `limit`/`offset` pages.
+- 'Operators: the same results on every adapter': `=~ null`, `!~ null`,
+  `=~ [null]`, `== []`, `!= []`, `== [v]`, `=~ [v]` and their parameters,
+  over text, numbers, a to-one's and a to-many's fields.
+- Unit: `==`/`!=` with a list on a list or binary field (as a whole).
+
+Known differences (unchanged):
+
+- 2 to-many relationships in one condition (`closedStores =~ [1] &&
+  stores =~ [2]`) fail on SQL (one relationship table is joined): see
+  1.33.0.
+- A `String` ID for an integer-ID relationship (`owner == ?` with `'1'`)
+  matches on SQL (the DB converts it), and not in memory (`'1'` isn't
+  `1`).
+- Matching entity objects (not a DB adapter: `Condition.matchesEntity`)
+  doesn't unpack an `EntityReferenceList` field to its IDs.
 
 ## 1.33.0
 

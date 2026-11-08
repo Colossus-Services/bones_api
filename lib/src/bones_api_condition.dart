@@ -1671,16 +1671,21 @@ abstract class KeyCondition<O, V> extends Condition<O> {
             null;
   }
 
-  /// The right side of a `==`/`!=` ([value]) as SQL compares it (any field):
-  /// - A list (also a parameter's) is a single value: `[]` is `null`
-  ///   (`== []` is `== null`, `IS NULL`), and `[x]` is `x` (`== [7]` is
-  ///   `== 7`).
+  /// The right side of a `==`/`!=` ([value]) as SQL compares it:
+  /// - `[]` (also a parameter's) is `null`: `== []` is `== null`
+  ///   (`IS NULL`), any field.
+  /// - A list as a single value, `[x]` is `x` (`== [7]` is `== 7`), unless
+  ///   the left side ([keyValue], the entity's) is itself a list field (a
+  ///   `List<String>`, a `Uint8List`; not a to-many relationship's values,
+  ///   see [hasToManyInKeyPath]): then the lists are compared as a whole.
   /// - An [EntityReference] (also a parameter's, or a list's element) is
   ///   its ID.
   ///
   /// Otherwise returns [value] unchanged (a [ConditionParameter] is then
   /// resolved while compared, as before).
   Object? _equalsRightValue(
+    Object? keyValue,
+    EntityHandler? entityHandler,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
@@ -1703,6 +1708,13 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     if (v is Iterable) {
       var list = v.toList();
       if (list.isEmpty) return null;
+
+      // A list field (not a to-many's values): compared as a whole, by
+      // [value] (a parameter is compared with [ConditionParameter.matches]).
+      var listField =
+          keyValue is Iterable && !hasToManyInKeyPath(entityHandler);
+      if (listField) return value;
+
       if (list.length == 1) {
         var e = list.first;
         return e is EntityReference ? e.id : e;
@@ -1857,6 +1869,12 @@ abstract class KeyCondition<O, V> extends Condition<O> {
               }
             }
           }).toList();
+        } else if (valueEntityHandler != null &&
+            (value as Object).isPrimitiveValue) {
+          // A related entity not resolved (only its ID: one stored by another
+          // adapter, or a missing row): its ID field is the ID; any other
+          // field is unknown, a `null` (as a SQL outer join's `NULL` row).
+          keyValue = keyName == valueEntityHandler.idFieldName() ? value : null;
         } else {
           throw StateError(
             "Can't access key[$keyName] for type: ${(value as Object?).runtimeTypeNameUnsafe}",
@@ -2048,6 +2066,8 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
 
     // `== []` is `== null`, `== [x]` is `== x` (see [_equalsRightValue]):
     var right = _equalsRightValue(
+      keyValue,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -2080,6 +2100,8 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
 
     // `== []` is `== null`, `== [x]` is `== x` (see [_equalsRightValue]):
     var right = _equalsRightValue(
+      keyValue?.value,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -2176,6 +2198,8 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   ) {
     // `!= []` is `!= null`, `!= [x]` is `!= x` (see [_equalsRightValue]):
     var right = _equalsRightValue(
+      keyValue,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -2558,9 +2582,19 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
       return not;
     }
 
+    // References on the right side (a path ending in a reference,
+    // `owner.userInfo =~ ?`): compared by their IDs, as SQL.
+    var rightValues =
+        _rightValuesWithReferencesAsIDs(
+          parameters,
+          positionalParameters,
+          namedParameters,
+        ) ??
+        value;
+
     bool inValues(Object? v) => inConditionValues(
       v,
-      value,
+      rightValues,
       parameters: parameters,
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
@@ -2574,6 +2608,50 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     }
 
     return inValues(keyValue) != not;
+  }
+
+  /// The right side of a `=~`/`!~` ([value]) with its parameters resolved,
+  /// and its [EntityReference]s (also an [EntityReferenceList]'s) as their
+  /// IDs (an empty reference: a `null` element). Returns `null` if there's
+  /// no reference: [value] is compared as before (its parameters resolved
+  /// while compared).
+  List<Object?>? _rightValuesWithReferencesAsIDs(
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    var hasReference = false;
+    var resolved = <Object?>[];
+
+    void add(Object? v) {
+      if (v is EntityReference) {
+        hasReference = true;
+        resolved.add(v.id);
+      } else if (v is EntityReferenceList) {
+        hasReference = true;
+        resolved.addAll(v.ids ?? const []);
+      } else if (v is Iterable) {
+        for (var e in v) {
+          add(e);
+        }
+      } else {
+        resolved.add(v);
+      }
+    }
+
+    for (var v in value) {
+      add(
+        v is ConditionParameter
+            ? v.getValue(
+                parameters: parameters,
+                positionalParameters: positionalParameters,
+                namedParameters: namedParameters,
+              )
+            : v,
+      );
+    }
+
+    return hasReference ? resolved : null;
   }
 
   /// A relationship's `=~`/`!~` (see [isRelationshipKey]): the left side

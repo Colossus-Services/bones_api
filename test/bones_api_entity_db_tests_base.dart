@@ -5951,6 +5951,9 @@ Future<bool> runAdapterTests(
           await check('$field == ?', [
             [id1],
           ], inSet([id1]));
+          await check('$field != ?', [
+            [id1],
+          ], where((r) => r.isEmpty || r.any((v) => v != id1)));
           await check('$field == ?', [entityParams.first], inSet([id1]));
           await check('$field != ?', [
             entityParams.first,
@@ -6239,6 +6242,40 @@ Future<bool> runAdapterTests(
           id2: uy.id!,
           entityParams: [ux, uy],
         );
+
+        // A path ending in a reference (`owner.userInfo`, not a
+        // relationship key): references as parameters are compared by
+        // their IDs too.
+        for (var (q, params, exp) in <(String, Object?, List<String>)>[
+          (
+            'owner.userInfo =~ ?',
+            [
+              [ux.userInfo],
+            ],
+            ['X'],
+          ),
+          (
+            'owner.userInfo =~ ?',
+            [
+              [ux.userInfo, uy.userInfo],
+            ],
+            ['X', 'Y'],
+          ),
+          ('owner.userInfo == ?', [ux.userInfo], ['X']),
+          ('owner.userInfo != ?', [ux.userInfo], ['Y', 'Z']),
+          (
+            'owner.userInfo !~ ?',
+            [
+              [ux.userInfo],
+            ],
+            ['Y', 'Z'],
+          ),
+        ]) {
+          var got = await selectStores(q, params);
+          if (got.join(',') != exp.join(',')) {
+            failures.add('`$q`  $params: $got, expected $exp');
+          }
+        }
 
         expect(failures, isEmpty, reason: failures.join('\n'));
       });
