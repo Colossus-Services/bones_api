@@ -105,6 +105,12 @@ Adapters clean-up (behavior-preserving):
 - `DBSQLMemoryAdapter` keeps its own relationship-tables resolution (it
   doesn't introspect a database).
 
+Dependencies:
+
+- `sqlite3: '>=3.8.0 <3.9.0'` (was `^3.8.0`): 3.9.0's build hook rejects
+  its native library download (a hash mismatch), so a VM run with it fails
+  before starting. The bound is raised again once a fixed release is out.
+
 Deprecated (still working):
 
 - `EntityHandler.graterThanValue`/`graterThanOrEqualValue`: use
