@@ -478,8 +478,12 @@ enum _Ordering {
   /// Compares [a] with [b] by the matching [EntityHandler] function.
   bool test(Object? a, Object? b, EntityHandler? entityHandler) =>
       switch (this) {
-        gt => EntityHandler.graterThanValue(a, b, entityHandler: entityHandler),
-        gte => EntityHandler.graterThanOrEqualValue(
+        gt => EntityHandler.greaterThanValue(
+          a,
+          b,
+          entityHandler: entityHandler,
+        ),
+        gte => EntityHandler.greaterThanOrEqualValue(
           a,
           b,
           entityHandler: entityHandler,
