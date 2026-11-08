@@ -449,25 +449,65 @@ class ConditionSQLEncoder extends ConditionEncoder {
     String operator, {
     bool valueAsList = false,
   }) {
-    var retKeySQL = keyToSQL(c, context);
+    // Only an `IN` list of a relationship ignores its `null`s:
+    var retRelationship = valueAsList ? _isRelationshipKey(c, context) : false;
 
-    return retKeySQL.resolveMapped((keySQL) {
-      var keyType = keySQL.key;
-      var tableKey = keySQL.value;
+    return retRelationship.resolveMapped((relationship) {
+      var retKeySQL = keyToSQL(c, context);
 
-      return encodeConditionValuesWithOperator(
-        context,
-        keyType,
-        null,
-        tableKey,
-        operator,
-        c.value,
-        valueAsList,
-        negated: c.isNegated,
-        nullable: !_isMainTableIDKey(c, context),
-        condition: c,
-      );
+      return retKeySQL.resolveMapped((keySQL) {
+        var keyType = keySQL.key;
+        var tableKey = keySQL.value;
+
+        return encodeConditionValuesWithOperator(
+          context,
+          keyType,
+          null,
+          tableKey,
+          operator,
+          c.value,
+          valueAsList,
+          negated: c.isNegated,
+          nullable: !_isMainTableIDKey(c, context),
+          condition: c,
+          nullsAsAbsent: relationship,
+        );
+      });
     });
+  }
+
+  /// If [c]'s key is a single relationship field of the main table: a
+  /// to-one (a referenced table's column) or a to-many (a relationship
+  /// table, no column). As memory's [KeyCondition.isRelationshipKey]: its
+  /// `IN` list is a set of related IDs, without `null`s (a relationship
+  /// never has a `null` ID), so `=~ null` matches none and `!~ null` all,
+  /// as `=~ []` / `!~ []`.
+  FutureOr<bool> _isRelationshipKey(KeyCondition c, EncodingContext context) {
+    var keys = c.keys;
+    if (keys.length != 1) return false;
+
+    var key = keys.first;
+    if (key is! ConditionKeyField) return false;
+
+    var schemeProvider = this.schemeProvider;
+    if (schemeProvider == null || _isMainTableIDKey(c, context)) return false;
+
+    return schemeProvider
+        .getTableScheme(context.tableNameOrEntityName)
+        .resolveMapped((tableScheme) {
+          if (tableScheme == null) return false;
+
+          // A to-one: a column referencing another table.
+          if (tableScheme.getFieldReferencedTable(key.name) != null) {
+            return true;
+          }
+
+          // A to-many: no column (a relationship table, see
+          // [keyFieldToSQL]).
+          var tableFieldName = tableScheme.resolveTableFieldName(key.name);
+          return tableFieldName == null ||
+              !tableScheme.fieldsTypes.containsKey(tableFieldName);
+        });
   }
 
   /// If [c]'s key is the ID of the main table (never `NULL`).
@@ -505,6 +545,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
     bool negated = false,
     bool nullable = true,
     Condition? condition,
+    bool nullsAsAbsent = false,
   }) {
     // The encoding value rather than only its text: a null supplied as a
     // parameter encodes to a placeholder, so the text alone cannot say whether
@@ -529,7 +570,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
         // An empty list (`x =~ []`, or a parameter's `[]`): `IN` matches
         // nothing and `NOT IN` everything, also a `NULL` (as in memory). It
         // is not a `null` (`x =~ null` and `[null]` are `IS NULL`, and arrive
-        // as a list with a `null`).
+        // as a list with a `null`), except for a relationship
+        // ([nullsAsAbsent], below).
         if (elements.isEmpty) {
           context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
           return context;
@@ -546,7 +588,20 @@ class ConditionSQLEncoder extends ConditionEncoder {
             }
           }
 
-          if (nonNulls.isEmpty) {
+          if (nullsAsAbsent) {
+            // A relationship's set of IDs ([_isRelationshipKey]): its `null`s
+            // aren't IDs. Without any other, an empty set (as `[]`).
+            if (nonNulls.isEmpty) {
+              context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
+              return context;
+            }
+            value = EncodingValueList(
+              value.key,
+              value.type,
+              nonNulls,
+              encodeEncodingValueList,
+            );
+          } else if (nonNulls.isEmpty) {
             value = EncodingValueNull(
               value.key,
               value.type,
@@ -562,6 +617,15 @@ class ConditionSQLEncoder extends ConditionEncoder {
             );
           }
         }
+      }
+
+      // A relationship's `IN` a `null` (not a list): an empty set of IDs.
+      if (nullsAsAbsent &&
+          (operator == 'IN' || operator == 'NOT IN') &&
+          isNullEncodingValue(value, context)) {
+        _markPlaceholderInlinedAsNull(value, context);
+        context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
+        return context;
       }
 
       if (isNullEncodingValue(value, context)) {

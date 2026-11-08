@@ -5326,8 +5326,10 @@ Future<bool> runAdapterTests(
         await s('owner != ?', {'s2', 's3', 's4', 's5'}, [ia]);
         await s('owner == null', {'s2'});
         await s('owner != null', {'s1', 's3', 's4', 's5'});
-        await s('owner =~ null', {'s2'});
-        await s('owner !~ null', {'s1', 's3', 's4', 's5'});
+        // A relationship's `=~`/`!~` is with a set of IDs, never `null`:
+        // `null` is an empty set (see 'Relationship operators').
+        await s('owner =~ null', {});
+        await s('owner !~ null', allStores);
         await s(
           'owner =~ ?',
           {'s1', 's4'},
@@ -5461,7 +5463,8 @@ Future<bool> runAdapterTests(
         // Each entity's own `null`s:
         await nullSplit(selectStores, allStores, 'name', {});
         await nullSplit(selectStores, allStores, 'number', {'s2'});
-        await nullSplit(selectStores, allStores, 'owner', {'s2'});
+        // (Not `owner`: a relationship's `=~ [null]` is an empty set of IDs,
+        // see above.)
 
         // A single value (not a list) with `=~`/`!~`:
         await s('name =~ "ox-apple"', {'s1'});
@@ -5756,6 +5759,285 @@ Future<bool> runAdapterTests(
         if ((await addressRepo.selectByID(ax1ID))?.id != ax1ID) {
           failures.add('delete address: $ax1ID was deleted');
         }
+
+        expect(failures, isEmpty, reason: failures.join('\n'));
+      });
+
+      test('Relationship operators: by ID, on every adapter', () async {
+        final userRepo = entityRepositoryProvider.userAPIRepository;
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        final addressRepo = entityRepositoryProvider.addressAPIRepository;
+
+        var failures = <String>[];
+
+        // The expected results come from a model: each entity's set of
+        // related IDs. A relationship is compared by its related IDs, and
+        // never has a `null` ID:
+        // - `=~ S`: any related ID in `S` (without `null`s: `[]`, `null`,
+        //   `[null]` are an empty set, which matches none).
+        // - `!~ S`: an empty `S` matches all; otherwise without related
+        //   entities, or any related ID not in `S` (as a SQL join of its
+        //   rows).
+        // - `== null` / `== []`: without related entities; `!=`: with some.
+        // - `== v`: any related ID is `v`; `!= v`: without related
+        //   entities, or any related ID isn't `v`.
+        Future<void> relationship({
+          required String field,
+          required Map<String, Set<Object>> model,
+          required Future<List<String>> Function(String q, Object? params)
+          select,
+          required Object id1,
+          required Object id2,
+          required List<Object> entityParams,
+        }) async {
+          var all = model.keys.toSet();
+
+          Set<String> where(bool Function(Set<Object> ids) f) => {
+            for (var e in model.entries)
+              if (f(e.value)) e.key,
+          };
+
+          Set<String> inSet(Iterable<Object?> s) {
+            var ids = s.nonNulls.toSet();
+            return where((r) => r.any(ids.contains));
+          }
+
+          Set<String> notInSet(Iterable<Object?> s) {
+            var ids = s.nonNulls.toSet();
+            if (ids.isEmpty) return all;
+            return where((r) => r.isEmpty || r.any((v) => !ids.contains(v)));
+          }
+
+          var none = where((r) => r.isEmpty);
+          var some = where((r) => r.isNotEmpty);
+
+          Future<void> check(String q, Object? params, Set<String> exp) async {
+            var p = params == null ? '' : '  $params';
+            for (var (query, expected) in [
+              (q, exp),
+              ('!($q)', all.difference(exp)),
+            ]) {
+              var expList = expected.toList()..sort();
+              try {
+                var got = await select(query, params);
+                if (got.join(',') != expList.join(',')) {
+                  failures.add(
+                    '`$query`$p: [${got.join(',')}], expected $expList',
+                  );
+                }
+              } catch (e) {
+                failures.add('`$query`$p: ERROR $e');
+              }
+            }
+          }
+
+          // The sets: literals, and parameters (positional and named).
+          var sets = <(String, List<Object?>)>[
+            ('[]', []),
+            ('null', [null]),
+            ('[null]', [null]),
+            ('$id1', [id1]),
+            ('[$id1]', [id1]),
+            ('[$id1, $id2]', [id1, id2]),
+            ('[$id2, null]', [id2, null]),
+          ];
+          for (var (literal, s) in sets) {
+            await check('$field =~ $literal', null, inSet(s));
+            await check('$field !~ $literal', null, notInSet(s));
+          }
+
+          var params = <(Object?, List<Object?>)>[
+            (<Object>[], []),
+            (null, [null]),
+            ([null], [null]),
+            (id1, [id1]),
+            ([id1], [id1]),
+            ([id1, id2], [id1, id2]),
+            ([id2, null], [id2, null]),
+          ];
+          for (var (param, s) in params) {
+            await check('$field =~ ?', [param], inSet(s));
+            await check('$field !~ ?', [param], notInSet(s));
+            await check('$field =~ ?:ids', {'ids': param}, inSet(s));
+            await check('$field !~ ?:ids', {'ids': param}, notInSet(s));
+          }
+
+          // Entities as parameters (compared by their IDs):
+          await check('$field =~ ?', [entityParams.first], inSet([id1]));
+          await check('$field =~ ?', [entityParams], inSet([id1, id2]));
+          await check('$field !~ ?', [entityParams], notInSet([id1, id2]));
+
+          // `==` / `!=`: `null` and `[]` are "without related entities":
+          for (var literal in ['null', '[]']) {
+            await check('$field == $literal', null, none);
+            await check('$field != $literal', null, some);
+          }
+          for (var param in [null, <Object>[]]) {
+            await check('$field == ?', [param], none);
+            await check('$field != ?', [param], some);
+            await check('$field == ?:v', {'v': param}, none);
+            await check('$field != ?:v', {'v': param}, some);
+          }
+          for (var id in [id1, id2]) {
+            await check('$field == $id', null, where((r) => r.contains(id)));
+            await check(
+              '$field != $id',
+              null,
+              where((r) => r.isEmpty || r.any((v) => v != id)),
+            );
+            await check('$field == ?', [id], where((r) => r.contains(id)));
+          }
+        }
+
+        // A to-many `EntityReferenceList` (`Address.closedStores`) and a
+        // to-many `List` (`Address.stores`):
+        var sc1 = Store('rk-c1', 1);
+        var sc2 = Store('rk-c2', 2);
+        var sc3 = Store('rk-c3', 3);
+        for (var s in [sc1, sc2, sc3]) {
+          await storeRepo.store(s);
+        }
+
+        var addresses = {
+          'A': Address(
+            'RK',
+            'RK A',
+            'RK Street',
+            1,
+            stores: [Store('rk-a1', 1)],
+            closedStores: [sc1],
+          ),
+          'B': Address(
+            'RK',
+            'RK B',
+            'RK Street',
+            2,
+            stores: [Store('rk-b1', 2), Store('rk-b2', 3)],
+            closedStores: [sc1, sc2],
+          ),
+          'C': Address('RK', 'RK C', 'RK Street', 3),
+        };
+        var addressNames = <Object, String>{};
+        for (var e in addresses.entries) {
+          addressNames[(await addressRepo.store(e.value))!] = e.key;
+        }
+
+        Future<List<String>> selectAddresses(String q, Object? params) async =>
+            (await addressRepo.selectByQuery(
+              q,
+              parameters: params,
+            )).map((e) => addressNames[e.id]).nonNulls.toList()..sort();
+
+        Set<Object> ids(Iterable<Store> stores) =>
+            stores.map((s) => s.id!).toSet();
+
+        await relationship(
+          field: 'closedStores',
+          model: {
+            'A': {sc1.id!},
+            'B': {sc1.id!, sc2.id!},
+            'C': {},
+          },
+          select: selectAddresses,
+          id1: sc1.id!,
+          id2: sc2.id!,
+          entityParams: [sc1, sc2],
+        );
+
+        var aStores = addresses['A']!.stores;
+        var bStores = addresses['B']!.stores;
+        await relationship(
+          field: 'stores',
+          model: {'A': ids(aStores), 'B': ids(bStores), 'C': {}},
+          select: selectAddresses,
+          id1: aStores.first.id!,
+          id2: bStores.first.id!,
+          entityParams: [aStores.first, bStores.first],
+        );
+
+        // A to-one entity (`Store.owner`) and a to-one `EntityReference`
+        // (`User.userInfo`):
+        var alpha = Address('RK', 'RK User', 'RK Street', 9);
+        var users = {
+          'X': User(
+            'rk-x@$testDomain',
+            'p',
+            alpha,
+            [],
+            userInfo: UserInfo('rk-x'),
+            creationTime: DateTime.utc(2020),
+          ),
+          'Y': User(
+            'rk-y@$testDomain',
+            'p',
+            alpha,
+            [],
+            userInfo: UserInfo('rk-y'),
+            creationTime: DateTime.utc(2020),
+          ),
+          'Z': User(
+            'rk-z@$testDomain',
+            'p',
+            alpha,
+            [],
+            creationTime: DateTime.utc(2020),
+          ),
+        };
+        var userNames = <Object, String>{};
+        for (var e in users.entries) {
+          userNames[(await userRepo.store(e.value))!] = e.key;
+        }
+
+        Future<List<String>> selectUsers(String q, Object? params) async =>
+            (await userRepo.selectByQuery(
+              q,
+              parameters: params,
+            )).map((e) => userNames[e.id]).nonNulls.toList()..sort();
+
+        var (ux, uy) = (users['X']!, users['Y']!);
+        var infoX = ux.userInfo.id!;
+        var infoY = uy.userInfo.id!;
+        await relationship(
+          field: 'userInfo',
+          model: {
+            'X': {infoX},
+            'Y': {infoY},
+            'Z': {},
+          },
+          select: selectUsers,
+          id1: infoX,
+          id2: infoY,
+          entityParams: [ux.userInfo.entity!, uy.userInfo.entity!],
+        );
+
+        var stores = {
+          'X': Store('rk-sx', 1, owner: ux),
+          'Y': Store('rk-sy', 2, owner: uy),
+          'Z': Store('rk-sz', 3),
+        };
+        var storeNames = <Object, String>{};
+        for (var e in stores.entries) {
+          storeNames[(await storeRepo.store(e.value))!] = e.key;
+        }
+
+        Future<List<String>> selectStores(String q, Object? params) async =>
+            (await storeRepo.selectByQuery(
+              q,
+              parameters: params,
+            )).map((e) => storeNames[e.id]).nonNulls.toList()..sort();
+
+        await relationship(
+          field: 'owner',
+          model: {
+            'X': {ux.id!},
+            'Y': {uy.id!},
+            'Z': {},
+          },
+          select: selectStores,
+          id1: ux.id!,
+          id2: uy.id!,
+          entityParams: [ux, uy],
+        );
 
         expect(failures, isEmpty, reason: failures.join('\n'));
       });
