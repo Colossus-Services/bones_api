@@ -614,7 +614,7 @@ void main() {
 
   group('An empty list field (not a to-many relationship)', () {
     // Only an empty to-many relationship is a `null` row (see
-    // `KeyCondition.isToManyKey`): an empty list field is a value, not a
+    // `KeyCondition.hasToManyInKeyPath`): an empty list field is a value, not a
     // `null`.
     bool matches(String query, Object? value, [Object? parameters]) =>
         Condition.parse(query)

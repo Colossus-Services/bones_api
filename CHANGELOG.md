@@ -33,7 +33,7 @@ changes:
   - `roles.type == ?` with a list parameter (`[['guest']]`, `[[null]]`)
     compares each related entity's value with it, as a field's
     `number == ?` does (it matched nothing).
-  - Only a to-many relationship (`KeyCondition.isToManyKey`, by the
+  - Only a to-many relationship (`KeyCondition.hasToManyInKeyPath`, by the
     declared field types): an empty list field (`List<String>`,
     `Uint8List`) is still a value, not a `null`.
 - Memory fix: `deleteByQuery` through a to-many relationship, of a table

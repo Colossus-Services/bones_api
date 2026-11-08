@@ -1498,38 +1498,44 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   bool get isInner => !isNegated && super.isInner;
 
   /// If [keyValue] is an empty list reached through a to-many relationship
-  /// (see [isToManyKey]): an entity without related entities.
+  /// (see [hasToManyInKeyPath]): an entity without related entities.
   bool _isEmptyToMany(Object? keyValue, EntityHandler? entityHandler) =>
-      keyValue is Iterable && keyValue.isEmpty && isToManyKey(entityHandler);
+      keyValue is Iterable &&
+      keyValue.isEmpty &&
+      hasToManyInKeyPath(entityHandler);
 
-  /// A cache of [isToManyKey]: the [EntityHandler] whose result is cached in
-  /// [_isToManyKeyCacheResult].
+  /// A cache of [hasToManyInKeyPath]: the [EntityHandler] whose result is cached in
+  /// [_hasToManyInKeyPathCacheResult].
   ///
-  /// Why: [isToManyKey] is called for every entity matched (an in-memory
+  /// Why: [hasToManyInKeyPath] is called for every entity matched (an in-memory
   /// select checks each row), and resolving it walks the [keys] through the
   /// entity handlers' field types. The result depends only on the [keys]
   /// (fixed) and the [EntityHandler] (the same for every row of a query), so
   /// it's computed once per handler. A different handler (the same parsed
   /// [Condition] used for another entity type, or none) recomputes it.
-  EntityHandler? _isToManyKeyCacheHandler;
+  EntityHandler? _hasToManyInKeyPathCacheHandler;
 
-  /// The cached [isToManyKey] of [_isToManyKeyCacheHandler] (`null`: not
+  /// The cached [hasToManyInKeyPath] of [_hasToManyInKeyPathCacheHandler] (`null`: not
   /// computed yet).
-  bool? _isToManyKeyCacheResult;
+  bool? _hasToManyInKeyPathCacheResult;
 
-  /// If the [keys] path goes through a to-many relationship (a field
-  /// declared as a list of entities or references, e.g. `roles` or
-  /// `owner.roles.type`), resolved by the declared field types of
-  /// [entityHandler]'s entity (not by the values: a to-many without related
-  /// entities is an empty list, as an empty list field).
+  /// If any key of the [keys] path, not only the last one, is a to-many
+  /// relationship (a field declared as a list of entities or references):
+  /// `roles` (the last key), `roles.type` and `owner.roles.type` (a key
+  /// before the last). Then the key's value is a list, one value per
+  /// related entity.
+  ///
+  /// Resolved by the declared field types of [entityHandler]'s entity (not
+  /// by the values: a to-many without related entities is an empty list, as
+  /// an empty list field).
   ///
   /// A list field that is not a relationship (`List<String> tags`, a
   /// `Uint8List`) is not a to-many: its value is compared as a whole.
   ///
-  /// Cached per [entityHandler] (see [_isToManyKeyCacheHandler]).
-  bool isToManyKey(EntityHandler? entityHandler) {
-    if (identical(entityHandler, _isToManyKeyCacheHandler)) {
-      return _isToManyKeyCacheResult ?? false;
+  /// Cached per [entityHandler] (see [_hasToManyInKeyPathCacheHandler]).
+  bool hasToManyInKeyPath(EntityHandler? entityHandler) {
+    if (identical(entityHandler, _hasToManyInKeyPathCacheHandler)) {
+      return _hasToManyInKeyPathCacheResult ?? false;
     }
 
     var toMany = false;
@@ -1548,8 +1554,8 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       handler = _resolveValueEntityHandler(type, handler);
     }
 
-    _isToManyKeyCacheHandler = entityHandler;
-    _isToManyKeyCacheResult = toMany;
+    _hasToManyInKeyPathCacheHandler = entityHandler;
+    _hasToManyInKeyPathCacheResult = toMany;
     return toMany;
   }
 
@@ -1559,7 +1565,7 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   /// In `roles.type == "admin"`:
   /// - [keyValue] is the left side: the value of the [keys] (`roles.type`)
   ///   in the entity being matched. Through a to-many relationship (see
-  ///   [isToManyKey]) it's a list, one value per related entity
+  ///   [hasToManyInKeyPath]) it's a list, one value per related entity
   ///   (`[admin, guest]`).
   /// - [compare] compares one left-side value with the right side: this
   ///   condition's [value] (`"admin"`), or its [ConditionParameter]'s value
@@ -1584,7 +1590,7 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     EntityHandler? entityHandler,
     bool Function(Object? leftValue) compare,
   ) {
-    if (keyValue is Iterable && isToManyKey(entityHandler)) {
+    if (keyValue is Iterable && hasToManyInKeyPath(entityHandler)) {
       return keyValue.isEmpty ? compare(null) : keyValue.any(compare);
     }
     return compare(keyValue);
