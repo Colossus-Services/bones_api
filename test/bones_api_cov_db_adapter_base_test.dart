@@ -460,8 +460,13 @@ void main() {
       var info = adapter.registeredEntityRepositoriesInformation;
       expect(info.keys.map((r) => r.name), containsAll(['user_info', 'role']));
 
-      var tables = await adapter.getEntityRepositoresTables();
+      var tables = await adapter.getEntityRepositoriesTables();
       expect(tables.values, containsAll(['user_info', 'role']));
+
+      // The deprecated (typo) name is kept as an alias:
+      // ignore: deprecated_member_use_from_same_package
+      var tablesDeprecated = await adapter.getEntityRepositoresTables();
+      expect(tablesDeprecated, equals(tables));
 
       expect(
         adapter.registeredEntityRepositories.map((e) => e.name),
