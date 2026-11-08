@@ -85,7 +85,7 @@ class UserModule extends APIModule {
   );
 
   Future<APIResponse<Map>> getContextEntityResolutionRules() async {
-    var contextProvider = EntityRulesResolver.cotextProviders.first;
+    var contextProvider = EntityRulesResolver.contextProviders.first;
     var resolutionRules = contextProvider.getContextEntityResolutionRules();
     return APIResponse.ok({
       'context.resolutionRules': resolutionRules?.toJson(),

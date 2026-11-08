@@ -848,8 +848,7 @@ class _FileStat implements WithMemorySize {
   }
 }
 
-abstract class _CachedResponse
-    implements WithMemorySize, Comparable<_CachedResponse> {
+abstract class _CachedResponse implements WithMemorySize {
   final int statusCode;
   final String path;
 
@@ -966,19 +965,12 @@ abstract class _CachedResponse
 
   bool validate(Request request);
 
-  @override
-  int compareTo(_CachedResponse other) => _compareUsageAndMemory(
-    usageCount,
-    memorySize,
-    other.usageCount,
-    other.memorySize,
-  );
-
   /// Compares two cache entries (a response and its compressed
-  /// alternatives) as [compareTo] compares two responses, using the totals
-  /// of each entry ([usageCount] and [memorySize] summed): the entry is
-  /// stored and evicted as a whole. Used to sort the eviction candidates in
-  /// `APIServerResponseCache._checkMaxMemorySize`.
+  /// alternatives) by the totals of each entry ([usageCount] and
+  /// [memorySize] summed): the entry is stored and evicted as a whole. Used
+  /// to sort the eviction candidates in
+  /// `APIServerResponseCache._checkMaxMemorySize`. (Responses aren't sorted
+  /// one by one: an entry's alternatives are evicted together.)
   static int compareEntries(
     List<_CachedResponse> entries1,
     List<_CachedResponse> entries2,
@@ -989,7 +981,7 @@ abstract class _CachedResponse
     entries2.map((e) => e.memorySize).sum,
   );
 
-  /// The order of [compareTo] and [compareEntries], the eviction order of
+  /// The order of [compareEntries], the eviction order of
   /// `APIServerResponseCache._checkMaxMemorySize` (it evicts from the
   /// first): the least used first (usage in buckets of 1000, ascending),
   /// then, among equally used, the largest first (memory size in buckets of

@@ -1179,8 +1179,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     // Unlike a select (`sql.namedParameters ?? sql.parametersByPlaceholder`,
     // see `_selectEntries`), a delete matches with the
-    // `parametersByPlaceholder` only: intentionally not unified (it's the
-    // established behavior of each).
+    // `parametersByPlaceholder` only (the condition's values as encoded for
+    // its SQL). The difference predates this code and its reason isn't
+    // recorded; it's kept, not unified, because unifying could change which
+    // entries a delete matches when the caller's named parameters differ
+    // from the encoded ones (a behavior change, out of a refactor's scope).
     if (noReferences) {
       var entries = candidates.where((e) {
         return sql.condition!.matchesEntityMap(

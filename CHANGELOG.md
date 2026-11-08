@@ -8,14 +8,13 @@ API/server layer clean-up (behavior-preserving):
   `_errorResponse`). The `CORS` headers are set once (they were set again
   when building the headers).
 - Request payload: one `_readPayloadBytes` for text and binary payloads, one
-  `maxPayloadLength` check (no copy of a single `Uint8List` block).
+  `maxPayloadLength` check, done before copying the blocks (a single
+  `Uint8List` block is still used as is).
 - `APIServer.toAPIRequest`: headers and query parameters flattened by one
   helper. New constants: `APIServer.sessionIDCookieName` (`SESSIONID`),
   `headerServerTiming`, `headerKeepAlive`, `headerContentLength`,
   `headerXAPIServerWorker`; `APIRoot.apiInfoRoute` (`API-INFO`) and
   `APIRoot.defaultAuthenticationRoute` (`authenticate`).
-- `APIServerConfig.normalizeHeaderValue`: the `k3` path key is used (it was
-  ignored).
 - `APISecurity`: one `resolveMapped` chain resolving a token's credential;
   the `disposeAuthentication*` methods share one helper.
 - `APIRoot`: the default-module fallback shared by `acceptsRequest` and the
@@ -81,6 +80,30 @@ Adapters clean-up (behavior-preserving):
   `newSelectOperation`; `getEntityRepositoriesTables` (the typo
   `getEntityRepositoresTables` kept, `@Deprecated`).
 - Cache fields named `*Cache` and documented.
+- New API (for subclasses of the adapters):
+  - `DBSQLAdapter`: `@protected` `openTransactionWithPool`,
+    `listTablesNamesImpl`, `findFieldsReferencedTablesImpl` (default: throw
+    `UnsupportedError`, for an adapter that doesn't introspect a database),
+    `listTablesNamesCached`, `findFieldsReferencedTablesCached`,
+    `findRelationshipTables`, `autoInsertAfterNoopUpdate`; the static
+    `sqlStringLiteral`.
+  - `DBSQLAdapter` defaults for what was abstract: `cancelTransaction`
+    (`true`), `closeTransaction` (nothing), `callCloseTransactionRequired`
+    (`false`), `cancelTransactionResultWithError` (`false`),
+    `throwTransactionResultWithError` (`true`), the behavior of a pooled
+    driver whose transaction callback commits or rolls back (as the
+    PostgreSQL, MySQL and SQLite adapters): a subclass that relied on them
+    being abstract now inherits these.
+  - `DBObjectAdapter`: `@protected` `executeOperation`,
+    `normalizeEntityJSON`, `normalizeObjectID`, `normalizeTableName`,
+    `getTableIDFieldName`, `applyTableOrderAndPagination`,
+    `createAdapterException`, `encodeBytesAsDataURL`, `adapterLogger`,
+    `onTransactionContextCanceled`, `onTransactionContextClosed`.
+  - The object adapters' `openTransaction` stays typed as their context
+    (synchronous); `cancelTransaction` of the MySQL/SQLite adapters stays
+    `bool`.
+- `DBSQLMemoryAdapter` keeps its own relationship-tables resolution (it
+  doesn't introspect a database).
 
 Deprecated (still working):
 
@@ -104,7 +127,11 @@ Fixes:
   without subtracting its memory size from `totalMemorySize`.
 - `APIServerConfig`: the user directory (Let's Encrypt paths) fell back to
   `Directory('~/')`, a literal `~` directory, not the home: it's resolved
-  from `HOME`/`USERPROFILE` only (`resolveUserDirectory`).
+  from the environment only (`resolveUserDirectory`): `USERPROFILE` then
+  `HOME` on Windows, `HOME` then `USERPROFILE` elsewhere (other platforms,
+  e.g. Android, used to have none).
+- `APIServerConfig.normalizeHeaderValue`: the `k3` path key was ignored (a
+  value at a 4-key config path returned the default): now used.
 - `APIServer`: the JSON-decode error log printed the stack trace in place
   of the invalid payload (a shadowed `catch` variable).
 - `IdenticalSet`: grouped elements by `hashCode`, missing an element whose
@@ -131,8 +158,11 @@ Fixes:
 - `EntityAccessRules` `==`/`hashCode`: `entityFields` compared element-wise
   (it was identity).
 - `EntityResolutionRules` with `allEager` and `allLazy` both `true`: invalid
-  (`validate` and `merge` throw `ValidateEntityRulesError`);
-  `isEagerEntityType`/`isLazyEntityType` recursed forever on it.
+  (`validate` throws `ValidateEntityRulesError`);
+  `isEagerEntityType`/`isLazyEntityType` recursed forever on it. A `merge`
+  of one side's `allEager` with the other's `allLazy` drops the conflict as
+  a same-flag one: both sides tolerant, both flags dropped; one tolerant, it
+  yields its flag; neither, it throws.
 - `DBPostgreSQLAdapter.doCountSQL`: a result without a row threw a
   `StateError`: now `0`, as the SQLite and MySQL adapters.
 - `DBPostgreSQLAdapter`: the ID sequence fix after an update's auto-insert
@@ -141,8 +171,10 @@ Fixes:
 - `DBPostgreSQLAdapter`, `DBMySQLAdapter`: the schema introspection
   queries interpolated the table (and database) names into SQL string
   literals unescaped: a `'` in a name broke (or changed) the query. Now
-  escaped by `DBSQLAdapter.sqlStringLiteral` (the queries are otherwise
-  the same).
+  escaped by `DBSQLAdapter.sqlStringLiteral`: the `'` doubled, and for
+  MySQL (`DBMySQLAdapter.mysqlStringLiteral`; its default `sql_mode` makes
+  `\` an escape in literals) also the `\`. The queries are otherwise the
+  same (MySQL's foreign keys query lost two trailing spaces).
 
 ## 1.34.0
 

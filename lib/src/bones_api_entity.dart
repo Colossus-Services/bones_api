@@ -8054,6 +8054,9 @@ class TransactionOperationSubTransaction<O> extends TransactionOperation {
          transaction: parentTransaction,
        );
 
+  /// The [toStringSimple]/[toString] prefix of a sub-transaction
+  /// ([_describe]): with its full class name, as it always was (not the
+  /// `TransactionOperation[...]` of the other operations).
   String get _describeSubTransaction =>
       _describe(className: 'TransactionOperationSubTransaction');
 
@@ -8385,9 +8388,10 @@ enum TransactionOperationType {
 }
 
 extension TransactionOperationTypeExtension on TransactionOperationType {
-  /// The same as [Enum.name] (each value's name is its identifier). Kept as
-  /// public API; a call on a [TransactionOperationType] value resolves to
-  /// [Enum.name] anyway (an instance member wins over an extension's).
+  /// The same as [Enum.name] (each value's name is its identifier), kept as
+  /// public API. (`Enum.name` is itself an extension of the SDK, `EnumName`:
+  /// on a [TransactionOperationType] value this more specific extension is
+  /// the one called, so it returns the same value as before.)
   String get name => (this as Enum).name;
 
   /// `true` for an operation that only reads.

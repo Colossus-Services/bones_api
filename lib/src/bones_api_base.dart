@@ -2285,10 +2285,12 @@ class APIRequest extends APIMetricSet with APIPayload {
     return idx >= 0 && idx < length ? _pathParts[idx] : '';
   }
 
-  String? _lastPathPart;
+  /// A cache of [lastPathPart]: the request's path doesn't change, and the
+  /// last path part is read on every routing of the request.
+  String? _lastPathPartCache;
 
   /// Returns the last [pathParts]. Sames as [pathPartReversed] for index `0`.
-  String get lastPathPart => _lastPathPart ??= pathPartReversed(0);
+  String get lastPathPart => _lastPathPartCache ??= pathPartReversed(0);
 
   /// Returns from [parameters] a value for [name1]. Defaults to [def] if defined.
   V? getParameter<V>(String name1, [V? def]) {

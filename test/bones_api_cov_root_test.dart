@@ -623,16 +623,16 @@ void main() {
         var copyResult = await Isolate.run(() async {
           // A new `Isolate`: nothing initialized yet for the copy.
           var noRequest = root.getCurrentAPIRequest();
-          var providers0 = EntityRulesResolver.cotextProviders.length;
+          var providers0 = EntityRulesResolver.contextProviders.length;
 
           // In the zone of this point (as an `APIServerWorker` start):
           root.initializeIsolateCopy();
-          var providers1 = EntityRulesResolver.cotextProviders.length;
+          var providers1 = EntityRulesResolver.contextProviders.length;
 
           var field = root.currentAPIRequest;
           root.initializeIsolateCopy(); // Idempotent.
           var sameField = identical(root.currentAPIRequest, field);
-          var providers2 = EntityRulesResolver.cotextProviders.length;
+          var providers2 = EntityRulesResolver.contextProviders.length;
 
           var res = await root.call(APIRequest.get('/cov/zone'));
           return '${root.isAuxiliaryInstance}|$noRequest|'
@@ -647,7 +647,7 @@ void main() {
         // (not an error).
         var copyResult2 = await Isolate.run(() async {
           var res = await root.call(APIRequest.get('/cov/zone'));
-          return '${res.payload}|${EntityRulesResolver.cotextProviders.length}';
+          return '${res.payload}|${EntityRulesResolver.contextProviders.length}';
         });
         expect(copyResult2, equals('cov-root-isolate-copy|true|1'));
 
@@ -676,12 +676,12 @@ void main() {
       var root = _CovRoot('cov-root-closed-provider');
 
       await root.ensureInitialized();
-      var registered = EntityRulesResolver.cotextProviders.length;
+      var registered = EntityRulesResolver.contextProviders.length;
 
       root.prepareForIsolateCopy();
       root.close();
       expect(
-        EntityRulesResolver.cotextProviders.length,
+        EntityRulesResolver.contextProviders.length,
         equals(registered - 1),
       );
 
@@ -689,7 +689,7 @@ void main() {
       root.modules;
       root.initializeIsolateCopy();
       expect(
-        EntityRulesResolver.cotextProviders.length,
+        EntityRulesResolver.contextProviders.length,
         equals(registered - 1),
       );
     });
