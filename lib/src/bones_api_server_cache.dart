@@ -194,11 +194,13 @@ class APIServerResponseCache {
     _log.info(
       () => "REMOVED $key > File modified: ${prev.file?.path ?? key.path}",
     );
-    _cachedResponses.remove(key);
+    // Through `_remove`, so the memory size of the removed entries is
+    // subtracted from the total (it was leaked by a direct map removal):
+    _remove(key);
 
     if (key.statusCode == 200) {
       var key304 = _CachedResponseKey(304, key.path);
-      var prev304 = _cachedResponses.remove(key304);
+      var prev304 = _remove(key304);
       if (prev304 != null) {
         _log.info(
           () =>
@@ -251,7 +253,9 @@ class APIServerResponseCache {
     return true;
   }
 
-  void _remove(_CachedResponseKey key) {
+  /// Removes the entry of [key] (with all its alternatives), subtracting its
+  /// memory size from the total. Returns the removed value, if any.
+  Object? _remove(_CachedResponseKey key) {
     var prev = _cachedResponses.remove(key);
 
     if (prev != null) {
@@ -263,6 +267,8 @@ class APIServerResponseCache {
         }
       }
     }
+
+    return prev;
   }
 
   bool _checkMaxMemorySize() {
@@ -270,28 +276,33 @@ class APIServerResponseCache {
 
     var targetMemory = maxMemorySize * 0.80;
 
-    var cachedResponses = _cachedResponses.values.toList();
-    cachedResponses.sort();
+    // Sorted per entry (key), not per value: a value with compressed
+    // alternatives is a `List<_CachedResponse>`, which isn't `Comparable`
+    // (sorting the raw values threw a `TypeError`).
+    var evictionCandidates = _cachedResponses.entries
+        .map((e) => (key: e.key, cachedEntries: e.value.asCachedEntries!))
+        .toList();
+
+    evictionCandidates.sort(
+      (a, b) =>
+          _CachedResponse.compareEntries(a.cachedEntries, b.cachedEntries),
+    );
 
     var totalRemoved = 0;
     var totalMemoryRemoved = 0;
 
-    for (var entry in cachedResponses) {
-      var cachedEntries = entry.asCachedEntries;
+    for (var (:key, :cachedEntries) in evictionCandidates) {
+      for (var cached in cachedEntries) {
+        ++totalRemoved;
+        totalMemoryRemoved += cached.memorySize;
+      }
 
-      if (cachedEntries != null && cachedEntries.isNotEmpty) {
-        for (var cached in cachedEntries) {
-          ++totalRemoved;
-          totalMemoryRemoved += cached.memorySize;
-        }
+      // `_remove` drops the whole entry (all its alternatives) and its
+      // memory size at once.
+      _remove(key);
 
-        // All the alternatives of an entry share its key: `_remove` drops the
-        // whole entry (and its memory size) at once.
-        _remove(cachedEntries.first.key);
-
-        if (_totalCachedResponsesMemorySize <= targetMemory) {
-          break;
-        }
+      if (_totalCachedResponsesMemorySize <= targetMemory) {
+        break;
       }
     }
 
@@ -956,18 +967,41 @@ abstract class _CachedResponse
   bool validate(Request request);
 
   @override
-  int compareTo(_CachedResponse other) {
-    int cmp;
+  int compareTo(_CachedResponse other) => _compareUsageAndMemory(
+    usageCount,
+    memorySize,
+    other.usageCount,
+    other.memorySize,
+  );
 
-    {
-      var use1 = usageCount ~/ 1000;
-      var use2 = other.usageCount ~/ 1000;
-      cmp = use2.compareTo(use1);
-    }
+  /// Compares two cache entries (a response and its compressed
+  /// alternatives) as [compareTo] compares two responses, using the totals
+  /// of each entry ([usageCount] and [memorySize] summed): the entry is
+  /// stored and evicted as a whole. Used to sort the eviction candidates in
+  /// `APIServerResponseCache._checkMaxMemorySize`.
+  static int compareEntries(
+    List<_CachedResponse> entries1,
+    List<_CachedResponse> entries2,
+  ) => _compareUsageAndMemory(
+    entries1.map((e) => e.usageCount).sum,
+    entries1.map((e) => e.memorySize).sum,
+    entries2.map((e) => e.usageCount).sum,
+    entries2.map((e) => e.memorySize).sum,
+  );
+
+  /// The order of [compareTo] and [compareEntries]: by usage (in buckets of
+  /// 1000) then by memory size (in buckets of 8 KB), both descending.
+  static int _compareUsageAndMemory(
+    int usage1,
+    int memory1,
+    int usage2,
+    int memory2,
+  ) {
+    var cmp = (usage2 ~/ 1000).compareTo(usage1 ~/ 1000);
 
     if (cmp == 0) {
-      var m1 = memorySize ~/ (1024 * 8);
-      var m2 = other.memorySize ~/ (1024 * 8);
+      var m1 = memory1 ~/ (1024 * 8);
+      var m2 = memory2 ~/ (1024 * 8);
       cmp = m2.compareTo(m1);
     }
 
