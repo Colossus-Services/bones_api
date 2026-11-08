@@ -6560,14 +6560,18 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   /// its position). See [_operationsSetCache].
   final List<TransactionOperation> _operations = <TransactionOperation>[];
 
-  /// Cache of the [_operations] as an identity set (kept in sync by
-  /// [addOperation] and [dispose]), for O(1) membership checks:
-  /// `_operations.contains` on every [addOperation] made a bulk store
-  /// (`storeAll`, thousands of operations) O(n²).
+  /// Cache of the [_operations] as an identity set, for O(1) membership
+  /// checks: `_operations.contains` on every [addOperation] made a bulk
+  /// store (`storeAll`, thousands of operations) O(n²).
   /// ([TransactionOperation] doesn't override `==`: identity is the same
   /// equality `List.contains` used.)
-  final Set<TransactionOperation> _operationsSetCache =
-      Set<TransactionOperation>.identity();
+  ///
+  /// `null` until the list grows past [_operationsSetThreshold] (see
+  /// [_isOperationIn]): most transactions hold one or a few operations,
+  /// where a scan is cheaper than allocating and filling a set (an eager
+  /// set cost a `count` ~4% in the benchmark). Kept in sync by
+  /// [addOperation] (through [_trackOperationIn]) and reset by [dispose].
+  Set<TransactionOperation>? _operationsSetCache;
 
   List<TransactionOperation> get operations =>
       UnmodifiableListView(_operations);
@@ -6599,12 +6603,58 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   final List<TransactionOperation> _executedOperations =
       <TransactionOperation>[];
 
-  /// Cache of the [_executedOperations] as an identity set (kept in sync
-  /// by [_markOperationExecuted] and [dispose]), for O(1) membership
-  /// checks: `_executedOperations.contains` on every executed operation made
-  /// a bulk store O(n²).
-  final Set<TransactionOperation> _executedOperationsSetCache =
-      Set<TransactionOperation>.identity();
+  /// Cache of the [_executedOperations] as an identity set, for O(1)
+  /// membership checks: `_executedOperations.contains` on every executed
+  /// operation made a bulk store O(n²).
+  ///
+  /// Created lazily as [_operationsSetCache] (see [_isOperationIn]); kept
+  /// in sync by [_markOperationExecuted] (through [_trackOperationIn]) and
+  /// reset by [dispose].
+  Set<TransactionOperation>? _executedOperationsSetCache;
+
+  /// The list size above which [_isOperationIn] uses an identity set
+  /// instead of scanning the list. Up to it a scan is at most a few
+  /// pointer comparisons; past it, the set keeps a bulk store linear.
+  static const int _operationsSetThreshold = 16;
+
+  /// `true` if [op] is in [operations] (by identity). Uses [set] when it's
+  /// been created (the list grew past [_operationsSetThreshold]), otherwise
+  /// scans the list. Used with [_operations]/[_operationsSetCache] and
+  /// [_executedOperations]/[_executedOperationsSetCache].
+  static bool _isOperationIn(
+    TransactionOperation op,
+    List<TransactionOperation> operations,
+    Set<TransactionOperation>? set,
+  ) {
+    if (set != null) return set.contains(op);
+    for (var o in operations) {
+      if (identical(o, op)) return true;
+    }
+    return false;
+  }
+
+  /// Keeps an identity-set cache in sync after [op] was added to
+  /// [operations]: adds it to [set] when the set exists, or creates the
+  /// set (with the whole list) once the list grows past
+  /// [_operationsSetThreshold]. Returns the set to store back in the cache
+  /// field (`null` while the list is small).
+  static Set<TransactionOperation>? _trackOperationIn(
+    TransactionOperation op,
+    List<TransactionOperation> operations,
+    Set<TransactionOperation>? set,
+  ) {
+    if (set != null) return set..add(op);
+    if (operations.length <= _operationsSetThreshold) return null;
+    return Set<TransactionOperation>.identity()..addAll(operations);
+  }
+
+  /// `true` if [op] was added to this transaction ([operations]).
+  bool _hasOperation(TransactionOperation op) =>
+      _isOperationIn(op, _operations, _operationsSetCache);
+
+  /// `true` if [op] was executed ([executedOperations]).
+  bool _hasExecutedOperation(TransactionOperation op) =>
+      _isOperationIn(op, _executedOperations, _executedOperationsSetCache);
 
   /// Returns the list of [operations] that were fully executed.
   List<TransactionOperation> get executedOperations =>
@@ -6781,12 +6831,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       return false;
     }
 
-    if (!_operationsSetCache.contains(op)) {
+    if (!_hasOperation(op)) {
       throw StateError("Operation not in transaction: $op");
     }
 
     if (notExecuted == 1) {
-      return !_executedOperationsSetCache.contains(op);
+      return !_hasExecutedOperation(op);
     } else {
       return _executedOperations.last == op;
     }
@@ -6920,7 +6970,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   Object? get result => _result;
 
   void addOperation(TransactionOperation op) {
-    if (_operationsSetCache.contains(op)) {
+    if (_hasOperation(op)) {
       throw StateError("Operation already in transaction: $op");
     }
 
@@ -6943,7 +6993,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     }
 
     _operations.add(op);
-    _operationsSetCache.add(op);
+    _operationsSetCache = _trackOperationIn(
+      op,
+      _operations,
+      _operationsSetCache,
+    );
     op.id = _operations.length;
   }
 
@@ -6990,7 +7044,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     Object? result,
     bool allowAutoCommit,
   ) {
-    if (_executedOperationsSetCache.contains(op)) {
+    if (_hasExecutedOperation(op)) {
       throw StateError("Operation already executed in transaction: $op");
     }
 
@@ -7001,7 +7055,11 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     op._endTime = DateTime.now();
 
     _executedOperations.add(op);
-    _executedOperationsSetCache.add(op);
+    _executedOperationsSetCache = _trackOperationIn(
+      op,
+      _executedOperations,
+      _executedOperationsSetCache,
+    );
 
     if (!_aborted) {
       _lastResult = result;
@@ -7052,13 +7110,13 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
       );
     }
 
-    if (!_operationsSetCache.contains(operation)) {
+    if (!_hasOperation(operation)) {
       throw StateError(
         "Operation not in transaction:\n-- Operation> $operation\n-- $this",
       );
     }
 
-    if (_executedOperationsSetCache.contains(operation)) {
+    if (_hasExecutedOperation(operation)) {
       return true;
     }
 
@@ -7090,12 +7148,12 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
         return true;
       }
 
-      if (_executedOperationsSetCache.contains(operation)) {
+      if (_hasExecutedOperation(operation)) {
         return true;
       }
     }
 
-    return _executedOperationsSetCache.contains(operation);
+    return _hasExecutedOperation(operation);
   }
 
   FutureOr<Object?> _doAutoCommit() {
@@ -7389,9 +7447,7 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
     _abortError = abortError;
     _aborted = true;
 
-    for (var op in _operations.where(
-      (op) => !_executedOperationsSetCache.contains(op),
-    )) {
+    for (var op in _operations.where((op) => !_hasExecutedOperation(op))) {
       finishOperationVoid(op, null, allowAutoCommit: false);
     }
 
@@ -7785,9 +7841,9 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
 
     _executionsFutures.clear();
     _executedOperations.clear();
-    _executedOperationsSetCache.clear();
+    _executedOperationsSetCache = null;
     _operations.clear();
-    _operationsSetCache.clear();
+    _operationsSetCache = null;
 
     clearCachedEntities();
 
