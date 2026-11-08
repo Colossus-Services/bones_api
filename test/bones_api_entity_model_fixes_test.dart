@@ -233,6 +233,29 @@ void main() {
       );
     });
 
+    test('a tolerant merge drops the `allEager`/`allLazy` conflict', () {
+      // Both tolerant: both flags dropped (as a same-flag conflict).
+      var both = EntityResolutionRules(
+        allEager: true,
+        mergeTolerant: true,
+      ).merge(EntityResolutionRules(allLazy: true, mergeTolerant: true));
+      expect(both.allEager, isNull);
+      expect(both.allLazy, isNull);
+
+      // One tolerant: it yields its flag to the intolerant side.
+      var tolerantEager = EntityResolutionRules(
+        allEager: true,
+        mergeTolerant: true,
+      ).merge(EntityResolutionRules(allLazy: true));
+      expect(tolerantEager.allEager, isNull);
+      expect(tolerantEager.allLazy, isTrue);
+
+      var tolerantLazy = EntityResolutionRules(allEager: true)
+          .merge(EntityResolutionRules(allLazy: true, mergeTolerant: true));
+      expect(tolerantLazy.allEager, isTrue);
+      expect(tolerantLazy.allLazy, isNull);
+    });
+
     test('`allEager`/`allLazy` with explicit exceptions (unchanged)', () {
       var eager = EntityResolutionRules(
         allEager: true,

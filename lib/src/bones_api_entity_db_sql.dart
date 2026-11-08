@@ -3377,8 +3377,11 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
 
   /// Default for the [openTransactionWithPool] adapters: nothing to cancel,
   /// the driver rolls back the transaction when its callback throws.
+  ///
+  /// Typed `bool` (synchronous), as the MySQL and SQLite overrides it
+  /// replaces were declared.
   @override
-  FutureOr<bool> cancelTransaction(
+  bool cancelTransaction(
     Transaction transaction,
     C? connection,
     Object? error,

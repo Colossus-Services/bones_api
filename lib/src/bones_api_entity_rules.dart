@@ -1490,6 +1490,23 @@ class EntityResolutionRules extends EntityRules<EntityResolutionRules> {
       'allEager',
     );
 
+    // `allEager` and `allLazy` can't both be `true` (see `_validateImpl`):
+    // a cross-flag conflict (one side `allEager`, the other `allLazy`) is
+    // dropped as the same-flag conflicts of [_mergeFlag] are: both sides
+    // tolerant, both flags dropped; one side tolerant, it yields its flag to
+    // the intolerant side; neither tolerant, the merge is invalid (thrown by
+    // `merge.validate()` below).
+    if ((allEager ?? false) && (allLazy ?? false)) {
+      if (bothMergeTolerant) {
+        allEager = null;
+        allLazy = null;
+      } else if (mergeTolerant || other.mergeTolerant) {
+        var tolerant = mergeTolerant ? this : other;
+        if (tolerant.allEager ?? false) allEager = null;
+        if (tolerant.allLazy ?? false) allLazy = null;
+      }
+    }
+
     var lazyEntityTypes = this.lazyEntityTypes
         .merge(other.lazyEntityTypes)
         .nullIfEmpty();

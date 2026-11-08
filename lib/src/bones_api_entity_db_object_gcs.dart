@@ -297,6 +297,14 @@ class DBObjectGCSAdapter extends DBObjectAdapter<DBObjectGCSAdapterContext> {
 
   int _connectionCount = 0;
 
+  /// The shared [DBObjectAdapter.openTransaction], typed as this adapter's
+  /// context: it opens synchronously ([createConnection] is synchronous), as
+  /// this adapter's own `openTransaction` was declared before the shared
+  /// implementation (a caller may rely on the concrete type).
+  @override
+  DBObjectGCSAdapterContext openTransaction(Transaction transaction) =>
+      super.openTransaction(transaction) as DBObjectGCSAdapterContext;
+
   @override
   DBObjectGCSAdapterContext createConnection() {
     var id = ++_connectionCount;
