@@ -260,7 +260,7 @@ the writes are lower from that drift.
 
 1.35.0, PR #209, alternated with 1.34.0 in the same session. `remove`:
 4.9× 1.34.0's (see the progression's notes); one round was much lower
-(8075, the others 13.4k–14.0k).
+(8075, the others 13.8k–14.0k).
 
 ---
 
