@@ -435,7 +435,10 @@ class IdenticalSet<O> {
     : _groups = List.filled(groups.clamp(2, 1000), null);
 
   List<O> _getGroup(Object? o) {
-    var h = o.hashCode;
+    // `identityHashCode`, not `hashCode`: elements are matched by identity,
+    // and an element whose `hashCode` changes (a mutable object) would be
+    // looked up in another group (not found by `contains`/`remove`).
+    var h = identityHashCode(o);
     var gIdx = h % _groups.length;
     var g = _groups[gIdx] ??= <O>[];
     return g;
