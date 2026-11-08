@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
@@ -1804,6 +1805,18 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<Object?> _resolveValueToTypeImpl(Object? value, Type valueType) {
+    // A list as a single value (`== [x]` is `== x`), unless the field is a
+    // list itself (a `List<String>`, a `Uint8List`: compared as a whole):
+    // first, so its element is resolved as a value (an enum by its name, an
+    // entity by its ID), not the list as text.
+    if (value is Iterable &&
+        value is! TypedData &&
+        !TypeInfo.from(valueType).isIterable) {
+      var list = value.toList();
+      if (list.isEmpty) return null;
+      if (list.length == 1) value = list.first;
+    }
+
     // A reference (an element of a parameter's list) is its ID:
     if (value is EntityReference) value = value.id;
 

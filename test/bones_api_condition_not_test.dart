@@ -717,6 +717,12 @@ void main() {
       // `[]` is still `null` (`IS NULL`): an empty list is not `null`.
       expect(matches('tags == []', <String>[]), isFalse);
       expect(matches('tags == []', null), isTrue);
+
+      // A list with a `null` element is a value, not `null`:
+      expect(matches('tags == null', ['a', null]), isFalse);
+      expect(matches('tags != null', ['a', null]), isTrue);
+      expect(matches('tags != []', ['a', null]), isTrue);
+      expect(matches('tags == []', ['a', null]), isFalse);
     });
   });
 }

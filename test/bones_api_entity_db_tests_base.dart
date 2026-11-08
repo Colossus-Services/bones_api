@@ -5625,6 +5625,25 @@ Future<bool> runAdapterTests(
           ],
         );
         await u('roles.type != ?:t', {'b', 'c'}, {'t': RoleType.admin});
+        // An enum in a one-element list (`== [x]` is `== x`):
+        await u(
+          'roles.type == ?',
+          {'a'},
+          [
+            [RoleType.admin],
+          ],
+        );
+        await u(
+          'roles.type != ?',
+          {'b', 'c'},
+          [
+            [RoleType.admin],
+          ],
+        );
+        // A to-many path's `== []` and `=~ null`:
+        await u('roles.id == []', {'c'});
+        await u('roles.id != []', {'a', 'b'});
+        await u('roles.type =~ ?', {}, [null]);
         // A bool:
         await u('roles.enabled =~ [false]', {'b'});
         await u('roles.enabled != true', {'b', 'c'});
@@ -5958,6 +5977,13 @@ Future<bool> runAdapterTests(
           await check('$field != ?', [
             entityParams.first,
           ], where((r) => r.isEmpty || r.any((v) => v != id1)));
+          // An entity in a one-element list (`== [x]` is `== x`):
+          await check('$field == ?', [
+            [entityParams.first],
+          ], inSet([id1]));
+          await check('$field != ?', [
+            [entityParams.first],
+          ], where((r) => r.isEmpty || r.any((v) => v != id1)));
 
           // Counted and paginated once each (a to-many's join):
           var inBoth = inSet([id1, id2]);
@@ -6115,6 +6141,21 @@ Future<bool> runAdapterTests(
           count: countAddresses,
           pageLength: pageAddresses,
         );
+
+        // A to-many path (`stores.number`: `C` has no stores, a `null` row):
+        // `=~ null` is an empty set, `=~ [null]` matches a `null`.
+        for (var (q, exp) in [
+          ('stores.number =~ null', <String>[]),
+          ('stores.number !~ null', ['A', 'B', 'C']),
+          ('stores.number =~ [null]', ['C']),
+          ('stores.number == []', ['C']),
+          ('stores.number == 1', ['A']),
+        ]) {
+          var got = await selectAddresses(q, null);
+          if (got.join(',') != exp.join(',')) {
+            failures.add('`$q`: $got, expected $exp');
+          }
+        }
 
         // An `EntityReferenceList` as a parameter (its IDs):
         var bClosed = addresses['B']!.closedStores;

@@ -1761,6 +1761,27 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     return compare(keyValue);
   }
 
+  /// If a left side's value ([v], one compared by [_matchesToManyOrValue]) is
+  /// `null`, for `== null` / `!= null` (`IS NULL` / `IS NOT NULL`).
+  ///
+  /// A list (a list field's value: a to-many's values are compared one at a
+  /// time) is a value, never `null`, also with a `null` element
+  /// (`['a', null]`): [equalsConditionValue] would compare its elements
+  /// ("any is `null`").
+  bool _isNullLeftValue(
+    Object? v,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  ) {
+    if (v is Iterable) return false;
+    return equalsConditionValue(
+      v,
+      null,
+      keyType: keyType,
+      keyEntityHandler: keyEntityHandler,
+    );
+  }
+
   @override
   void resolve({
     Condition? parent,
@@ -2078,13 +2099,15 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     return _matchesToManyOrValue(
       keyValue,
       entityHandler,
-      (v) => equalsConditionValue(
-        v,
-        right,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-      ),
+      (v) => right == null
+          ? _isNullLeftValue(v, null, null)
+          : equalsConditionValue(
+              v,
+              right,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            ),
     );
   }
 
@@ -2112,15 +2135,17 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
     return _matchesToManyOrValue(
       keyValue?.value,
       entityHandler,
-      (v) => equalsConditionValue(
-        v,
-        right,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler,
-      ),
+      (v) => right == null
+          ? _isNullLeftValue(v, keyValue?.type, keyValue?.entityHandler)
+          : equalsConditionValue(
+              v,
+              right,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+              keyType: keyValue?.type,
+              keyEntityHandler: keyValue?.entityHandler,
+            ),
     );
   }
 
@@ -2211,11 +2236,10 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
       return _matchesToManyOrValue(
         keyValue,
         entityHandler,
-        (v) => !equalsConditionValue(
+        (v) => !_isNullLeftValue(
           v,
-          null,
-          keyType: keyConditionValue?.type,
-          keyEntityHandler: keyConditionValue?.entityHandler,
+          keyConditionValue?.type,
+          keyConditionValue?.entityHandler,
         ),
       );
     }

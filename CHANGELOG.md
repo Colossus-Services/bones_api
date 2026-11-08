@@ -42,10 +42,16 @@ relationship field:
 - `== []` is `IS NULL` also for a list or binary field (an empty
   `List<String>`, an empty `Uint8List`, is not `== []`). A missing named
   parameter (`x =~ ?:a` without `a`) is a `null`: an empty set.
-- Memory: a path through a to-one not resolved (only its ID: an entity
-  stored by another adapter, or a missing row) is its ID for the ID field
-  (`photo.id`) and a `null` for other fields (`photo.data`), as a SQL outer
+- Memory: a path through a to-one whose row is missing (only its ID) is
+  its ID for the ID field and a `null` for other fields, as a SQL outer
   join; it failed.
+- `==`/`!=` with a parameter list of 2 or more values isn't a single value:
+  SQL fails (unchanged), and memory matches none (it compared any element).
+- Fix (SQL): an enum or an entity in a one-element list (`roles.type == ?`
+  with `[RoleType.admin]`, `photo == ?` with `[photo]`) was compared as its
+  text (`toString`), not its name / ID.
+- Fix (memory): a list field with a `null` element (`['a', null]`) was
+  `== null` (any element `null`); a list is a value, not `null`.
 - Fix: `store == ?` with `[]` (a to-one entity) failed resolving `[]` as an
   entity's ID (memory). A list as a single entity's value: `[]` is `null`,
   `[x]` is `x`.
@@ -89,6 +95,9 @@ Known differences (unchanged):
   `1`).
 - Matching entity objects (not a DB adapter: `Condition.matchesEntity`)
   doesn't unpack an `EntityReferenceList` field to its IDs.
+- A path through a to-one stored by another adapter (`photo.data`, a
+  `Photo` in an object storage) isn't supported (an error, on every
+  adapter).
 
 ## 1.33.0
 
