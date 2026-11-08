@@ -1748,7 +1748,9 @@ abstract class ConditionEncoder {
   }) {
     if (valueAsList) {
       if (value == null) {
-        return [];
+        // A `null` as a list is `[null]` (`x =~ null` is `IS NULL`), not an
+        // empty list (`x =~ []` matches nothing).
+        return [null];
       } else if (value is Iterable) {
         var list = value
             .map((v) => _resolveValueToTypeCompatibleImpl(v, valueType))

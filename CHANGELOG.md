@@ -1,3 +1,23 @@
+## 1.32.1
+
+- Fix (1.32.0 regression): on SQL an empty `IN` list was written as a
+  `null`: `x =~ ?` with `[]` was `x IS NULL` (matching the rows with a
+  `NULL`, instead of none), and `x !~ ?` with `[]` was `x IS NOT NULL`
+  (excluding them). Now `=~ []` is `FALSE` and `!~ []` is `TRUE`, as when
+  matched in memory. (1.31.0 wrote `x IN ( null )` and `x NOT IN ( null )`,
+  both matching nothing.) Also a literal `x =~ []` (was `x IS NULL`).
+  - A `null` is still `IS NULL`: `x =~ null` (a parameter's `null`) and
+    `x =~ [null]`. `resolveValueToType(null, valueAsList: true)` is now
+    `[null]` (was `[]`, indistinguishable from an empty list).
+  - Note: a `deleteByQuery('x !~ ?', [[]])` now deletes every row (as
+    matched in memory); 1.31.0's `NOT IN ( null )` deleted none.
+- New tests: the empty lists' SQL (`bones_api_condition_not_test.dart`), and
+  on every `SQLAdapter` (memory, SQLite, PostgreSQL, MySQL): `=~ []`,
+  `!~ []`, `!(x =~ [])`, a reference column (`owner =~ []`), through a
+  relationship (`owner.email =~ []`, `!~ []` and `!( ... )`: the JOIN and
+  the subquery) and a to-many one (`roles =~ []`, `!(roles =~ [])`), in an
+  `||`, and a `null` parameter.
+
 ## 1.32.0
 
 - **Breaking (query results):** the negated operators also match a `null`

@@ -1128,9 +1128,10 @@ void main() {
       expect(await encoder.resolveValueToType(_Color.blue, double), 2.0);
       expect(await encoder.resolveValueToType(_Color.blue, BigInt), BigInt.two);
 
+      // A `null` as a list is `[null]` (`IS NULL`), not an empty list:
       expect(
         await encoder.resolveValueToType(null, int, valueAsList: true),
-        isEmpty,
+        equals([null]),
       );
       expect(
         await encoder.resolveValueToType(['1', '2'], int, valueAsList: true),
@@ -1237,12 +1238,19 @@ void main() {
       );
       expect(sql2.parametersPlaceholders, equals({'id': 3}));
 
-      // An empty `IN` list: compared to null.
+      // An empty `IN` list is not a null: it matches nothing (`NOT IN`,
+      // everything), as in memory.
       var sql3 = await _encoder().encode(
         KeyConditionIN(ConditionKey.parse('id'), []),
         'user',
       );
-      expect(sql3.outputString, equals('( "us"."id" IS NULL )'));
+      expect(sql3.outputString, equals('( FALSE )'));
+
+      var sql4 = await _encoder().encode(
+        KeyConditionNotIN(ConditionKey.parse('id'), []),
+        'user',
+      );
+      expect(sql4.outputString, equals('( TRUE )'));
     });
 
     test('a group with a single condition', () async {
