@@ -1497,10 +1497,26 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   @override
   bool get isInner => !isNegated && super.isInner;
 
-  /// A to-many relationship without related entities (an empty [keyValue])
-  /// is compared as a `null` (as the `NULL` row of a SQL outer join), unless
-  /// [value] (or its parameter's) is a list.
-  Object? _noRowsAsNull(
+  /// Returns `null` for an empty [keyValue] (a to-many relationship without
+  /// related entities), so it's compared as a `null` field; otherwise
+  /// returns [keyValue] unchanged.
+  ///
+  /// Why: on SQL, a to-many relationship is an outer join, and an entity
+  /// without related rows joins one row of `NULL`s. So
+  /// `roles.type == null` matches a user without roles, as `IS NULL` does.
+  /// Without this, the empty list would be compared element by element
+  /// (none), and match nothing.
+  ///
+  /// [keyValue] is returned unchanged when the compared [value] (or its
+  /// [ConditionParameter]'s value, resolved with [parameters],
+  /// [positionalParameters] and [namedParameters]) is a list, so a list
+  /// field still compares as a whole: `tags == []` matches an empty
+  /// `tags`.
+  ///
+  /// Used by [KeyConditionEQ] (`==`). [KeyConditionNotEQ] (`!=`) and
+  /// [KeyConditionINBase] (`=~`/`!~`) handle an empty list the same way,
+  /// directly (see `_notEquals` and `_matchesIn`).
+  Object? _emptyToManyAsNull(
     Object? keyValue,
     Object? parameters,
     List? positionalParameters,
@@ -1795,8 +1811,10 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
+    // A to-many relationship without related entities is a `null` field
+    // (as a SQL outer join's `NULL` row):
     return equalsConditionValue(
-      _noRowsAsNull(
+      _emptyToManyAsNull(
         keyValue,
         parameters,
         positionalParameters,
@@ -1819,8 +1837,10 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
+    // A to-many relationship without related entities is a `null` field
+    // (as a SQL outer join's `NULL` row):
     return equalsConditionValue(
-      _noRowsAsNull(
+      _emptyToManyAsNull(
         keyValue?.value,
         parameters,
         positionalParameters,
