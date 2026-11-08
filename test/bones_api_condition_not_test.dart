@@ -506,6 +506,11 @@ void main() {
         '( "ac"."email" = @email OR FALSE )',
       );
 
+      // Not an `IN`: `==`/`!=` with an empty list are still compared to
+      // `null` (unchanged; in memory they match none/all).
+      expect(await sql('pass == []', null), '( "ac"."pass" IS NULL )');
+      expect(await sql('pass != []', null), '( "ac"."pass" IS NOT NULL )');
+
       // A `null` (as a list) is still `IS NULL`:
       expect(await sql('pass =~ ?', {'pass': null}), '( "ac"."pass" IS NULL )');
       expect(
