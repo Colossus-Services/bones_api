@@ -1546,7 +1546,7 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       var type = handler.getFieldType(null, key.name, resolveFiledName: true);
       if (type == null) break;
 
-      if (type.isListEntityOrReference) {
+      if (isToManyType(type, handler)) {
         toMany = true;
         break;
       }
@@ -1557,6 +1557,171 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     _hasToManyInKeyPathCacheHandler = entityHandler;
     _hasToManyInKeyPathCacheResult = toMany;
     return toMany;
+  }
+
+  /// A cache of [isRelationshipKey]: the [EntityHandler] whose result is
+  /// cached in [_isRelationshipKeyCacheResult].
+  ///
+  /// Why: as [hasToManyInKeyPath] (see [_hasToManyInKeyPathCacheHandler]),
+  /// it's called for every entity matched, and resolved by the entity
+  /// handler's field types: computed once per handler.
+  EntityHandler? _isRelationshipKeyCacheHandler;
+
+  /// The cached [isRelationshipKey] of [_isRelationshipKeyCacheHandler]
+  /// (`null`: not computed yet).
+  bool? _isRelationshipKeyCacheResult;
+
+  /// If the [keys] are a single relationship field of [entityHandler]'s
+  /// entity: a to-one (an entity, `User? owner`, or an [EntityReference]) or
+  /// a to-many (a `List` of entities or an [EntityReferenceList]). Not a
+  /// path through one (`owner.email`), nor a field of another type.
+  ///
+  /// A relationship is compared by the IDs of its related entities, and it
+  /// never has a `null` ID: so a `null` element of a `=~`/`!~` list
+  /// (`=~ [1, null]`, `=~ [null]`) is ignored (for another field, it matches
+  /// a `null`, as `IS NULL`). As any field, `=~ null` (or a `null`
+  /// parameter) is an empty set (`=~` matches none, `!~` all, as with `[]`),
+  /// and `==`/`!=` with `[]` are with `null` ("without related entities" /
+  /// "with some").
+  ///
+  /// Cached per [entityHandler] (see [_isRelationshipKeyCacheHandler]).
+  bool isRelationshipKey(EntityHandler? entityHandler) {
+    if (identical(entityHandler, _isRelationshipKeyCacheHandler)) {
+      return _isRelationshipKeyCacheResult ?? false;
+    }
+
+    var relationship = false;
+    var key = keys.length == 1 ? keys.first : null;
+    if (entityHandler != null && key is ConditionKeyField) {
+      var type = entityHandler.getFieldType(
+        null,
+        key.name,
+        resolveFiledName: true,
+      );
+      if (type != null) {
+        relationship = isRelationshipType(type, entityHandler);
+      }
+    }
+
+    _isRelationshipKeyCacheHandler = entityHandler;
+    _isRelationshipKeyCacheResult = relationship;
+    return relationship;
+  }
+
+  /// The right side of a `=~`/`!~` ([value], a list) with its parameters
+  /// resolved (a parameter's list flattened), without `null`s: the IDs (or
+  /// entities) of a relationship (see [isRelationshipKey]) to match. Empty
+  /// for `[]`, `null`, `[null]` or a `null` parameter.
+  List<Object> _relationshipRightIDs(
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    var ids = <Object>[];
+
+    void add(Object? v) {
+      if (v == null) return;
+      if (v is Iterable) {
+        for (var e in v) {
+          add(e);
+        }
+      } else if (v is EntityReference) {
+        // A reference as a parameter: its ID (`null` if empty).
+        add(v.id);
+      } else if (v is EntityReferenceList) {
+        add(v.ids);
+      } else {
+        ids.add(v);
+      }
+    }
+
+    var values = value;
+    for (var v in values is Iterable ? values : [values]) {
+      add(
+        v is ConditionParameter
+            ? v.getValue(
+                parameters: parameters,
+                positionalParameters: positionalParameters,
+                namedParameters: namedParameters,
+              )
+            : v,
+      );
+    }
+
+    return ids;
+  }
+
+  /// If the right side of a `=~`/`!~` ([value], a list) is a single
+  /// parameter whose value is `null` (`x =~ ?` with `null`): an empty set,
+  /// as `x =~ null` and `x =~ []` (`=~` matches none, `!~` all, any field).
+  bool _isNullParameterSet(
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    var values = value;
+    if (values is! List || values.length != 1) return false;
+    var p = values.first;
+    return p is ConditionParameter &&
+        p.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            ) ==
+            null;
+  }
+
+  /// The right side of a `==`/`!=` ([value]) as SQL compares it:
+  /// - `[]` (also a parameter's) is `null`: `== []` is `== null`
+  ///   (`IS NULL`), any field.
+  /// - A list as a single value, `[x]` is `x` (`== [7]` is `== 7`), unless
+  ///   the left side ([keyValue], the entity's) is itself a list field (a
+  ///   `List<String>`, a `Uint8List`; not a to-many relationship's values,
+  ///   see [hasToManyInKeyPath]): then the lists are compared as a whole.
+  /// - An [EntityReference] (also a parameter's, or a list's element) is
+  ///   its ID.
+  ///
+  /// Otherwise returns [value] unchanged (a [ConditionParameter] is then
+  /// resolved while compared, as before).
+  Object? _equalsRightValue(
+    Object? keyValue,
+    EntityHandler? entityHandler,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    Object? v = value;
+    if (v is ConditionParameter) {
+      var paramValue = v.getValue(
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      );
+      if (paramValue is! Iterable && paramValue is! EntityReference) {
+        return value;
+      }
+      v = paramValue;
+    }
+
+    if (v is EntityReference) return v.id;
+
+    if (v is Iterable) {
+      var list = v.toList();
+      if (list.isEmpty) return null;
+
+      // A list field (not a to-many's values): compared as a whole, by
+      // [value] (a parameter is compared with [ConditionParameter.matches]).
+      var listField =
+          keyValue is Iterable && !hasToManyInKeyPath(entityHandler);
+      if (listField) return value;
+
+      if (list.length == 1) {
+        var e = list.first;
+        return e is EntityReference ? e.id : e;
+      }
+    }
+
+    return v;
   }
 
   /// Matches the left side of a comparison with [compare], one value at a
@@ -1594,6 +1759,27 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       return keyValue.isEmpty ? compare(null) : keyValue.any(compare);
     }
     return compare(keyValue);
+  }
+
+  /// If a left side's value ([v], one compared by [_matchesToManyOrValue]) is
+  /// `null`, for `== null` / `!= null` (`IS NULL` / `IS NOT NULL`).
+  ///
+  /// A list (a list field's value: a to-many's values are compared one at a
+  /// time) is a value, never `null`, also with a `null` element
+  /// (`['a', null]`): [equalsConditionValue] would compare its elements
+  /// ("any is `null`").
+  bool _isNullLeftValue(
+    Object? v,
+    TypeInfo? keyType,
+    EntityHandler? keyEntityHandler,
+  ) {
+    if (v is Iterable) return false;
+    return equalsConditionValue(
+      v,
+      null,
+      keyType: keyType,
+      keyEntityHandler: keyEntityHandler,
+    );
   }
 
   @override
@@ -1704,6 +1890,12 @@ abstract class KeyCondition<O, V> extends Condition<O> {
               }
             }
           }).toList();
+        } else if (valueEntityHandler != null &&
+            (value as Object).isPrimitiveValue) {
+          // A related entity not resolved (only its ID: one stored by another
+          // adapter, or a missing row): its ID field is the ID; any other
+          // field is unknown, a `null` (as a SQL outer join's `NULL` row).
+          keyValue = keyName == valueEntityHandler.idFieldName() ? value : null;
         } else {
           throw StateError(
             "Can't access key[$keyName] for type: ${(value as Object?).runtimeTypeNameUnsafe}",
@@ -1781,7 +1973,29 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     return parse(value)!;
   }
 
-  EntityHandler? _resolveValueEntityHandler(
+  /// If [type] is a to-many relationship's: an [EntityReferenceList], or a
+  /// `List` of an entity type (one with an [EntityHandler], resolved from
+  /// [entityHandler]). Not a `List` of enums or of other classes.
+  static bool isToManyType(TypeInfo type, EntityHandler? entityHandler) {
+    if (type.isEntityReferenceListType) return true;
+    if (!type.isListEntity) return false;
+    var elementType = type.arguments0;
+    return elementType != null &&
+        _resolveValueEntityHandler(elementType, entityHandler) != null;
+  }
+
+  /// If [type] is a relationship field's (see [isRelationshipKey]): a
+  /// to-one, an [EntityReference] or an entity type (one with an
+  /// [EntityHandler], resolved from [entityHandler]), or a to-many (see
+  /// [isToManyType]).
+  static bool isRelationshipType(TypeInfo type, EntityHandler? entityHandler) {
+    if (type.isEntityReferenceBaseType) return true;
+    if (type.isListEntity) return isToManyType(type, entityHandler);
+    if (type.isPrimitiveType || type.isIterable || type.isMap) return false;
+    return _resolveValueEntityHandler(type, entityHandler) != null;
+  }
+
+  static EntityHandler? _resolveValueEntityHandler(
     TypeInfo? objType,
     EntityHandler? objEntityHandler,
   ) {
@@ -1871,18 +2085,29 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
+    // `== []` is `== null`, `== [x]` is `== x` (see [_equalsRightValue]):
+    var right = _equalsRightValue(
+      keyValue,
+      entityHandler,
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
+
     // Through a to-many relationship, each related entity's value (or a
     // `null` without any):
     return _matchesToManyOrValue(
       keyValue,
       entityHandler,
-      (v) => equalsConditionValue(
-        v,
-        value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-      ),
+      (v) => right == null
+          ? _isNullLeftValue(v, null, null)
+          : equalsConditionValue(
+              v,
+              right,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            ),
     );
   }
 
@@ -1896,20 +2121,31 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
+    // `== []` is `== null`, `== [x]` is `== x` (see [_equalsRightValue]):
+    var right = _equalsRightValue(
+      keyValue?.value,
+      entityHandler,
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
+
     // Through a to-many relationship, each related entity's value (or a
     // `null` without any):
     return _matchesToManyOrValue(
       keyValue?.value,
       entityHandler,
-      (v) => equalsConditionValue(
-        v,
-        value,
-        parameters: parameters,
-        positionalParameters: positionalParameters,
-        namedParameters: namedParameters,
-        keyType: keyValue?.type,
-        keyEntityHandler: keyValue?.entityHandler,
-      ),
+      (v) => right == null
+          ? _isNullLeftValue(v, keyValue?.type, keyValue?.entityHandler)
+          : equalsConditionValue(
+              v,
+              right,
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+              keyType: keyValue?.type,
+              keyEntityHandler: keyValue?.entityHandler,
+            ),
     );
   }
 
@@ -1985,9 +2221,32 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
   ) {
+    // `!= []` is `!= null`, `!= [x]` is `!= x` (see [_equalsRightValue]):
+    var right = _equalsRightValue(
+      keyValue,
+      entityHandler,
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
+
+    // `!= null` (`IS NOT NULL`): with a value; a relationship, with some
+    // related entity.
+    if (right == null) {
+      return _matchesToManyOrValue(
+        keyValue,
+        entityHandler,
+        (v) => !_isNullLeftValue(
+          v,
+          keyConditionValue?.type,
+          keyConditionValue?.entityHandler,
+        ),
+      );
+    }
+
     bool notEquals(Object? v) => !equalsConditionValue(
       v,
-      value,
+      right,
       parameters: parameters,
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
@@ -1995,7 +2254,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
       keyEntityHandler: keyConditionValue?.entityHandler,
     );
 
-    if (keyValue is Iterable && value is! Iterable) {
+    if (keyValue is Iterable && right is! Iterable) {
       if (_isEmptyToMany(keyValue, entityHandler)) return notEquals(null);
       return keyValue.isEmpty || keyValue.any(notEquals);
     }
@@ -2234,8 +2493,15 @@ class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
 }
 
 abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
+  /// The values of an `IN` list.
+  ///
+  /// `x =~ null` is an empty set of values, as `x =~ []`: `=~` matches none
+  /// and `!~` all (any field). An explicit `null` element (`x =~ [null]`,
+  /// `x =~ [3, null]`) is kept: for a field (not a relationship, see
+  /// [KeyCondition.isRelationshipKey]), it also matches a `null` (as
+  /// `IS NULL`).
   static List<Object?> valuesAsList(dynamic value) {
-    if (value == null) return [null];
+    if (value == null) return [];
 
     if (value is List) return value;
 
@@ -2273,6 +2539,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     return _matchesIn(
       keyValue,
       _isEmptyToMany(keyValue, entityHandler),
+      isRelationshipKey(entityHandler),
       parameters,
       positionalParameters,
       namedParameters,
@@ -2293,6 +2560,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     return _matchesIn(
       keyValue?.value,
       _isEmptyToMany(keyValue?.value, entityHandler),
+      isRelationshipKey(entityHandler),
       parameters,
       positionalParameters,
       namedParameters,
@@ -2304,17 +2572,53 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
   /// join of its rows), with [not] (`NOT IN`): any of them not in. Without
   /// any ([emptyToMany], see [_isEmptyToMany]), as a `NULL` row (in a list
   /// with a `null`; also `NOT IN` a list without one).
+  ///
+  /// With a [relationshipKey] (see [isRelationshipKey]), the related
+  /// entities' IDs are matched with a set of IDs, without `null`s (see
+  /// [_matchesRelationshipIn]).
   bool _matchesIn(
     Object? keyValue,
     bool emptyToMany,
+    bool relationshipKey,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     EntityHandler? entityHandler,
   ) {
+    if (relationshipKey) {
+      return _matchesRelationshipIn(
+        keyValue,
+        emptyToMany,
+        parameters,
+        positionalParameters,
+        namedParameters,
+        entityHandler,
+      );
+    }
+
+    // `x =~ ?` with `null`: an empty set, as `x =~ null` and `x =~ []`
+    // (`=~` matches none, `!~` all).
+    if (_isNullParameterSet(
+      parameters,
+      positionalParameters,
+      namedParameters,
+    )) {
+      return not;
+    }
+
+    // References on the right side (a path ending in a reference,
+    // `owner.userInfo =~ ?`): compared by their IDs, as SQL.
+    var rightValues =
+        _rightValuesWithReferencesAsIDs(
+          parameters,
+          positionalParameters,
+          namedParameters,
+        ) ??
+        value;
+
     bool inValues(Object? v) => inConditionValues(
       v,
-      value,
+      rightValues,
       parameters: parameters,
       positionalParameters: positionalParameters,
       namedParameters: namedParameters,
@@ -2328,6 +2632,93 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     }
 
     return inValues(keyValue) != not;
+  }
+
+  /// The right side of a `=~`/`!~` ([value]) with its parameters resolved,
+  /// and its [EntityReference]s (also an [EntityReferenceList]'s) as their
+  /// IDs (an empty reference: a `null` element). Returns `null` if there's
+  /// no reference: [value] is compared as before (its parameters resolved
+  /// while compared).
+  List<Object?>? _rightValuesWithReferencesAsIDs(
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    var hasReference = false;
+    var resolved = <Object?>[];
+
+    void add(Object? v) {
+      if (v is EntityReference) {
+        hasReference = true;
+        resolved.add(v.id);
+      } else if (v is EntityReferenceList) {
+        hasReference = true;
+        resolved.addAll(v.ids ?? const []);
+      } else if (v is Iterable) {
+        for (var e in v) {
+          add(e);
+        }
+      } else {
+        resolved.add(v);
+      }
+    }
+
+    for (var v in value) {
+      add(
+        v is ConditionParameter
+            ? v.getValue(
+                parameters: parameters,
+                positionalParameters: positionalParameters,
+                namedParameters: namedParameters,
+              )
+            : v,
+      );
+    }
+
+    return hasReference ? resolved : null;
+  }
+
+  /// A relationship's `=~`/`!~` (see [isRelationshipKey]): the left side
+  /// ([keyValue]) is the related entities' IDs (a to-one's, or a to-many's
+  /// list); the right side is the set of IDs (or entities) to match
+  /// ([_relationshipRightIDs]: [value] with its parameters resolved, and
+  /// without `null`s).
+  ///
+  /// - An empty set (`[]`, `null`, `[null]`, a `null` parameter): `=~`
+  ///   matches none and `!~` all (a relationship never has a `null` ID).
+  /// - Without related entities (a `null` to-one, an empty to-many): in no
+  ///   set (`=~` doesn't match, `!~` does).
+  /// - A to-many: `=~` if any related ID is in the set, `!~` if any isn't
+  ///   (as a SQL join of its rows).
+  bool _matchesRelationshipIn(
+    Object? keyValue,
+    bool emptyToMany,
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+    EntityHandler? entityHandler,
+  ) {
+    var ids = _relationshipRightIDs(
+      parameters,
+      positionalParameters,
+      namedParameters,
+    );
+    if (ids.isEmpty) return not;
+
+    if (keyValue == null ||
+        emptyToMany ||
+        (keyValue is Iterable && keyValue.isEmpty)) {
+      return not;
+    }
+
+    bool inIDs(Object? v) =>
+        inConditionValues(v, ids, entityHandler: entityHandler);
+
+    if (keyValue is Iterable) {
+      return not ? keyValue.any((v) => !inIDs(v)) : keyValue.any(inIDs);
+    }
+
+    return inIDs(keyValue) != not;
   }
 
   String get encodeValue => Condition.encodeConditionValue(value);

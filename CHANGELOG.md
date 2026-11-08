@@ -1,3 +1,109 @@
+## 1.34.0
+
+`null` and `[]` mean the same in a condition: an empty set for `=~`/`!~`, a
+`null` for `==`/`!=`. Behavior changes, on every DB adapter, for any field
+(a number, a text, a relationship, a path through one):
+
+| Condition | Now | Was |
+|---|---|---|
+| `x =~ null`, `x =~ ?` with `null` | none (as `x =~ []`) | `IS NULL` |
+| `x !~ null`, `x !~ ?` with `null` | all (as `x !~ []`) | `IS NOT NULL` |
+| `x == []`, `x == ?` with `[]` | `IS NULL` (as `x == null`) | memory: none |
+| `x != []`, `x != ?` with `[]` | `IS NOT NULL` (as `x != null`) | memory: all |
+
+(SQL already encoded `== []` / `!= []` as `IS NULL` / `IS NOT NULL`.)
+
+An explicit `null` element is kept: `number =~ [null]` / `=~ [3, null]`
+(also a parameter `[null]`) still match a `null` (`IS NULL`), except for a
+relationship field:
+
+- A relationship field (a to-one: an entity or an `EntityReference`; a
+  to-many: a `List` of entities or an `EntityReferenceList`) is compared by
+  the IDs of its related entities, which are never `null`: a `null` element
+  is ignored. `store =~ [null]` matches none and `store =~ [1, null]` is
+  `store =~ [1]` (it was `IS NULL`, "without a related entity"). Use
+  `store == null` / `store != null` (or `== []` / `!= []`) for "without" /
+  "with" a related entity. (`KeyCondition.isRelationshipKey`.)
+  A relationship field is resolved by its declared type, on memory and SQL
+  alike (`KeyCondition.isRelationshipType`): an `EntityReference`, an
+  `EntityReferenceList`, an entity type, or a `List` of one (not a `List`
+  of enums or of other classes); on SQL not by the DB's foreign keys (a
+  to-one may have none, e.g. `User.photo`, a `String` ID).
+- `==`/`!=` with a single-element list is with its element, as SQL
+  already did: `store == [7]` is `store == 7` (memory matched none). Not
+  for a list or binary field (a `List<String>`, a `Uint8List`): it's
+  compared with the list as a whole (`tags == ["a"]` doesn't match
+  `["a", "b"]`).
+- An `EntityReference` (or an `EntityReferenceList`) as a parameter is
+  compared by its ID(s), with `=~`/`!~` (also of a path ending in a
+  reference: `owner.userInfo =~ ?`) and with `==`/`!=` (a reference, or a
+  reference list with up to 1 ID: as `== [1, 3]`, more IDs aren't a
+  single value). They matched none (SQL: `IS NULL`).
+- `== []` is `IS NULL` also for a list or binary field (an empty
+  `List<String>`, an empty `Uint8List`, is not `== []`). A missing named
+  parameter (`x =~ ?:a` without `a`) is a `null`: an empty set.
+- Memory: a path through a to-one whose row is missing (only its ID) is
+  its ID for the ID field and a `null` for other fields, as a SQL outer
+  join; it failed.
+- `==`/`!=` with a parameter list of 2 or more values isn't a single value:
+  SQL fails (unchanged), and memory matches none (it compared any element).
+- Fix (SQL): an enum or an entity in a one-element list (`roles.type == ?`
+  with `[RoleType.admin]`, `photo == ?` with `[photo]`) was compared as its
+  text (`toString`), not its name / ID.
+- Fix (memory): a list field with a `null` element (`['a', null]`) was
+  `== null` (any element `null`); a list is a value, not `null`.
+- Fix (SQL, 1.33.0 regression): a query through a to-many relationship,
+  without an explicit order (`orderByID: null`), lost the ID order its
+  `JOIN` had: its IDs subquery (`id IN ( SELECT ... )`) may not keep the
+  table order (PostgreSQL's hash semi-join). It's ordered by ID again (as
+  memory).
+- Fix: `store == ?` with `[]` (a to-one entity) failed resolving `[]` as an
+  entity's ID (memory). A list as a single entity's value: `[]` is `null`,
+  `[x]` is `x`.
+- Fix (SQL): an entity as a parameter of a `String`/`int` ID column (a
+  to-one without a foreign key, `photo == ?` with a `Photo`) was compared
+  as its text (`toString`), not its ID.
+- Fix (memory): a to-one whose entity is stored by another adapter (a
+  `Photo` in an object storage) was resolved as `null`: `photo == null`
+  matched every user, and `photo =~ [id]` none. Its ID is kept, as a SQL
+  column. And a `String` ID for an entity-typed key (`photo =~ ["<id>"]`)
+  failed resolving it as an entity.
+- `KeyConditionINBase.valuesAsList(null)` is `[]` (it was `[null]`).
+
+Tests:
+
+- 'Relationship operators: by ID, on every adapter', on all the DB
+  adapters, with the expected results computed from a model (each entity's
+  set of related IDs), each also checked through `!(...)`: `=~`/`!~` with
+  `[]`, `null`, `[null]`, an ID, `[id]`, `[id1, id2]`, `[id, null]` (as
+  literals, and as `?` and `?:name` parameters), and entities as parameters;
+  `==`/`!=` with `null`, `[]` (literals and parameters) and IDs; `Set`
+  parameters, `EntityReference`/`EntityReferenceList` parameters, `== [id]`,
+  and `&&`/`||` combinations. Over a to-many `EntityReferenceList`
+  (`Address.closedStores`), a to-many `List` (`Address.stores`), a to-one
+  entity (`Store.owner`), a to-one `EntityReference` (`User.userInfo`), and
+  a to-one with a `String` ID without a foreign key (`User.photo`); a path
+  ending in a reference (`owner.userInfo`) with references as parameters;
+  and a to-many's `countByQuery` and `limit`/`offset` pages.
+- 'Operators: the same results on every adapter': `=~ null`, `!~ null`,
+  `=~ [null]`, `== []`, `!= []`, `== [v]`, `=~ [v]` and their parameters,
+  over text, numbers, a to-one's and a to-many's fields.
+- Unit: `==`/`!=` with a list on a list or binary field (as a whole).
+
+Known differences (unchanged):
+
+- 2 to-many relationships in one condition (`closedStores =~ [1] &&
+  stores =~ [2]`) fail on SQL (one relationship table is joined): see
+  1.33.0.
+- A `String` ID for an integer-ID relationship (`owner == ?` with `'1'`)
+  matches on SQL (the DB converts it), and not in memory (`'1'` isn't
+  `1`).
+- Matching entity objects (not a DB adapter: `Condition.matchesEntity`)
+  doesn't unpack an `EntityReferenceList` field to its IDs.
+- A path through a to-one stored by another adapter (`photo.data`, a
+  `Photo` in an object storage) isn't supported (an error, on every
+  adapter).
+
 ## 1.33.0
 
 The condition operators give the same results on every DB adapter (memory,

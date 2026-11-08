@@ -3263,7 +3263,16 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
     // A `limit` of `0` is no `LIMIT` clause here: it doesn't need an order.
     var effectiveLimit = limit != null && limit > 0 ? limit : null;
 
-    if (OrderDirection.resolveOrderByID(orderByID, offset, effectiveLimit)) {
+    // A query through a to-many relationship selects the matching IDs in a
+    // subquery (see [_joinsSubqueryConditionSQL]): without an explicit order
+    // (`orderByID: null`), ordered by ID, as its plain `JOIN` (and memory)
+    // returned them. An `IN ( subquery )` doesn't keep the table order (e.g.
+    // PostgreSQL's hash semi-join).
+    var toManySubquery =
+        orderByID == null && context.relationshipTables.isNotEmpty;
+
+    if (toManySubquery ||
+        OrderDirection.resolveOrderByID(orderByID, offset, effectiveLimit)) {
       var tableFieldID = context.tableFieldID ?? 'id';
       tail += dialect.orderBySQL(
         tableAlias,

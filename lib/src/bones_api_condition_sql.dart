@@ -1,9 +1,11 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_condition_encoder.dart';
+import 'bones_api_extension.dart';
 
 final _log = logging.Logger('ConditionSQLEncoder');
 
@@ -449,25 +451,91 @@ class ConditionSQLEncoder extends ConditionEncoder {
     String operator, {
     bool valueAsList = false,
   }) {
-    var retKeySQL = keyToSQL(c, context);
+    // Only an `IN` list of a relationship ignores its `null`s:
+    var retRelationship = valueAsList ? _isRelationshipKey(c, context) : false;
 
-    return retKeySQL.resolveMapped((keySQL) {
-      var keyType = keySQL.key;
-      var tableKey = keySQL.value;
+    return retRelationship.resolveMapped((relationship) {
+      var retKeySQL = keyToSQL(c, context);
 
-      return encodeConditionValuesWithOperator(
-        context,
-        keyType,
-        null,
-        tableKey,
-        operator,
-        c.value,
-        valueAsList,
-        negated: c.isNegated,
-        nullable: !_isMainTableIDKey(c, context),
-        condition: c,
-      );
+      return retKeySQL.resolveMapped((keySQL) {
+        var keyType = keySQL.key;
+        var tableKey = keySQL.value;
+
+        return encodeConditionValuesWithOperator(
+          context,
+          keyType,
+          null,
+          tableKey,
+          operator,
+          valueAsList && _isNullParameterSet(c, context) ? const [] : c.value,
+          valueAsList,
+          negated: c.isNegated,
+          nullable: !_isMainTableIDKey(c, context),
+          condition: c,
+          nullsAsAbsent: relationship,
+        );
+      });
     });
+  }
+
+  /// If [c]'s `IN` list is a single parameter whose value is `null`
+  /// (`x =~ ?` with `null`): an empty set, as `x =~ null` and `x =~ []`
+  /// (`IN` matches none, `NOT IN` all; any field). As memory's
+  /// `KeyConditionINBase` (`_isNullParameterSet`).
+  bool _isNullParameterSet(KeyCondition c, EncodingContext context) {
+    var values = c.value;
+    if (values is! List || values.length != 1) return false;
+    var p = values.first;
+    return p is ConditionParameter &&
+        p.getValue(
+              parameters: context.parameters,
+              positionalParameters: context.positionalParameters,
+              namedParameters: context.namedParameters,
+              encodingParameters: context.encodingParameters,
+            ) ==
+            null;
+  }
+
+  /// If [c]'s key is a single relationship field of the main entity: its `IN`
+  /// list is a set of related IDs, without `null`s (a relationship never has
+  /// a `null` ID; see [KeyCondition.isRelationshipKey]).
+  ///
+  /// Resolved as memory's [KeyCondition.isRelationshipKey], by the field's
+  /// declared type (not by the DB scheme: a to-one may have no foreign key,
+  /// e.g. a `String` ID): an [EntityReference] / [EntityReferenceList], or
+  /// an entity type (or a `List` of one) with a table.
+  FutureOr<bool> _isRelationshipKey(KeyCondition c, EncodingContext context) {
+    var keys = c.keys;
+    if (keys.length != 1) return false;
+
+    var key = keys.first;
+    if (key is! ConditionKeyField) return false;
+
+    var schemeProvider = this.schemeProvider;
+    if (schemeProvider == null || _isMainTableIDKey(c, context)) return false;
+
+    return schemeProvider
+        .getFieldType(
+          key.name,
+          entityName: context.entityName,
+          tableName: context.tableName,
+        )
+        .resolveMapped((type) {
+          if (type == null) return false;
+          if (type.isEntityReferenceBaseType) return true;
+
+          TypeInfo? entityType;
+          if (type.isListEntity) {
+            entityType = type.arguments0;
+          } else if (!type.isPrimitiveType && !type.isIterable && !type.isMap) {
+            entityType = type;
+          }
+          if (entityType == null) return false;
+
+          return schemeProvider
+              .getTableForType(entityType)
+              .resolveMapped((table) => table != null);
+        });
   }
 
   /// If [c]'s key is the ID of the main table (never `NULL`).
@@ -505,6 +573,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
     bool negated = false,
     bool nullable = true,
     Condition? condition,
+    bool nullsAsAbsent = false,
   }) {
     // The encoding value rather than only its text: a null supplied as a
     // parameter encodes to a placeholder, so the text alone cannot say whether
@@ -529,7 +598,8 @@ class ConditionSQLEncoder extends ConditionEncoder {
         // An empty list (`x =~ []`, or a parameter's `[]`): `IN` matches
         // nothing and `NOT IN` everything, also a `NULL` (as in memory). It
         // is not a `null` (`x =~ null` and `[null]` are `IS NULL`, and arrive
-        // as a list with a `null`).
+        // as a list with a `null`), except for a relationship
+        // ([nullsAsAbsent], below).
         if (elements.isEmpty) {
           context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
           return context;
@@ -546,7 +616,20 @@ class ConditionSQLEncoder extends ConditionEncoder {
             }
           }
 
-          if (nonNulls.isEmpty) {
+          if (nullsAsAbsent) {
+            // A relationship's set of IDs ([_isRelationshipKey]): its `null`s
+            // aren't IDs. Without any other, an empty set (as `[]`).
+            if (nonNulls.isEmpty) {
+              context.write(operator == 'IN' ? ' FALSE ' : ' TRUE ');
+              return context;
+            }
+            value = EncodingValueList(
+              value.key,
+              value.type,
+              nonNulls,
+              encodeEncodingValueList,
+            );
+          } else if (nonNulls.isEmpty) {
             value = EncodingValueNull(
               value.key,
               value.type,

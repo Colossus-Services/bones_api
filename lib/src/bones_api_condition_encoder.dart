@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
@@ -8,6 +9,7 @@ import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
 import 'bones_api_entity.dart';
+import 'bones_api_entity_reference.dart';
 import 'bones_api_entity_sql.dart';
 import 'bones_api_logging.dart';
 import 'bones_api_mixin.dart';
@@ -1757,10 +1759,19 @@ abstract class ConditionEncoder {
     Type valueType, {
     bool valueAsList = false,
   }) {
+    // A reference (as a parameter) is compared by its ID(s):
+    if (value is EntityReference) {
+      value = value.id;
+    } else if (value is EntityReferenceList) {
+      value = value.ids ?? const [];
+    }
+
     if (valueAsList) {
       if (value == null) {
-        // A `null` as a list is `[null]` (`x =~ null` is `IS NULL`), not an
-        // empty list (`x =~ []` matches nothing).
+        // A `null` element of a list is `[null]` (`x =~ [null]` is `IS NULL`).
+        // `x =~ null` and a single `null` parameter don't get here: they're
+        // an empty set (see `ConditionSQLEncoder._isNullParameterSet` and
+        // `KeyConditionINBase.valuesAsList`).
         return [null];
       } else if (value is Iterable) {
         var list = value
@@ -1794,6 +1805,21 @@ abstract class ConditionEncoder {
   }
 
   FutureOr<Object?> _resolveValueToTypeImpl(Object? value, Type valueType) {
+    // A list as a single value (`== [x]` is `== x`), unless the field is a
+    // list itself (a `List<String>`, a `Uint8List`: compared as a whole):
+    // first, so its element is resolved as a value (an enum by its name, an
+    // entity by its ID), not the list as text.
+    if (value is Iterable &&
+        value is! TypedData &&
+        !TypeInfo.from(valueType).isIterable) {
+      var list = value.toList();
+      if (list.isEmpty) return null;
+      if (list.length == 1) value = list.first;
+    }
+
+    // A reference (an element of a parameter's list) is its ID:
+    if (value is EntityReference) value = value.id;
+
     if (value == null) {
       return null;
     }
@@ -1826,6 +1852,26 @@ abstract class ConditionEncoder {
       }
     }
 
+    var schemeProvider = this.schemeProvider;
+
+    // An entity compared with an ID column (a `String`/`int` relationship
+    // column, e.g. a to-one without a foreign key): its ID, not the
+    // entity's text (parsed below as a `String`).
+    if (schemeProvider != null &&
+        TypeParser.isPrimitiveType(valueType) &&
+        !TypeParser.isPrimitiveValue(value) &&
+        value is! Iterable &&
+        value is! Map &&
+        value is! Enum &&
+        value is! DateTime &&
+        value is! DynamicNumber) {
+      var entityID = schemeProvider.getEntityID(
+        value,
+        entityType: value.runtimeType,
+      );
+      if (entityID != null) value = entityID;
+    }
+
     var valueTypeInfo = TypeInfo.from(valueType);
 
     var valueParser = TypeParser.parserForTypeInfo(valueTypeInfo);
@@ -1853,10 +1899,15 @@ abstract class ConditionEncoder {
       }
     }
 
-    var schemeProvider = this.schemeProvider;
-
     if (schemeProvider != null) {
       if (!TypeParser.isPrimitiveType(valueType)) {
+        // (A list as a single entity, `[]` or `[x]`, was unwrapped at the
+        // top.)
+
+        // An ID (a primitive value, e.g. a `String` ID) for an entity type:
+        // already the entity's ID.
+        if (TypeParser.isPrimitiveValue(value)) return value;
+
         var entityID = schemeProvider.getEntityID(value, entityType: valueType);
         return entityID;
       } else {
