@@ -1577,10 +1577,12 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   /// path through one (`owner.email`), nor a field of another type.
   ///
   /// A relationship is compared by the IDs of its related entities, and it
-  /// never has a `null` ID: so `=~`/`!~` with `null` (or a `null` element,
-  /// a `null` parameter) are with an empty set of IDs (`=~` matches none,
-  /// `!~` all, as with `[]`), and `==`/`!=` with `[]` are with `null`
-  /// ("without related entities" / "with some").
+  /// never has a `null` ID: so a `null` element of a `=~`/`!~` list
+  /// (`=~ [1, null]`, `=~ [null]`) is ignored (for another field, it matches
+  /// a `null`, as `IS NULL`). As any field, `=~ null` (or a `null`
+  /// parameter) is an empty set (`=~` matches none, `!~` all, as with `[]`),
+  /// and `==`/`!=` with `[]` are with `null` ("without related entities" /
+  /// "with some").
   ///
   /// Cached per [entityHandler] (see [_isRelationshipKeyCacheHandler]).
   bool isRelationshipKey(EntityHandler? entityHandler) {
@@ -1650,9 +1652,29 @@ abstract class KeyCondition<O, V> extends Condition<O> {
     return ids;
   }
 
+  /// If the right side of a `=~`/`!~` ([value], a list) is a single
+  /// parameter whose value is `null` (`x =~ ?` with `null`): an empty set,
+  /// as `x =~ null` and `x =~ []` (`=~` matches none, `!~` all, any field).
+  bool _isNullParameterSet(
+    Object? parameters,
+    List? positionalParameters,
+    Map<String, Object?>? namedParameters,
+  ) {
+    var values = value;
+    if (values is! List || values.length != 1) return false;
+    var p = values.first;
+    return p is ConditionParameter &&
+        p.getValue(
+              parameters: parameters,
+              positionalParameters: positionalParameters,
+              namedParameters: namedParameters,
+            ) ==
+            null;
+  }
+
   /// If the right side ([value], or its parameter's value) is an empty list
-  /// (`== []`, `== ?` with `[]`). With a relationship (see
-  /// [isRelationshipKey]), `==`/`!=` compare it as a `null`.
+  /// (`== []`, `== ?` with `[]`): `==`/`!=` compare it as a `null` (any
+  /// field, as SQL encodes it: `IS NULL` / `IS NOT NULL`).
   bool _isEmptyListValue(
     Object? parameters,
     List? positionalParameters,
@@ -1981,10 +2003,9 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    // A relationship `== []` is `== null` (see [isRelationshipKey]):
+    // `== []` is `== null` (any field, see [_isEmptyListValue]):
     var right =
-        isRelationshipKey(entityHandler) &&
-            _isEmptyListValue(parameters, positionalParameters, namedParameters)
+        _isEmptyListValue(parameters, positionalParameters, namedParameters)
         ? null
         : value;
 
@@ -2013,10 +2034,9 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    // A relationship `== []` is `== null` (see [isRelationshipKey]):
+    // `== []` is `== null` (any field, see [_isEmptyListValue]):
     var right =
-        isRelationshipKey(entityHandler) &&
-            _isEmptyListValue(parameters, positionalParameters, namedParameters)
+        _isEmptyListValue(parameters, positionalParameters, namedParameters)
         ? null
         : value;
 
@@ -2109,10 +2129,9 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
   ) {
-    // A relationship `!= []` is `!= null` (see [isRelationshipKey]): with
-    // some related entity.
-    if (isRelationshipKey(entityHandler) &&
-        _isEmptyListValue(parameters, positionalParameters, namedParameters)) {
+    // `!= []` is `!= null` (any field, see [_isEmptyListValue]; a
+    // relationship: with some related entity).
+    if (_isEmptyListValue(parameters, positionalParameters, namedParameters)) {
       return _matchesToManyOrValue(
         keyValue,
         entityHandler,
@@ -2374,8 +2393,15 @@ class KeyConditionLessThanOrEqual<O> extends KeyCondition<O, Object?> {
 }
 
 abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
+  /// The values of an `IN` list.
+  ///
+  /// `x =~ null` is an empty set of values, as `x =~ []`: `=~` matches none
+  /// and `!~` all (any field). An explicit `null` element (`x =~ [null]`,
+  /// `x =~ [3, null]`) is kept: for a field (not a relationship, see
+  /// [KeyCondition.isRelationshipKey]), it also matches a `null` (as
+  /// `IS NULL`).
   static List<Object?> valuesAsList(dynamic value) {
-    if (value == null) return [null];
+    if (value == null) return [];
 
     if (value is List) return value;
 
@@ -2468,6 +2494,16 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
         namedParameters,
         entityHandler,
       );
+    }
+
+    // `x =~ ?` with `null`: an empty set, as `x =~ null` and `x =~ []`
+    // (`=~` matches none, `!~` all).
+    if (_isNullParameterSet(
+      parameters,
+      positionalParameters,
+      namedParameters,
+    )) {
+      return not;
     }
 
     bool inValues(Object? v) => inConditionValues(

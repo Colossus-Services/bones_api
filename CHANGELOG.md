@@ -1,25 +1,33 @@
 ## 1.34.0
 
-A relationship field (a to-one: an entity or an `EntityReference`; a
-to-many: a `List` of entities or an `EntityReferenceList`) is compared by
-the IDs of its related entities, which are never `null`. Behavior changes,
-on every DB adapter:
+`null` and `[]` mean the same in a condition: an empty set for `=~`/`!~`, a
+`null` for `==`/`!=`. Behavior changes, on every DB adapter, for any field
+(a number, a text, a relationship, a path through one):
 
-- `=~`/`!~` with `null` (`store =~ null`, `=~ ?` with a `null` parameter,
-  `=~ [null]`) is with an empty set of IDs, as `[]`: `=~` matches none and
-  `!~` all. It was `IS NULL` / `IS NOT NULL` (without / with a related
-  entity). A `null` in a list is ignored: `store =~ [1, null]` is
-  `store =~ [1]`. Use `store == null` / `store != null` for "without" /
-  "with" a related entity.
-- `==`/`!=` with `[]` (`stores == []`, `== ?` with `[]`) is as with `null`:
-  without / with related entities. SQL already did; memory matched none /
-  all.
+| Condition | Now | Was |
+|---|---|---|
+| `x =~ null`, `x =~ ?` with `null` | none (as `x =~ []`) | `IS NULL` |
+| `x !~ null`, `x !~ ?` with `null` | all (as `x !~ []`) | `IS NOT NULL` |
+| `x == []`, `x == ?` with `[]` | `IS NULL` (as `x == null`) | memory: none |
+| `x != []`, `x != ?` with `[]` | `IS NOT NULL` (as `x != null`) | memory: all |
+
+(SQL already encoded `== []` / `!= []` as `IS NULL` / `IS NOT NULL`.)
+
+An explicit `null` element is kept: `number =~ [null]` / `=~ [3, null]`
+(also a parameter `[null]`) still match a `null` (`IS NULL`), except for a
+relationship field:
+
+- A relationship field (a to-one: an entity or an `EntityReference`; a
+  to-many: a `List` of entities or an `EntityReferenceList`) is compared by
+  the IDs of its related entities, which are never `null`: a `null` element
+  is ignored. `store =~ [null]` matches none and `store =~ [1, null]` is
+  `store =~ [1]` (it was `IS NULL`, "without a related entity"). Use
+  `store == null` / `store != null` (or `== []` / `!= []`) for "without" /
+  "with" a related entity. (`KeyCondition.isRelationshipKey`.)
 - Fix: `store == ?` with `[]` (a to-one entity) failed resolving `[]` as an
   entity's ID (memory). A list as a single entity's value: `[]` is `null`,
   `[x]` is `x`.
-- Unchanged: a field that is not a relationship (`number =~ null` is `IS
-  NULL`), and a path through a relationship (`store.name =~ null`,
-  `roles.type == null`). (`KeyCondition.isRelationshipKey`.)
+- `KeyConditionINBase.valuesAsList(null)` is `[]` (it was `[null]`).
 
 - Tests: 'Relationship operators: by ID, on every adapter', on all the DB
   adapters, with the expected results computed from a model (each entity's
@@ -29,7 +37,10 @@ on every DB adapter:
   `==`/`!=` with `null`, `[]` (literals and parameters) and IDs. Over a
   to-many `EntityReferenceList` (`Address.closedStores`), a to-many `List`
   (`Address.stores`), a to-one entity (`Store.owner`) and a to-one
-  `EntityReference` (`User.userInfo`).
+  `EntityReference` (`User.userInfo`). And in 'Operators: the same results
+  on every adapter': `=~ null`, `!~ null`, `=~ [null]`, `== []`, `!= []`
+  and their parameters, over text, numbers, a to-one's and a to-many's
+  fields.
 
 ## 1.33.0
 

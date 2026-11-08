@@ -710,7 +710,8 @@ void main() {
     });
 
     test('KeyConditionINBase.valuesAsList', () {
-      expect(KeyConditionINBase.valuesAsList(null), equals([null]));
+      // `x =~ null` is an empty set, as `x =~ []` (since 1.34.0):
+      expect(KeyConditionINBase.valuesAsList(null), equals([]));
       expect(KeyConditionINBase.valuesAsList([1, 2]), equals([1, 2]));
       expect(KeyConditionINBase.valuesAsList({1, 2}), equals([1, 2]));
       expect(KeyConditionINBase.valuesAsList({'a': 1, 'b': 2}), equals([1, 2]));

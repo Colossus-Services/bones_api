@@ -465,7 +465,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
           null,
           tableKey,
           operator,
-          c.value,
+          valueAsList && _isNullParameterSet(c, context) ? const [] : c.value,
           valueAsList,
           negated: c.isNegated,
           nullable: !_isMainTableIDKey(c, context),
@@ -474,6 +474,24 @@ class ConditionSQLEncoder extends ConditionEncoder {
         );
       });
     });
+  }
+
+  /// If [c]'s `IN` list is a single parameter whose value is `null`
+  /// (`x =~ ?` with `null`): an empty set, as `x =~ null` and `x =~ []`
+  /// (`IN` matches none, `NOT IN` all; any field). As memory's
+  /// `KeyConditionINBase` (`_isNullParameterSet`).
+  bool _isNullParameterSet(KeyCondition c, EncodingContext context) {
+    var values = c.value;
+    if (values is! List || values.length != 1) return false;
+    var p = values.first;
+    return p is ConditionParameter &&
+        p.getValue(
+              parameters: context.parameters,
+              positionalParameters: context.positionalParameters,
+              namedParameters: context.namedParameters,
+              encodingParameters: context.encodingParameters,
+            ) ==
+            null;
   }
 
   /// If [c]'s key is a single relationship field of the main table: a

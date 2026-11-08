@@ -474,16 +474,29 @@ void main() {
 
     test('an empty `IN` list is not a `null` (SQL as memory)', () async {
       // Memory: `=~ []` matches nothing, `!~ []` everything (also a `null`);
-      // `=~ null` is "is null".
+      // `=~ null` (also a `null` parameter) is as `=~ []` (since 1.34.0);
+      // `=~ [null]` is "is null".
       for (var a in [null, 5]) {
         var empty = {'a': <int>[]};
         expect(matches('a =~ ?', {'a': a}, parameters: empty), isFalse);
         expect(matches('a !~ ?', {'a': a}, parameters: empty), isTrue);
         expect(matches('!(a =~ ?)', {'a': a}, parameters: empty), isTrue);
+
+        var aNull = {'a': null};
+        expect(matches('a =~ ?', {'a': a}, parameters: aNull), isFalse);
+        expect(matches('a !~ ?', {'a': a}, parameters: aNull), isTrue);
+        expect(matches('a =~ null', {'a': a}), isFalse);
+        expect(matches('a !~ null', {'a': a}), isTrue);
       }
-      var aNull = {'a': null};
-      expect(matches('a =~ ?', {'a': null}, parameters: aNull), isTrue);
-      expect(matches('a =~ ?', {'a': 5}, parameters: aNull), isFalse);
+      expect(matches('a =~ [null]', {'a': null}), isTrue);
+      expect(matches('a =~ [null]', {'a': 5}), isFalse);
+      expect(matches('a =~ [5, null]', {'a': null}), isTrue);
+
+      // `== []` is `== null` (since 1.34.0, as SQL):
+      expect(matches('a == []', {'a': null}), isTrue);
+      expect(matches('a == []', {'a': 5}), isFalse);
+      expect(matches('a != []', {'a': null}), isFalse);
+      expect(matches('a != []', {'a': 5}), isTrue);
 
       // SQL (1.32.0 wrote `[]` as `IS NULL`/`IS NOT NULL`):
       Future<String> sql(String q, Object? p) async =>
@@ -508,17 +521,19 @@ void main() {
         '( "ac"."email" = @email OR FALSE )',
       );
 
-      // Not an `IN`: `==`/`!=` with an empty list are still compared to
-      // `null` (unchanged; in memory they match none/all).
+      // Not an `IN`: `==`/`!=` with an empty list are compared to `null`
+      // (as memory, since 1.34.0):
       expect(await sql('pass == []', null), '( "ac"."pass" IS NULL )');
       expect(await sql('pass != []', null), '( "ac"."pass" IS NOT NULL )');
 
-      // A `null` (as a list) is still `IS NULL`:
-      expect(await sql('pass =~ ?', {'pass': null}), '( "ac"."pass" IS NULL )');
-      expect(
-        await sql('pass !~ ?', {'pass': null}),
-        '( "ac"."pass" IS NOT NULL )',
-      );
+      // `=~ null` and a `null` parameter are as `=~ []` (since 1.34.0):
+      expect(await sql('pass =~ null', null), '( FALSE )');
+      expect(await sql('pass !~ null', null), '( TRUE )');
+      expect(await sql('pass =~ ?', {'pass': null}), '( FALSE )');
+      expect(await sql('pass !~ ?', {'pass': null}), '( TRUE )');
+
+      // An explicit `null` element is still `IS NULL`:
+      expect(await sql('pass =~ [null]', null), '( "ac"."pass" IS NULL )');
       expect(
         await sql('pass =~ ?', {
           'pass': [null],

@@ -4944,10 +4944,10 @@ Future<bool> runAdapterTests(
           ),
           equals({'s2'}),
         );
-        // ... and a `null` parameter is `IS NULL`:
+        // ... and a `null` parameter is as `[]` (since 1.34.0):
         expect(
           await stores('number =~ ?', parameters: {'number': null}),
-          equals({'s2'}),
+          isEmpty,
         );
 
         // A to-one relationship (a subquery): a missing owner is included.
@@ -5221,6 +5221,11 @@ Future<bool> runAdapterTests(
         await s('name !~ null', allStores);
         await s('name =~ []', {});
         await s('name !~ []', allStores);
+        // `== []` is `== null`:
+        await s('name == []', {});
+        await s('name != []', allStores);
+        await s('name == ?', {}, [<String>[]]);
+        await s('name != ?:n', allStores, {'n': <String>[]});
         await s('name == ?', {'s3'}, ['ox-cherry']);
         await s('name != ?:n', {'s1', 's2', 's4', 's5'}, {'n': 'ox-cherry'});
         await s(
@@ -5265,14 +5270,21 @@ Future<bool> runAdapterTests(
         await s('number != null', {'s1', 's3', 's4', 's5'});
         await s('number =~ [1, 3]', {'s1', 's3', 's5'});
         await s('number !~ [1, 3]', {'s2', 's4'});
-        await s('number =~ null', {'s2'});
-        await s('number !~ null', {'s1', 's3', 's4', 's5'});
+        // `=~ null` is as `=~ []` (an empty set); an explicit `null` element
+        // matches a `null`:
+        await s('number =~ null', {});
+        await s('number !~ null', allStores);
         await s('number =~ [null]', {'s2'});
         await s('number !~ [null]', {'s1', 's3', 's4', 's5'});
         await s('number =~ [3, null]', {'s2', 's3'});
         await s('number !~ [3, null]', {'s1', 's4', 's5'});
         await s('number =~ []', {});
         await s('number !~ []', allStores);
+        // `== []` is `== null`:
+        await s('number == []', {'s2'});
+        await s('number != []', {'s1', 's3', 's4', 's5'});
+        await s('number == ?', {'s2'}, [<int>[]]);
+        await s('number != ?:n', {'s1', 's3', 's4', 's5'}, {'n': <int>[]});
         await s('number =~ /^3/', {'s3', 's4'});
         await s('number !~ /^3/', {'s1', 's2', 's5'});
         await s(r'number =~ /0$/', {'s4'});
@@ -5298,8 +5310,26 @@ Future<bool> runAdapterTests(
             'n': [1, 30],
           },
         );
-        await s('number =~ ?', {'s2'}, [null]);
-        await s('number !~ ?', {'s1', 's3', 's4', 's5'}, [null]);
+        // A `null` parameter is as `[]`; a `[null]` parameter matches a
+        // `null`:
+        await s('number =~ ?', {}, [null]);
+        await s('number !~ ?', allStores, [null]);
+        await s('number =~ ?:n', {}, {'n': null});
+        await s('number !~ ?:n', allStores, {'n': null});
+        await s(
+          'number =~ ?',
+          {'s2'},
+          [
+            [null],
+          ],
+        );
+        await s(
+          'number !~ ?',
+          {'s1', 's3', 's4', 's5'},
+          [
+            [null],
+          ],
+        );
         await s(
           'number =~ ?',
           {'s2', 's3'},
@@ -5375,7 +5405,10 @@ Future<bool> runAdapterTests(
         // A missing owner (`s2`) is a `null` field: `== null` matches it (as
         // `!=` does):
         await nullSplit(selectStores, allStores, 'owner.email', {'s2'});
-        await s('owner.email =~ null', {'s2'});
+        await s('owner.email =~ null', {});
+        await s('owner.email !~ null', allStores);
+        await s('owner.email =~ [null]', {'s2'});
+        await s('owner.email == []', {'s2'});
         await s(
           'owner.email =~ ?',
           {'s1', 's2'},
@@ -5402,7 +5435,10 @@ Future<bool> runAdapterTests(
           's3',
           's5',
         });
-        await s('owner.level =~ null', {'s2', 's3', 's5'});
+        await s('owner.level =~ null', {});
+        await s('owner.level =~ [null]', {'s2', 's3', 's5'});
+        await s('owner.level == []', {'s2', 's3', 's5'});
+        await s('owner.level =~ ?', {}, [null]);
         await s('owner.level =~ [5, null]', {'s2', 's3', 's4', 's5'});
         await s('owner.level !~ [5, null]', {'s1'});
         await s('owner.level == ?:l', {'s2', 's3', 's5'}, {'l': null});
@@ -5437,7 +5473,8 @@ Future<bool> runAdapterTests(
         );
         await s('owner.address.city =~ /?/', {'s3', 's5'}, ['Beta\$']);
         await nullSplit(selectStores, allStores, 'owner.address.city', {'s2'});
-        await s('owner.address.city =~ null', {'s2'});
+        await s('owner.address.city =~ null', {});
+        await s('owner.address.city =~ [null]', {'s2'});
 
         // A to-many relationship through a to-one one (`owner.roles`): `s2`
         // has no owner, `s4`'s owner (`uC`) no roles.
@@ -5554,7 +5591,10 @@ Future<bool> runAdapterTests(
           ],
         );
         await nullSplit(selectUsers, allUsers, 'roles.type', {'c'});
-        await u('roles.type =~ null', {'c'});
+        await u('roles.type =~ null', {});
+        await u('roles.type !~ null', allUsers);
+        await u('roles.type =~ [null]', {'c'});
+        await u('roles.type == []', {'c'});
         await u('roles.type =~ ["admin", null]', {'a', 'c'});
         await u('roles.type !~ ["admin", null]', {'b'});
         await u(
@@ -5646,8 +5686,12 @@ Future<bool> runAdapterTests(
         // The user's own fields:
         await nullSplit(selectUsers, allUsers, 'level', {'b'});
         await u('level == null', {'b'});
-        await u('level =~ null', {'b'});
-        await u('level !~ null', {'a', 'c'});
+        await u('level =~ null', {});
+        await u('level !~ null', allUsers);
+        await u('level =~ [null]', {'b'});
+        await u('level !~ [null]', {'a', 'c'});
+        await u('level == []', {'b'});
+        await u('level != []', {'a', 'c'});
         await u('level !~ [10]', {'b', 'c'});
         await u('level =~ [5, null]', {'b', 'c'});
         await u('address.city =~ /alpha/i', {'a', 'c'});
