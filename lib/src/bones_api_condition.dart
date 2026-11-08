@@ -1576,6 +1576,14 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   ) {
     if (!_isEmptyToMany(keyValue, entityHandler)) return keyValue;
 
+    // The right side: only known here, while matching. A parameter (`?`,
+    // `?:name`) is just a placeholder in this condition: its value comes
+    // with each query's parameters, and decides how the empty left side is
+    // compared:
+    // - `roles == ?` with `[[]]` (a list): compares the lists as a whole (the
+    //   empty list stays the left side).
+    // - `roles.type == ?` with `[null]` (not a list): compares as a `null`
+    //   field (returns `null`).
     Object? v = value;
     if (v is ConditionParameter) {
       v = v.getValue(
