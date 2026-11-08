@@ -1,3 +1,49 @@
+## 1.35.0
+
+Entity model clean-up (behavior-preserving, except the fixes below):
+
+- Entity rules: `EntityResolutionRules.merge`/`fetchTypes` and
+  `EntityAccessRules` (group flattening, condition check, reversed scan)
+  through shared helpers.
+- `EntityHandler`: one scalar equality chain for `equalsValues` and
+  `equalsValuesBasic`; the comparisons through one numeric helper; a shared
+  cached field-type lookup for `GenericEntityHandler` and
+  `ClassReflectionEntityHandler`; private caches named `*Cache` and
+  documented.
+- `Transaction`: identity sets beside the operation lists, for O(1)
+  membership checks (a bulk `storeAll` was O(n²)).
+- Cascade delete, `storeAllFromJson` (named block-size constants), the seed
+  JSON helpers, the provider lookups, `IterableEntityRepository` and
+  `TransactionOperation.toString`: duplicated blocks moved into helpers.
+- `EntityReference`/`EntityReferenceList`, `TypeInfo` and `Map` getter
+  extensions, `Time`, `EntityPagination`: duplicated code merged.
+- `isEqualsIterableDeep`/`intersectsIterableDeep`: iterate instead of
+  `elementAt(i)` (O(n²) on a non-`List` `Iterable`).
+
+Deprecated (still working):
+
+- `EntityHandler.graterThanValue`/`graterThanOrEqualValue`: use
+  `greaterThanValue`/`greaterThanOrEqualValue`.
+- `EntityRulesResolver.cotextProviders`: use `contextProviders`.
+
+Fixes:
+
+- `GenericEntityHandler.getFieldType` with `resolveFiledName`: the entity is
+  asked for the resolved field name (it was asked for the key again).
+- `EntityRepositoryProvider.populateFromSource`: `workingPath` is used to
+  resolve the source (and the variables) file.
+- `EntityRepositoryProvider.storeAllFromJson`/`storeAllFromJsonEncoded`:
+  `transaction` is used, and the `%name%` `variables` are resolved (they
+  were ignored).
+- `EntityReference.from`/`EntityReferenceList.from`: `entityHandlerProvider`
+  is forwarded.
+- `IterableEntityRepository.deleteEntity`: `transaction` is forwarded.
+- `EntityAccessRules` `==`/`hashCode`: `entityFields` compared element-wise
+  (it was identity).
+- `EntityResolutionRules` with `allEager` and `allLazy` both `true`: invalid
+  (`validate` and `merge` throw `ValidateEntityRulesError`);
+  `isEagerEntityType`/`isLazyEntityType` recursed forever on it.
+
 ## 1.34.0
 
 `null` and `[]` mean the same in a condition: an empty set for `=~`/`!~`, a
