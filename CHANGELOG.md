@@ -52,6 +52,11 @@ relationship field:
   text (`toString`), not its name / ID.
 - Fix (memory): a list field with a `null` element (`['a', null]`) was
   `== null` (any element `null`); a list is a value, not `null`.
+- Fix (SQL, 1.33.0 regression): a query through a to-many relationship,
+  without an explicit order (`orderByID: null`), lost the ID order its
+  `JOIN` had: its IDs subquery (`id IN ( SELECT ... )`) may not keep the
+  table order (PostgreSQL's hash semi-join). It's ordered by ID again (as
+  memory).
 - Fix: `store == ?` with `[]` (a to-one entity) failed resolving `[]` as an
   entity's ID (memory). A list as a single entity's value: `[]` is `null`,
   `[x]` is `x`.

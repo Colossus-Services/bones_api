@@ -6142,6 +6142,21 @@ Future<bool> runAdapterTests(
           pageLength: pageAddresses,
         );
 
+        // A to-many relationship's query, without an explicit order: in ID
+        // order (as its `JOIN` was, before its IDs subquery).
+        {
+          var ids = (await addressRepo.selectByQuery(
+            'closedStores =~ ?',
+            parameters: [
+              [sc1.id, sc2.id],
+            ],
+          )).map((e) => e.id as int).toList();
+          var sorted = [...ids]..sort();
+          if (ids.join(',') != sorted.join(',')) {
+            failures.add('`closedStores =~ ?` order: $ids, expected $sorted');
+          }
+        }
+
         // A to-many path (`stores.number`: `C` has no stores, a `null` row):
         // `=~ null` is an empty set, `=~ [null]` matches a `null`.
         for (var (q, exp) in [
