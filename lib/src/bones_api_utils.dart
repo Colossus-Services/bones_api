@@ -8,6 +8,10 @@ class StringUtils {
 
   static final RegExp _regexpNotLettersAndDigits = RegExp(r'[^a-zA-Z\d]+');
 
+  /// Cache of [toLowerCaseSimple] results (input -> result), filled by
+  /// [toLowerCaseSimpleCached]: the same (field) names are normalized again
+  /// and again (e.g. matching entity fields to map keys), and each call runs
+  /// a [RegExp] replace. Never cleared: meant for a bounded set of names.
   static final Map<String, String> _toLowerCaseSimpleCache = {};
 
   /// Cached version of [toLowerCaseSimple].

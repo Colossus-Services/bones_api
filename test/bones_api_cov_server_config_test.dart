@@ -463,6 +463,27 @@ void main() {
         ),
         equals('def'),
       );
+
+      // `k3` is part of the config path (it was ignored before):
+      var apiConfig4 = APIConfig({
+        'cache': {
+          'api': {
+            'v2': {'cache_control': 'from-config-k3'},
+          },
+        },
+      });
+      expect(
+        APIServerConfig.normalizeHeaderValue(
+          null,
+          'def',
+          apiConfig4,
+          'cache',
+          'api',
+          'v2',
+          'cache_control',
+        ),
+        equals('from-config-k3'),
+      );
     });
 
     test('resolveDomainsRoots', () {

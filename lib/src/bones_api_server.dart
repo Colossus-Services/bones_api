@@ -949,7 +949,7 @@ class APIServerConfig {
       return header;
     } else {
       if (apiConfig != null && k0 != null) {
-        var val = apiConfig.getPath(k0, k1, k2);
+        var val = apiConfig.getPath(k0, k1, k2, k3);
         if (val != null) return val;
       }
       return def;
@@ -1665,7 +1665,7 @@ abstract class _APIServerBase extends APIServerConfig {
   String get url => 'http://$urlHost:$port/';
 
   /// The local `API-INFO` URL of this server.
-  String get apiInfoURL => 'http://$urlHost:$port/API-INFO';
+  String get apiInfoURL => 'http://$urlHost:$port/${APIRoot.apiInfoRoute}';
 
   /// Returns `true` if the basic conditions for Let's Encrypt are configured.
   ///
@@ -1914,12 +1914,7 @@ class APIServer extends _APIServerBase {
 
     var method = parseAPIRequestMethod(request.method) ?? APIRequestMethod.GET;
 
-    var headers = Map.fromEntries(
-      request.headersAll.entries.map((e) {
-        var values = e.value;
-        return MapEntry(e.key, values.length == 1 ? values[0] : values);
-      }),
-    );
+    var headers = _flattenSingleValues(request.headersAll);
 
     if (cookieless) {
       headers.remove('cookie');
@@ -1928,14 +1923,9 @@ class APIServer extends _APIServerBase {
     var requestedUri = request.requestedUri;
 
     var path = requestedUri.path;
-    var parameters = Map.fromEntries(
-      requestedUri.queryParametersAll.entries.map((e) {
-        var values = e.value;
-        return MapEntry(e.key, values.length == 1 ? values[0] : values);
-      }),
-    );
+    var parameters = _flattenSingleValues(requestedUri.queryParametersAll);
 
-    var scheme = request.requestedUri.scheme;
+    var scheme = requestedUri.scheme;
 
     var connectionInfo = _getConnectionInfo(request);
     var requesterAddress = connectionInfo?.remoteAddress.address;
@@ -1952,7 +1942,7 @@ class APIServer extends _APIServerBase {
     if (useSessionID && !cookieless) {
       var cookies = _parseCookies(request);
       if (cookies != null && cookies.isNotEmpty) {
-        sessionID = cookies['SESSIONID'] ?? cookies['SESSION_ID'];
+        sessionID = cookies[sessionIDCookieName] ?? cookies['SESSION_ID'];
       }
 
       if (sessionID == null) {
@@ -2012,7 +2002,7 @@ class APIServer extends _APIServerBase {
         newSession: newSession,
         credential: credential,
         scheme: scheme,
-        requestedUri: request.requestedUri,
+        requestedUri: requestedUri,
         originalRequest: request,
         payload: payload,
         payloadMimeType: mimeType,
@@ -2023,6 +2013,19 @@ class APIServer extends _APIServerBase {
       return req;
     });
   }
+
+  /// Flattens a multi-value map (request headers or query parameters):
+  /// a key with exactly one value maps to that `String`, any other key keeps
+  /// its `List<String>`. Used by [toAPIRequest], so that the common
+  /// single-value case is read as a plain `String` by [APIRequest] users.
+  static Map<String, Object> _flattenSingleValues(
+    Map<String, List<String>> multiValues,
+  ) => Map.fromEntries(
+    multiValues.entries.map((e) {
+      var values = e.value;
+      return MapEntry(e.key, values.length == 1 ? values[0] : values);
+    }),
+  );
 
   static Map<String, String>? _parseCookies(Request request) {
     var headerCookies = request.headersAll['cookie'];
@@ -2164,18 +2167,12 @@ class APIServer extends _APIServerBase {
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => request
-      .read()
-      .toList()
-      .then(
-        (bs) => _loadPayloadBytes(
-          request,
-          bs,
-          maxPayloadLength: maxPayloadLength,
-          decompressPayload: decompressPayload,
-        ),
-      )
-      .then((allBytes) {
+  }) =>
+      _readPayloadBytes(
+        request,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      ).then((allBytes) {
         var encoding = mimeType.charsetEncoding ?? utf8;
 
         try {
@@ -2190,14 +2187,34 @@ class APIServer extends _APIServerBase {
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
+  }) => _readPayloadBytes(
+    request,
+    maxPayloadLength: maxPayloadLength,
+    decompressPayload: decompressPayload,
+  ).then((allBytes) => (mimeType, allBytes));
+
+  /// Reads the whole [request] body and passes its blocks to
+  /// [_loadPayloadBytes] (size check and optional decompression).
+  /// Shared by [_loadPayloadString] and [_resolvePayloadBytes], which only
+  /// differ in how they interpret the resulting bytes.
+  static Future<Uint8List> _readPayloadBytes(
+    Request request, {
+    int? maxPayloadLength,
+    bool? decompressPayload,
   }) => request.read().toList().then(
     (bs) => _loadPayloadBytes(
       request,
       bs,
       maxPayloadLength: maxPayloadLength,
       decompressPayload: decompressPayload,
-    ).resolveMapped((allBytes) => (mimeType, allBytes)),
+    ),
   );
+
+  /// Returns [bytes] itself when it is already a [Uint8List] (no copy),
+  /// otherwise a [Uint8List] copy of it. Used for the single-block payload
+  /// in [_loadPayloadBytes] and for the `gzip`/`deflate` decoder outputs.
+  static Uint8List _toUint8List(List<int> bytes) =>
+      bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
   /// The decoded size limit of a Brotli request payload when
   /// `maxPayloadLength` is not defined (`64 MB`): a few bytes of Brotli
@@ -2213,32 +2230,25 @@ class APIServer extends _APIServerBase {
     maxPayloadLength ??= -1;
     decompressPayload ??= false;
 
+    var allBytesSz = payloadBlocks.length == 1
+        ? payloadBlocks[0].length
+        : payloadBlocks.map((e) => e.length).sum;
+
+    // Checked before copying/concatenating, so an oversized payload is
+    // rejected without allocating its buffer:
+    if (maxPayloadLength >= 0 && allBytesSz > maxPayloadLength) {
+      throw StateError(
+        "Payload size ($allBytesSz) exceeds `maxPayloadLength` ($maxPayloadLength).",
+      );
+    }
+
     Uint8List bytes;
 
     if (payloadBlocks.length == 1) {
-      final bs0 = payloadBlocks[0];
-      if (bs0 is Uint8List) {
-        bytes = bs0;
-      } else {
-        bytes = Uint8List.fromList(bs0);
-      }
-
-      assert(bytes.length == bs0.length);
-
-      if (maxPayloadLength >= 0 && bytes.length > maxPayloadLength) {
-        throw StateError(
-          "Payload size (${bytes.length}) exceeds `maxPayloadLength` ($maxPayloadLength).",
-        );
-      }
+      // A single block needs no concatenation (and no copy if it's already
+      // a `Uint8List`):
+      bytes = _toUint8List(payloadBlocks[0]);
     } else {
-      var allBytesSz = payloadBlocks.map((e) => e.length).sum;
-
-      if (maxPayloadLength >= 0 && allBytesSz > maxPayloadLength) {
-        throw StateError(
-          "Payload size ($allBytesSz) exceeds `maxPayloadLength` ($maxPayloadLength).",
-        );
-      }
-
       bytes = Uint8List(allBytesSz);
       var bytesOffset = 0;
 
@@ -2301,8 +2311,7 @@ class APIServer extends _APIServerBase {
       }
     }
 
-    var decoded = gzip.decode(bytes);
-    return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
+    return _toUint8List(gzip.decode(bytes));
   }
 
   /// Decodes in the [compressionIsolatePool] (not blocking the event loop),
@@ -2327,8 +2336,7 @@ class APIServer extends _APIServerBase {
   }
 
   static Uint8List _decodePayloadZlib(Uint8List bytes) {
-    var decoded = zlib.decode(bytes);
-    return decoded is Uint8List ? decoded : Uint8List.fromList(decoded);
+    return _toUint8List(zlib.decode(bytes));
   }
 
   static final RegExp _regExpSpace = RegExp(r'\s+');
@@ -2378,6 +2386,22 @@ class APIServer extends _APIServerBase {
   static const String headerXAccessToken = "X-Access-Token";
   static const String headerXAccessTokenExpiration =
       "X-Access-Token-Expiration";
+
+  /// The cookie that carries the session ID (see [APIRequest.sessionID]).
+  static const String sessionIDCookieName = 'SESSIONID';
+
+  /// The `Server-Timing` header (lower-case, as `shelf` normalizes it).
+  static const String headerServerTiming = 'server-timing';
+
+  /// The `Keep-Alive` header (lower-case, as `shelf` normalizes it).
+  static const String headerKeepAlive = 'keep-alive';
+
+  /// The `Content-Length` header (lower-case, as `shelf` normalizes it).
+  static const String headerContentLength = 'content-length';
+
+  /// The header identifying the [APIServerWorker] that answered a request:
+  /// `workerIndex/totalWorkers`.
+  static const String headerXAPIServerWorker = 'X-API-Server-Worker';
 
   /// The header flagging a `cookieless` server. See [headerXCookielessServerValue].
   static const String headerXCookielessServer = "X-Cookieless-Server";
@@ -3011,13 +3035,26 @@ final class APIServerWorker extends _APIServerBase {
         .resolveMapped((response) => _APIResponseStaticFile<T>(response));
   }
 
-  final Map<String, Handler> _directoriesStaticHandlers = <String, Handler>{};
+  /// Cache of the static-files [Handler] of each root directory (keyed by
+  /// [Directory.path]), filled by [_getDirectoryStaticHandler]. A handler
+  /// (and its response cache) is built once per directory and reused, rather
+  /// than rebuilt (and its cache lost) on each request.
+  final Map<String, Handler> _directoriesStaticHandlersCache =
+      <String, Handler>{};
 
   Handler _getDirectoryStaticHandler(Directory rootDirectory) =>
-      _directoriesStaticHandlers[rootDirectory.path] ??=
+      _directoriesStaticHandlersCache[rootDirectory.path] ??=
           _createDirectoryHandler(rootDirectory);
 
   APIServerResponseCache? _responseCache;
+
+  /// Cache of [responseCompression] (a getter that builds a new
+  /// [APIResponseCompression] on each read), used by
+  /// [_createDirectoryHandler] and by [_disposeAndCompressResponse] for every
+  /// API response. The fields it's built from are `final`, so it's resolved
+  /// once (lazily, on first use).
+  late final APIResponseCompression _responseCompressionCache =
+      responseCompression;
 
   Handler _createDirectoryHandler(Directory rootDirectory) {
     rootDirectory = Directory(pack_path.normalize(rootDirectory.absolute.path));
@@ -3032,7 +3069,7 @@ final class APIServerWorker extends _APIServerBase {
 
     var pipeline = const Pipeline().addMiddleware(aliases.middleware);
 
-    var compression = responseCompression;
+    var compression = _responseCompressionCache;
 
     APIResponseCompression Function(Request request, Response response)?
     resolveCompression;
@@ -3372,14 +3409,17 @@ final class APIServerWorker extends _APIServerBase {
 
     _log.info("Starting...$_logSectionOpen");
 
-    return _startImpl2().then((ok) {
+    return _startServersAndInitializeAPIRoot().then((ok) {
       _log.info("Started: ${ok ? 'OK' : 'Fail'}$_logSectionClose");
 
       return _log.flushMessages().then((_) => ok);
     });
   }
 
-  Future<bool> _startImpl2() async {
+  /// Starts the HTTP(S) servers (Let's Encrypt or normal) and hot reload,
+  /// then initializes the [apiRoot]. Returns whether the [apiRoot] loaded
+  /// `OK`. Called by [_startImpl], which wraps it with the start log section.
+  Future<bool> _startServersAndInitializeAPIRoot() async {
     if (isAuxiliaryWorker) {
       DBAdapter.enableAuxiliaryMode();
     }
@@ -3395,9 +3435,11 @@ final class APIServerWorker extends _APIServerBase {
     }
 
     if (cookieless) {
-      _log.info('Cookieless Server: all cookies disabled! (NO `SESSIONID`)');
+      _log.info(
+        'Cookieless Server: all cookies disabled! (NO `${APIServer.sessionIDCookieName}`)',
+      );
     } else if (useSessionID) {
-      _log.info('Using `SESSIONID` cookies.');
+      _log.info('Using `${APIServer.sessionIDCookieName}` cookies.');
     }
 
     var workerInfo = totalWorkers > 1
@@ -3587,11 +3629,11 @@ final class APIServerWorker extends _APIServerBase {
           return _processAPIRequest(request, apiReq);
         },
         onError: (e, s) {
-          return _errorProcessing(request, apiRequest, e, s);
+          return _errorResponse(request, apiRequest, e, s);
         },
       );
     } catch (e, s) {
-      return _errorProcessing(request, apiRequest, e, s);
+      return _errorResponse(request, apiRequest, e, s);
     }
   }
 
@@ -3610,7 +3652,7 @@ final class APIServerWorker extends _APIServerBase {
         return _processCall(request, apiRequest);
       }
     } catch (e, s) {
-      return _errorProcessing(request, apiRequest, e, s);
+      return _errorResponse(request, apiRequest, e, s);
     }
   }
 
@@ -3646,7 +3688,11 @@ final class APIServerWorker extends _APIServerBase {
         });
   }
 
-  Response _errorProcessing(
+  /// Logs an [error] raised while processing [request] and returns a `500`
+  /// [Response] describing it. Used by [_process] and [_processAPIRequest]
+  /// for errors thrown outside the route call (errors of the route itself
+  /// become an [APIResponse.error] in [_processCall]).
+  Response _errorResponse(
     Request request,
     APIRequest? apiRequest,
     Object error,
@@ -3727,6 +3773,11 @@ final class APIServerWorker extends _APIServerBase {
     APIRequest apiRequest,
     APIResponse apiResponse,
   ) {
+    // The only place the `CORS` headers of an API response are set (the
+    // headers built later by `_resolveAPIResponseHeaders` are read from this
+    // `apiResponse`). Use the configured `CORS`, not the [APIResponse]
+    // defaults, so that a header this server is configured to omit is not
+    // added.
     APIServer.setCORS(apiRequest, apiResponse, cors: crossOrigin.api);
 
     if (apiResponse is _APIResponseStaticFile) {
@@ -3752,39 +3803,62 @@ final class APIServerWorker extends _APIServerBase {
 
     return retPayload.resolveMapped((payload) {
       if (payload is APIResponse) {
+        // The payload resolved to another `APIResponse` (e.g. an error
+        // response from a failed payload `Future`): its status and body are
+        // sent, with the headers of the original `apiResponse`.
         var apiResponse2 = payload;
 
-        return _resolveBody(apiResponse2.payload, apiResponse2).resolveMapped((
-          payload2,
-        ) {
-          var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
-
-          var response = _sendAPIResponse(
+        return _resolveBody(apiResponse2.payload, apiResponse2).resolveMapped(
+          (payload2) => _finishResponse(
             request,
             apiRequest,
             apiResponse2,
-            headers,
             payload2,
-          );
-
-          apiResponse.disposeAsync();
-
-          return _processResponse(apiRequest, apiResponse2, request, response);
-        });
-      } else {
-        var headers = _resolveAPIResponseHeaders(apiResponse, apiRequest);
-
-        var response = _sendAPIResponse(
-          request,
-          apiRequest,
-          apiResponse,
-          headers,
-          payload,
+            outerAPIResponse: apiResponse,
+          ),
         );
-
-        return _processResponse(apiRequest, apiResponse, request, response);
+      } else {
+        return _finishResponse(request, apiRequest, apiResponse, payload);
       }
     });
+  }
+
+  /// Builds the final [Response] of [apiResponse] with the resolved body
+  /// [payload], then disposes and compresses it.
+  ///
+  /// When [apiResponse] came from the payload of another response
+  /// ([outerAPIResponse]), the headers are taken from [outerAPIResponse],
+  /// which is disposed after the [Response] is built (it's not passed to
+  /// [_disposeAndCompressResponse]). Used by [_processAPIResponse] for both
+  /// cases.
+  FutureOr<Response> _finishResponse(
+    Request request,
+    APIRequest apiRequest,
+    APIResponse apiResponse,
+    Object? payload, {
+    APIResponse? outerAPIResponse,
+  }) {
+    var headers = _resolveAPIResponseHeaders(
+      outerAPIResponse ?? apiResponse,
+      apiRequest,
+    );
+
+    var response = _buildShelfResponse(
+      request,
+      apiRequest,
+      apiResponse,
+      headers,
+      payload,
+    );
+
+    outerAPIResponse?.disposeAsync();
+
+    return _disposeAndCompressResponse(
+      apiRequest,
+      apiResponse,
+      request,
+      response,
+    );
   }
 
   Map<String, Object> _resolveAPIResponseHeaders(
@@ -3793,11 +3867,8 @@ final class APIServerWorker extends _APIServerBase {
   ) {
     var headers = <String, Object>{};
 
-    if (!apiResponse.hasCORS) {
-      // Use the configured `CORS`, not the [APIResponse] defaults, so that a
-      // header this server is configured to omit is not added back here:
-      APIServer.setCORS(apiRequest, apiResponse, cors: crossOrigin.api);
-    }
+    // The `CORS` headers were already set in `apiResponse.headers` by
+    // `_processAPIResponse` (copied below with the other headers).
 
     if (apiResponse.requiresAuthentication) {
       var type = apiResponse.authenticationType;
@@ -3823,7 +3894,8 @@ final class APIServerWorker extends _APIServerBase {
     headers[HttpHeaders.serverHeader] ??= serverName;
 
     if (apiRequest.newSession && !cookieless) {
-      var setSessionID = 'SESSIONID=${apiRequest.sessionID}';
+      var setSessionID =
+          '${APIServer.sessionIDCookieName}=${apiRequest.sessionID}';
       headers.setMultiValue(
         HttpHeaders.setCookieHeader,
         setSessionID,
@@ -3837,13 +3909,17 @@ final class APIServerWorker extends _APIServerBase {
 
       if (authentication.resumed ||
           _needToSendHeaderXAccessToken(apiRequest, headers, tokenKey)) {
-        headers.setMultiValue('X-Access-Token', tokenKey, ignoreCase: true);
+        headers.setMultiValue(
+          APIServer.headerXAccessToken,
+          tokenKey,
+          ignoreCase: true,
+        );
       }
     }
 
     headers[HttpHeaders.cacheControlHeader] = apiCacheControl;
 
-    headers['X-API-Server-Worker'] = '$workerIndex/$totalWorkers';
+    headers[APIServer.headerXAPIServerWorker] = '$workerIndex/$totalWorkers';
 
     // headers['X-APIToken'] = apiRequest.credential?.token ?? '?';
 
@@ -3851,7 +3927,7 @@ final class APIServerWorker extends _APIServerBase {
   }
 
   /// Resolves the body of an API response, NOT compressed: the API
-  /// responses are only compressed by [_processResponse]
+  /// responses are only compressed by [_disposeAndCompressResponse]
   /// ([compressResponse]), with the headers of the final [Response].
   static FutureOr<Object?> _resolveBody(
     Object? payload,
@@ -3870,7 +3946,10 @@ final class APIServerWorker extends _APIServerBase {
         compression: APIResponseCompression.none,
       );
 
-  FutureOr<Response> _processResponse(
+  /// Disposes [apiResponse] and [apiRequest] (their `Response` is already
+  /// built) and compresses [response], as accepted by [request].
+  /// The last step of [_finishResponse].
+  FutureOr<Response> _disposeAndCompressResponse(
     APIRequest apiRequest,
     APIResponse apiResponse,
     Request request,
@@ -3882,13 +3961,11 @@ final class APIServerWorker extends _APIServerBase {
     return compressResponse(
       request,
       response,
-      compression: _responseCompression,
+      compression: _responseCompressionCache,
       addCompressionRatioHeader: true,
       addServerTiming: true,
     );
   }
-
-  late final APIResponseCompression _responseCompression = responseCompression;
 
   bool _needToSendHeaderXAccessToken(
     APIRequest apiRequest,
@@ -3904,7 +3981,7 @@ final class APIServerWorker extends _APIServerBase {
     // Already in the response headers (e.g. set by the route):
 
     var headerAccessToken = headers.getMultiValue(
-      'x-access-token',
+      APIServer.headerXAccessToken,
       ignoreCase: true,
     );
     var notSentByAccessToken =
@@ -3916,7 +3993,11 @@ final class APIServerWorker extends _APIServerBase {
     return needToSendHeaderXAccessToken;
   }
 
-  Response _sendAPIResponse(
+  /// Builds the `shelf` [Response] of [apiResponse]: records the final
+  /// metrics (`Server-Timing`), sets the content/cache/keep-alive headers
+  /// and maps [APIResponse.status] to a status code. It doesn't send
+  /// anything (`shelf` does, once the handler returns).
+  Response _buildShelfResponse(
     Request request,
     APIRequest apiRequest,
     APIResponse apiResponse,
@@ -3955,16 +4036,16 @@ final class APIServerWorker extends _APIServerBase {
       var max = apiResponse.keepAliveMaxRequests.clamp(0, 1000000);
 
       headers[HttpHeaders.connectionHeader] = 'Keep-Alive';
-      headers['keep-alive'] = 'timeout=$timeout, max=$max';
+      headers[APIServer.headerKeepAlive] = 'timeout=$timeout, max=$max';
     }
 
     var allMetrics = apiRequest.hasMetrics
         ? CombinedMapView([apiRequest.metrics, apiResponse.metrics])
         : apiResponse.metrics;
 
-    headers['server-timing'] = APIServer.resolveServerTiming(
+    headers[APIServer.headerServerTiming] = APIServer.resolveServerTiming(
       allMetrics,
-      headers['server-timing']?.toString(),
+      headers[APIServer.headerServerTiming]?.toString(),
     );
 
     if (cookieless) {
@@ -3980,13 +4061,13 @@ final class APIServerWorker extends _APIServerBase {
         return Response.notFound(payload, headers: headers);
       case APIResponseStatus.NOT_MODIFIED:
         {
-          headers.remove('content-length');
+          headers.remove(APIServer.headerContentLength);
           return Response.notModified(headers: headers);
         }
       case APIResponseStatus.UNAUTHORIZED:
         {
           var wwwAuthenticate = headers.getAsString(
-            'WWW-Authenticate',
+            HttpHeaders.wwwAuthenticateHeader,
             ignoreCase: true,
           );
 

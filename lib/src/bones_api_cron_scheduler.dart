@@ -458,20 +458,90 @@ class APICronScheduler {
     run.status = APICronRunStatus.running;
 
     if (!await store.updateRun(run, previousOwner: previousOwner)) {
-      _log.warning(
-        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
-        'taken by another instance',
-      );
+      _log.warning('${_runLabel(job, run)}: taken by another instance');
       return run;
     }
 
     _log.info(
-      'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): started, '
+      '${_runLabel(job, run)}: started, '
       'owner=$owner${run.calls > 0 ? ', resuming after ${run.calls} call(s)' : ''}',
     );
 
     renewer.start();
 
+    var (:succeeded, :error, interrupted: interruptedByStore) = await _runCalls(
+      job,
+      run,
+      renewer,
+    );
+
+    var interrupted =
+        interruptedByStore ??
+        (renewer.lost ? 'lock lost' : (_stopping ? 'scheduler stopped' : null));
+
+    if (interrupted != null) {
+      // Left `running`: resumed by the new owner (or another instance).
+      _log.warning(
+        '${_runLabel(job, run)}: '
+        '$interrupted, left running after ${run.calls} call(s)',
+      );
+      return run;
+    }
+
+    var finished = _now;
+    run.finishedAt = finished;
+    run.durationMs = finished
+        .difference(run.startedAt ?? started)
+        .inMilliseconds;
+    run.status = succeeded
+        ? APICronRunStatus.succeeded
+        : APICronRunStatus.failed;
+    run.lastError = succeeded ? null : error;
+
+    if (!await _storeRunResult(job, run)) {
+      // Rejected (taken by another instance) or not stored: as stored.
+      _log.warning(
+        '${_runLabel(job, run)}: result '
+        '(${run.status.name}) not stored: interrupted',
+      );
+      return run..status = APICronRunStatus.running;
+    }
+
+    var msg =
+        '${_runLabel(job, run)}: '
+        '${run.status.name}, calls=${run.calls}, attempts=${run.attempts}, '
+        'duration=${run.durationMs}ms';
+
+    if (succeeded) {
+      _log.info(msg);
+    } else {
+      _log.severe('$msg, error: $error');
+    }
+
+    return run;
+  }
+
+  /// The log label of a [run] of [job]: `` Run `name` (scheduledAt) ``.
+  /// Used by [_execute] for every message about a run's lifecycle.
+  static String _runLabel(APICronJob job, APICronJobRun run) =>
+      'Run `${job.name}` (${run.scheduledAt.toIso8601String()})';
+
+  /// Calls the route of [job] (with retries) until there's no continuation,
+  /// storing the progress ([APICronJobRun.calls] and continuation) after
+  /// each call. Used by [_execute].
+  ///
+  /// Returns whether the run [succeeded], its [error] (when it failed) and,
+  /// when the progress store was rejected (taken by another instance), why
+  /// it was [interrupted]. An interruption by the [renewer] (lock lost) or
+  /// by [stop] only stops the loop: [_execute] checks it afterwards.
+  ///
+  /// An error never escapes: it fails the run (a run left `running` by an
+  /// error would be resumed again and again).
+  Future<({bool succeeded, String? error, String? interrupted})> _runCalls(
+    APICronJob job,
+    APICronJobRun run,
+    _LockRenewer renewer,
+  ) async {
     String? error;
     var succeeded = false;
     String? interrupted;
@@ -526,58 +596,19 @@ class APICronScheduler {
       _log.severe('Run `${job.name}`: error', e, s);
     }
 
-    interrupted ??= renewer.lost
-        ? 'lock lost'
-        : (_stopping ? 'scheduler stopped' : null);
+    return (succeeded: succeeded, error: error, interrupted: interrupted);
+  }
 
-    if (interrupted != null) {
-      // Left `running`: resumed by the new owner (or another instance).
-      _log.warning(
-        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
-        '$interrupted, left running after ${run.calls} call(s)',
-      );
-      return run;
-    }
-
-    var finished = _now;
-    run.finishedAt = finished;
-    run.durationMs = finished
-        .difference(run.startedAt ?? started)
-        .inMilliseconds;
-    run.status = succeeded
-        ? APICronRunStatus.succeeded
-        : APICronRunStatus.failed;
-    run.lastError = succeeded ? null : error;
-
-    bool stored;
+  /// Stores the final result of [run] (already set by [_execute]). Returns
+  /// `false` if the store rejected it (taken by another instance) or failed
+  /// (the error is logged, not rethrown).
+  Future<bool> _storeRunResult(APICronJob job, APICronJobRun run) async {
     try {
-      stored = await store.updateRun(run);
+      return await store.updateRun(run);
     } catch (e, s) {
       _log.severe('Run `${job.name}`: error storing its result', e, s);
-      stored = false;
+      return false;
     }
-
-    if (!stored) {
-      // Rejected (taken by another instance) or not stored: as stored.
-      _log.warning(
-        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): result '
-        '(${run.status.name}) not stored: interrupted',
-      );
-      return run..status = APICronRunStatus.running;
-    }
-
-    var msg =
-        'Run `${job.name}` (${run.scheduledAt.toIso8601String()}): '
-        '${run.status.name}, calls=${run.calls}, attempts=${run.attempts}, '
-        'duration=${run.durationMs}ms';
-
-    if (succeeded) {
-      _log.info(msg);
-    } else {
-      _log.severe('$msg, error: $error');
-    }
-
-    return run;
   }
 
   /// Calls the route of [job], with the [APICronJob.retry] attempts.

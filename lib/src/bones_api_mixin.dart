@@ -772,47 +772,38 @@ mixin FieldsFromMap {
     fieldSimple ??= fieldToSimpleKey(field);
     if (map.containsKey(fieldSimple)) return fieldSimple;
 
-    if (mapLC != null) {
-      if (mapLC.isEmpty) {
-        for (var e in map.entries) {
-          var k = e.key;
-          var kLC = fieldToLCKey(k);
-          mapLC[kLC] = k;
+    return _findKeyByNormalized(map, fieldLC, mapLC, fieldToLCKey) ??
+        _findKeyByNormalized(map, fieldSimple, mapSimple, fieldToSimpleKey);
+  }
+
+  /// Returns the key of [map] whose [normalize]d form is [fieldNormalized].
+  /// Used by [_getFieldKeyInMapImpl] for the lower-case ([fieldToLCKey]) and
+  /// the simple ([fieldToSimpleKey]) lookups.
+  ///
+  /// If [mapNormalized] (a caller-provided index: normalized key -> [map]
+  /// key) is given, it's filled on first use (when empty) and used for the
+  /// lookup, so a caller resolving many fields in the same [map] normalizes
+  /// its keys only once. On a normalized collision, the index keeps the last
+  /// key while the scan (without an index) returns the first one.
+  String? _findKeyByNormalized(
+    Map<String, Object?> map,
+    String fieldNormalized,
+    Map<String, String>? mapNormalized,
+    String Function(String key) normalize,
+  ) {
+    if (mapNormalized != null) {
+      if (mapNormalized.isEmpty) {
+        for (var k in map.keys) {
+          mapNormalized[normalize(k)] = k;
         }
       }
 
-      var mapKey = mapLC[fieldLC];
-      if (mapKey != null) {
-        return mapKey;
-      }
-    } else {
-      for (var k in map.keys) {
-        var kLC = fieldToLCKey(k);
-        if (kLC == fieldLC) {
-          return k;
-        }
-      }
+      return mapNormalized[fieldNormalized];
     }
 
-    if (mapSimple != null) {
-      if (mapSimple.isEmpty) {
-        for (var e in map.entries) {
-          var k = e.key;
-          var kSimple = fieldToSimpleKey(k);
-          mapSimple[kSimple] = k;
-        }
-      }
-
-      var mapKey = mapSimple[fieldSimple];
-      if (mapKey != null) {
-        return mapKey;
-      }
-    } else {
-      for (var k in map.keys) {
-        var kSimple = fieldToSimpleKey(k);
-        if (kSimple == fieldSimple) {
-          return k;
-        }
+    for (var k in map.keys) {
+      if (normalize(k) == fieldNormalized) {
+        return k;
       }
     }
 
