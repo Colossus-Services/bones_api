@@ -7,11 +7,9 @@ import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 
 import 'bones_api_condition.dart';
-import 'bones_api_condition_encoder.dart';
 import 'bones_api_entity.dart';
 import 'bones_api_entity_db.dart';
 import 'bones_api_entity_db_object.dart';
-import 'bones_api_entity_reference.dart';
 import 'bones_api_extension.dart';
 import 'bones_api_logging.dart';
 import 'bones_api_types.dart';
@@ -235,146 +233,55 @@ class DBObjectMemoryAdapter
     return info;
   }
 
-  final Map<String, TableScheme> tablesSchemes = <String, TableScheme>{};
-
-  void addTableSchemes(Iterable<TableScheme> tablesSchemes) {
-    for (var s in tablesSchemes) {
-      this.tablesSchemes[s.name] = s;
-    }
-  }
-
   bool _hasTableScheme(String table) => tablesSchemes.containsKey(table);
 
   @override
-  TableScheme? getTableSchemeImpl(
-    String table,
-    TableRelationshipReference? relationship, {
-    Object? contextID,
-  }) {
-    //_log.info('getTableSchemeImpl> $table ; relationship: $relationship');
+  logging.Logger get adapterLogger => _log;
 
-    var tableScheme = tablesSchemes[table];
-    if (tableScheme != null) return tableScheme;
+  @override
+  DBObjectMemoryAdapterException createAdapterException(
+    String type,
+    String message, {
+    Object? parentError,
+    StackTrace? parentStackTrace,
+    Object? operation,
+    Object? previousError,
+  }) => DBObjectMemoryAdapterException(
+    type,
+    message,
+    parentError: parentError,
+    parentStackTrace: parentStackTrace,
+    operation: operation,
+    previousError: previousError,
+  );
 
-    var entityHandler = getEntityHandler(tableName: table);
-    if (entityHandler == null) {
-      if (relationship != null) {
-        var sourceId =
-            '${relationship.sourceTable}_${relationship.sourceField}';
-        var targetId =
-            '${relationship.targetTable}_${relationship.targetField}';
+  /// The objects are kept in memory (not encoded as JSON): a bytes field is
+  /// stored as it is.
+  @override
+  bool get encodeBytesAsDataURL => false;
 
-        tableScheme = TableScheme(
-          table,
-          relationship: true,
-          idFieldName: sourceId,
-          fieldsTypes: {
-            sourceId: relationship.sourceFieldType,
-            targetId: relationship.targetFieldType,
-          },
-        );
-
-        _log.info('relationship> $tableScheme');
-
-        return tableScheme;
-      }
-
-      throw StateError(
-        "Can't resolve `TableScheme` for table `$table`. No `EntityHandler` found for table `$table`!",
-      );
-    }
-
-    var idFieldName = entityHandler.idFieldName();
-
-    var entityFieldsTypes = entityHandler.fieldsTypes();
-
-    var fieldsTypes = entityFieldsTypes.map(
-      (key, value) => MapEntry(key, value.type),
-    );
-
-    tableScheme = TableScheme(
-      table,
-      relationship: relationship != null,
-      idFieldName: idFieldName,
-      fieldsTypes: fieldsTypes,
-    );
-
-    _log.info('$tableScheme');
-
-    return tableScheme;
+  /// A canceled transaction rolls back its changes of the tables.
+  @override
+  void onTransactionContextCanceled(DBObjectMemoryAdapterContext context) {
+    _rollbackTables(context.tablesVersions);
   }
 
-  @override
-  FutureOr<Map<String, Type>?> getTableFieldsTypesImpl(String table) {
-    return tablesSchemes[table]?.fieldsTypes;
-  }
-
-  @override
-  FutureOr<bool> isConnectionValid(connection, {bool checkUsage = true}) =>
-      true;
-
-  final Map<DBObjectMemoryAdapterContext, DateTime> _openTransactionsContexts =
-      <DBObjectMemoryAdapterContext, DateTime>{};
-
-  @override
-  DBObjectMemoryAdapterContext openTransaction(Transaction transaction) {
-    var conn = createConnection();
-
-    _openTransactionsContexts[conn] = DateTime.now();
-
-    transaction.transactionFuture
-    // ignore: discarded_futures
-    .then(
-      // ignore: discarded_futures
-      (res) => resolveTransactionResult(res, transaction, conn),
-      onError: (e, s) {
-        cancelTransaction(transaction, conn, e, s);
-        throw e;
-      },
-    );
-
-    return conn;
-  }
-
-  @override
-  bool get cancelTransactionResultWithError => true;
-
-  @override
-  bool get throwTransactionResultWithError => false;
-
-  @override
-  bool cancelTransaction(
-    Transaction transaction,
-    DBObjectMemoryAdapterContext? connection,
-    Object? error,
-    StackTrace? stackTrace,
-  ) {
-    if (connection == null) return true;
-    _openTransactionsContexts.remove(connection);
-    _rollbackTables(connection.tablesVersions);
-    return true;
-  }
-
-  @override
-  bool get callCloseTransactionRequired => true;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    DBObjectMemoryAdapterContext? connection,
-  ) {
-    if (connection != null) {
-      _consolidateTransactionContext(connection);
-    }
-  }
-
+  /// The closed transactions' contexts waiting for the other open
+  /// transactions to close, to consolidate their tables' changes together
+  /// (in context order). See [onTransactionContextClosed].
   final ListQueue<DBObjectMemoryAdapterContext> _consolidateContextQueue =
       ListQueue<DBObjectMemoryAdapterContext>();
 
-  void _consolidateTransactionContext(DBObjectMemoryAdapterContext context) {
-    _openTransactionsContexts.remove(context);
-
-    if (_openTransactionsContexts.isNotEmpty) {
+  /// Consolidates the tables' changes of the closed [context]: only when no
+  /// other transaction is open (a consolidation would also make the open
+  /// ones' changes permanent); otherwise [context] waits in
+  /// [_consolidateContextQueue].
+  @override
+  void onTransactionContextClosed(
+    DBObjectMemoryAdapterContext context, {
+    required bool otherTransactionsOpen,
+  }) {
+    if (otherTransactionsOpen) {
       _consolidateContextQueue.add(context);
       return;
     }
@@ -436,7 +343,7 @@ class DBObjectMemoryAdapter
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<int, int>? preFinish,
   }) {
-    return _executeOperation(
+    return executeOperation(
       op,
       (conn) => _doCountImpl(op, table, matcher, parameters ?? namedParameters),
       preFinish,
@@ -471,7 +378,7 @@ class DBObjectMemoryAdapter
     String table,
     List<I> ids,
   ) {
-    return _executeOperation<List<I>, List<I>>(
+    return executeOperation<List<I>, List<I>>(
       op,
       (conn) => _doExistIDsImpl(op, table, ids),
       null,
@@ -498,7 +405,7 @@ class DBObjectMemoryAdapter
     String table,
     Object id, {
     PreFinishDBOperation<Map<String, dynamic>?, R?>? preFinish,
-  }) => _executeOperation<Map<String, dynamic>?, R?>(
+  }) => executeOperation<Map<String, dynamic>?, R?>(
     op,
     (conn) => _doSelectByIDImpl<R>(table, id, entityName),
     preFinish,
@@ -532,7 +439,7 @@ class DBObjectMemoryAdapter
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<List<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => _executeOperation<List<Map<String, dynamic>>, List<R>>(
+  }) => executeOperation<List<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectByIDsImpl<R>(
       table,
@@ -571,7 +478,7 @@ class DBObjectMemoryAdapter
         .nonNulls
         .toList();
 
-    return _applyOrderAndPagination(
+    return applyTableOrderAndPagination(
       table,
       entries,
       limit: limit,
@@ -591,7 +498,7 @@ class DBObjectMemoryAdapter
     bool? orderByID,
     OrderDirection? orderDirection,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, List<R>>? preFinish,
-  }) => _executeOperation<Iterable<Map<String, dynamic>>, List<R>>(
+  }) => executeOperation<Iterable<Map<String, dynamic>>, List<R>>(
     op,
     (conn) => _doSelectAllImpl<R>(
       table,
@@ -615,7 +522,7 @@ class DBObjectMemoryAdapter
     var map = _getTableMap(table, false);
     if (map == null) return [];
 
-    return _applyOrderAndPagination(
+    return applyTableOrderAndPagination(
       table,
       map.values,
       limit: limit,
@@ -623,26 +530,6 @@ class DBObjectMemoryAdapter
       orderByID: orderByID,
       orderDirection: orderDirection,
     );
-  }
-
-  List<Map<String, dynamic>> _applyOrderAndPagination(
-    String table,
-    Iterable<Map<String, dynamic>> entries, {
-    int? limit,
-    int? offset,
-    bool? orderByID,
-    OrderDirection? orderDirection,
-  }) {
-    var idField = _getTableIDFieldName(table);
-
-    return applySelectOrderAndPagination(
-      entries,
-      (e) => e[idField],
-      limit: limit,
-      offset: offset,
-      orderByID: orderByID,
-      orderDirection: orderDirection,
-    ).toList();
   }
 
   @override
@@ -655,7 +542,7 @@ class DBObjectMemoryAdapter
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
-  }) => _executeOperation<Iterable<Map<String, dynamic>>, R>(
+  }) => executeOperation<Iterable<Map<String, dynamic>>, R>(
     op,
     (conn) =>
         _doDeleteImpl<R>(op, table, matcher, parameters ?? namedParameters),
@@ -680,13 +567,6 @@ class DBObjectMemoryAdapter
     throw UnsupportedError("Relationship delete not supported for: $matcher");
   }
 
-  String _getTableIDFieldName(String table) {
-    var tablesScheme = tablesSchemes[table];
-
-    var idField = tablesScheme?.idFieldName ?? 'id';
-    return idField;
-  }
-
   @override
   FutureOr<dynamic> doInsert<O>(
     TransactionOperation op,
@@ -696,7 +576,7 @@ class DBObjectMemoryAdapter
     Map<String, dynamic> fields, {
     String? idFieldName,
     PreFinishDBOperation? preFinish,
-  }) => _executeOperation<dynamic, dynamic>(
+  }) => executeOperation<dynamic, dynamic>(
     op,
     (conn) => _doInsertImpl<O>(op, table, fields, entityName),
     preFinish,
@@ -710,13 +590,13 @@ class DBObjectMemoryAdapter
   ) {
     var map = _getTableMap(table, true)!;
 
-    var entry = _normalizeEntityJSON(
+    var entry = normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
     );
 
-    var idField = _getTableIDFieldName(table);
+    var idField = getTableIDFieldName(table);
     var id = entry[idField];
 
     _logTransactionOperation('doInsert', op, 'INSERT INTO $table OBJECT `$id`');
@@ -751,7 +631,7 @@ class DBObjectMemoryAdapter
     String? idFieldName,
     PreFinishDBOperation? preFinish,
     bool allowAutoInsert = false,
-  }) => _executeOperation<dynamic, dynamic>(
+  }) => executeOperation<dynamic, dynamic>(
     op,
     (conn) => _doUpdateImpl(op, table, fields, entityName, id),
     preFinish,
@@ -768,7 +648,7 @@ class DBObjectMemoryAdapter
 
     var map = _getTableMap(table, true)!;
 
-    var changes = _normalizeEntityJSON(
+    var changes = normalizeEntityJSON(
       fields,
       entityName: entityName,
       table: table,
@@ -778,217 +658,12 @@ class DBObjectMemoryAdapter
     // entry (if any: an auto-insert).
     var entry = <String, dynamic>{...?map[id], ...changes};
 
-    var idField = _getTableIDFieldName(table);
+    var idField = getTableIDFieldName(table);
     entry[idField] = id;
 
     map[id] = entry;
 
     return id;
-  }
-
-  Map<String, dynamic> _normalizeEntityJSON(
-    Map<String, dynamic> entityJson, {
-    String? entityName,
-    String? table,
-    EntityRepository? entityRepository,
-  }) {
-    entityRepository ??= getEntityRepository(
-      name: entityName,
-      tableName: table,
-    );
-
-    if (entityRepository == null) {
-      throw StateError(
-        "Can't determine `EntityRepository` for: entityName=$entityName ; tableName=$table",
-      );
-    }
-
-    var entityHandler = entityRepository.entityHandler;
-
-    var entityJsonNormalized = entityJson.map((key, value) {
-      if (value == null || (value as Object).isPrimitiveValue) {
-        return MapEntry(key, value);
-      }
-
-      var fieldType = entityHandler.getFieldType(
-        null,
-        key,
-        resolveFiledName: false,
-      );
-
-      if (fieldType != null) {
-        if (fieldType.isEntityReferenceType) {
-          var entityType = fieldType.arguments0!.type;
-          var fieldEntityRepository = getEntityRepositoryByType(entityType);
-
-          if (fieldEntityRepository == null) {
-            throw StateError(
-              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
-            );
-          }
-
-          if (value is EntityReference) {
-            if (value.isNull) {
-              value = null;
-            } else if (value.isIdSet) {
-              value = value.id;
-            } else if (value.isEntitySet) {
-              value = fieldEntityRepository.getEntityID(value.entity);
-            } else {
-              throw StateError("Invalid state: $value");
-            }
-          } else if (!value.isPrimitiveValue) {
-            value = fieldEntityRepository.getEntityID(value);
-          }
-        } else if (fieldType.isEntityReferenceListType) {
-          var listEntityType = fieldType.arguments0!;
-
-          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
-            listEntityType,
-          );
-          if (fieldListEntityRepository == null) {
-            throw StateError(
-              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
-            );
-          }
-
-          if (value is EntityReferenceList) {
-            // Its IDs (from its entities, if only those are set):
-            value = value.isNull ? null : value.ids;
-          } else {
-            var valIter = value is Iterable ? value : [value];
-
-            value = valIter
-                .map(
-                  (v) => fieldListEntityRepository.isOfEntityType(v)
-                      ? fieldListEntityRepository.getEntityID(v)
-                      : v,
-                )
-                .toList();
-          }
-        } else if (fieldType.isListEntity) {
-          var listEntityType = fieldType.listEntityType!;
-
-          var fieldListEntityRepository = getEntityRepositoryByTypeInfo(
-            listEntityType,
-          );
-          if (fieldListEntityRepository == null) {
-            throw StateError(
-              "Can't determine `EntityRepository` for field `$key` List type: fieldType=$fieldType",
-            );
-          }
-
-          var valIter = value is Iterable ? value : [value];
-
-          value = valIter
-              .map(
-                (v) => fieldListEntityRepository.isOfEntityType(v)
-                    ? fieldListEntityRepository.getEntityID(v)
-                    : v,
-              )
-              .toList();
-        } else if (!fieldType.isPrimitiveType && fieldType.entityType != null) {
-          var entityType = fieldType.entityType!;
-          var fieldEntityRepository = getEntityRepositoryByType(entityType);
-
-          if (fieldEntityRepository == null) {
-            throw StateError(
-              "Can't determine `EntityRepository` for field `$key`: fieldType=$fieldType",
-            );
-          }
-
-          value = fieldEntityRepository.getEntityID(value);
-        }
-      }
-
-      return MapEntry(key, value);
-    });
-
-    return entityJsonNormalized;
-  }
-
-  Object resolveError(
-    Object error,
-    StackTrace stackTrace,
-    Object? operation,
-    Object? previousError,
-  ) => DBObjectMemoryAdapterException(
-    'error',
-    '$error',
-    parentError: error,
-    parentStackTrace: stackTrace,
-    previousError: previousError,
-    operation: operation,
-  );
-
-  FutureOr<R> _finishOperation<T, R>(
-    TransactionOperation op,
-    T res,
-    PreFinishDBOperation<T, R>? preFinish,
-  ) => finishOperation<T, R>(op, res, preFinish, errorResolver: resolveError);
-
-  /// Executes [f] in the transaction of [op], and finishes [op] (with
-  /// [preFinish]) after that execution, not inside it: a [preFinish] can
-  /// issue other operations in the same transaction (e.g. selecting the
-  /// sub-entities), executed after this one (inside it, they would wait for
-  /// it, that waits for them).
-  FutureOr<R> _executeOperation<T, R>(
-    TransactionOperation op,
-    FutureOr<T> Function(DBObjectMemoryAdapterContext connection) f,
-    PreFinishDBOperation<T, R>? preFinish,
-  ) => executeTransactionOperation<T>(
-    op,
-    f,
-  ).resolveMapped((res) => _finishOperation<T, R>(op, res, preFinish));
-
-  FutureOr<R> executeTransactionOperation<R>(
-    TransactionOperation op,
-    FutureOr<R> Function(DBObjectMemoryAdapterContext connection) f,
-  ) {
-    var transaction = op.transaction;
-
-    if (isTransactionWithSingleOperation(op)) {
-      return executeWithPool(
-        f,
-        onError: (e, s) => transaction.notifyExecutionError(
-          e,
-          s,
-          errorResolver: resolveError,
-          operation: op,
-          debugInfo: () => op.toString(),
-        ),
-      );
-    }
-
-    if (transaction.isOpen) {
-      return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
-        f,
-        errorResolver: resolveError,
-        operation: op,
-        debugInfo: () => op.toString(),
-      );
-    }
-
-    if (!transaction.isOpening) {
-      transaction.open(
-        () => openTransaction(transaction),
-        callCloseTransactionRequired
-            ? () => closeTransaction(
-                transaction,
-                transaction.context as DBObjectMemoryAdapterContext?,
-              )
-            : null,
-      );
-    }
-
-    return transaction.onOpen<R>(() {
-      return transaction.addExecution<R, DBObjectMemoryAdapterContext>(
-        f,
-        errorResolver: resolveError,
-        operation: op,
-        debugInfo: () => op.toString(),
-      );
-    });
   }
 }
 

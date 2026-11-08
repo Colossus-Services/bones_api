@@ -64,12 +64,32 @@ Entity model clean-up (behavior-preserving, except the fixes below):
 - `isEqualsIterableDeep`/`intersectsIterableDeep`: iterate instead of
   `elementAt(i)` (O(n²) on a non-`List` `Iterable`).
 
+Adapters clean-up (behavior-preserving):
+
+- `DBObjectAdapter`: the implementation copy-pasted in the memory,
+  directory and GCS object adapters (table schemes, transactions,
+  order/pagination, ID/table names and entity JSON normalization, operation
+  execution), with the hooks `createAdapterException` (each adapter keeps
+  its exception type), `encodeBytesAsDataURL` and `adapterLogger`.
+- `DBSQLAdapter`: the schema introspection of the PostgreSQL, MySQL and
+  SQLite adapters (tables names and fields references caches, relationship
+  tables) over `listTablesNamesImpl`/`findFieldsReferencedTablesImpl`; the
+  30 s fields references cache TTL named; `openTransactionWithPool`, the
+  shared transaction defaults and `autoInsertAfterNoopUpdate`.
+- `DBEntityRepository`: one `ensureStored` implementation (hooks
+  `storeWithParentOperation`, `onEnsureStoredExisting`) and
+  `newSelectOperation`; `getEntityRepositoriesTables` (the typo
+  `getEntityRepositoresTables` kept, `@Deprecated`).
+- Cache fields named `*Cache` and documented.
+
 Deprecated (still working):
 
 - `EntityHandler.graterThanValue`/`graterThanOrEqualValue`: use
   `greaterThanValue`/`greaterThanOrEqualValue`.
 - `EntityRulesResolver.cotextProviders`: use `contextProviders`.
 - `FieldsFromMap.getFieldsKeysInMap`'s `fieldLC`/`fieldSimple` (ignored).
+- `DBAdapter.getEntityRepositoresTables`: use
+  `getEntityRepositoriesTables`.
 
 Fixes:
 
@@ -113,6 +133,16 @@ Fixes:
 - `EntityResolutionRules` with `allEager` and `allLazy` both `true`: invalid
   (`validate` and `merge` throw `ValidateEntityRulesError`);
   `isEagerEntityType`/`isLazyEntityType` recursed forever on it.
+- `DBPostgreSQLAdapter.doCountSQL`: a result without a row threw a
+  `StateError`: now `0`, as the SQLite and MySQL adapters.
+- `DBPostgreSQLAdapter`: the ID sequence fix after an update's auto-insert
+  used `max(id)`, failing for a table whose ID column isn't `id`: now the
+  table's (quoted) ID column.
+- `DBPostgreSQLAdapter`, `DBMySQLAdapter`: the schema introspection
+  queries interpolated the table (and database) names into SQL string
+  literals unescaped: a `'` in a name broke (or changed) the query. Now
+  escaped by `DBSQLAdapter.sqlStringLiteral` (the queries are otherwise
+  the same).
 
 ## 1.34.0
 

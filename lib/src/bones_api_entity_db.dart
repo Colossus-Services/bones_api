@@ -3,6 +3,7 @@ import 'package:bones_api/bones_api.dart';
 import 'package:bones_api/src/bones_api_entity_db_object.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:statistics/statistics.dart' hide IterableIntExtension;
 
 import 'bones_api_mixin.dart';
@@ -445,7 +446,12 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
           .map((e) => MapEntry(e, e.information(extended: true)))
           .toMapFromEntries();
 
+  @Deprecated("Renamed to `getEntityRepositoriesTables` (typo)")
   FutureOr<Map<EntityRepository, String>> getEntityRepositoresTables() =>
+      getEntityRepositoriesTables();
+
+  /// The table of each registered [EntityRepository].
+  FutureOr<Map<EntityRepository, String>> getEntityRepositoriesTables() =>
       entityRepositories
           .map(
             (r) => MapEntry<EntityRepository, String>(
@@ -478,7 +484,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     }
   }
 
-  EntityRepository? _geAdapterEntityRepository({
+  EntityRepository? _getAdapterEntityRepository({
     String? entityName,
     String? tableName,
     Type? entityType,
@@ -509,7 +515,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     String? tableName,
     Type? entityType,
   }) {
-    var entityRepository = _geAdapterEntityRepository(
+    var entityRepository = _getAdapterEntityRepository(
       entityName: entityName,
       tableName: tableName,
       entityType: entityType,
@@ -562,7 +568,7 @@ abstract class DBAdapter<C extends Object> extends SchemeProvider
     String? tableName,
     Type? entityType,
   }) {
-    var entityRepository = _geAdapterEntityRepository(
+    var entityRepository = _getAdapterEntityRepository(
       entityName: entityName,
       tableName: tableName,
       entityType: entityType,
@@ -1599,19 +1605,44 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       return _ensureStoredImpl(o, transaction, operation);
     } else {
       if (isTrackingEntity(o)) {
-        return id;
+        return onEnsureStoredExisting(o, id, transaction);
       }
 
       return existsID(id, transaction: transaction).resolveMapped((exists) {
         if (!exists) {
           return _ensureStoredImpl(o, transaction, operation);
         } else {
-          return id;
+          return onEnsureStoredExisting(o, id, transaction);
         }
       });
     }
   }
 
+  /// Called by [ensureStored] when [o] (with [id]) is already stored (and
+  /// unchanged): returns the result of [ensureStored]. Default: [id].
+  ///
+  /// A relational repository overrides it to also ensure that the entities
+  /// referenced by [o] are stored.
+  @protected
+  FutureOr<dynamic> onEnsureStoredExisting(
+    O o,
+    Object id,
+    Transaction? transaction,
+  ) => id;
+
+  /// Stores [o] as a store of [ensureStored] (with [parentOperation], the
+  /// operation that required it). Each repository implementation stores
+  /// with its own `store` implementation.
+  @protected
+  FutureOr<dynamic> storeWithParentOperation(
+    O o,
+    Transaction? transaction,
+    TransactionOperation? parentOperation,
+  ) => _storeImpl(o, transaction, parentOperation);
+
+  /// Stores [o] for [ensureStored], unless it's already being stored by
+  /// [transaction] (then waits for that store, avoiding a recursive
+  /// relationship loop). The store is [storeWithParentOperation].
   FutureOr<dynamic> _ensureStoredImpl(
     dynamic o,
     Transaction? transaction,
@@ -1637,7 +1668,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
       }
     }
 
-    return _storeImpl(o, transaction, parentOperation);
+    return storeWithParentOperation(o, transaction, parentOperation);
   }
 
   @override
@@ -1753,7 +1784,7 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     if (matcher is KeyConditionEQ) {
       var keys = matcher.keys;
       if (keys.length == 1) {
-        var conditionKey = matcher.keys.first;
+        var conditionKey = keys.first;
 
         if (conditionKey is ConditionKeyField) {
           var key = conditionKey.name;
@@ -1824,6 +1855,36 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     );
   }
 
+  /// Creates the [TransactionOperationSelect] of a select of [matcher] (in
+  /// [transaction]), and resolves its [resolutionRules].
+  ///
+  /// The operation can propagate (to the same transaction) only if the
+  /// resolved rules select referenced entities: their selects are issued
+  /// by the operation's `preFinish` (see [resolveEntities]).
+  @protected
+  (TransactionOperationSelect, EntityResolutionRulesResolved)
+  newSelectOperation(
+    Transaction? transaction,
+    EntityMatcher matcher,
+    EntityResolutionRules? resolutionRules,
+  ) {
+    final resolutionRulesResolved = resolveEntityResolutionRules(
+      resolutionRules,
+    );
+
+    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
+
+    var op = TransactionOperationSelect(
+      name,
+      canPropagate,
+      operationExecutor,
+      matcher,
+      transaction: transaction,
+    );
+
+    return (op, resolutionRulesResolved);
+  }
+
   FutureOr<O?> _selectByID(
     Transaction? transaction,
     ConditionID matcher,
@@ -1838,18 +1899,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
 
     if (id == null) return null;
 
-    final resolutionRulesResolved = resolveEntityResolutionRules(
-      resolutionRules,
-    );
-
-    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
-
-    var op = TransactionOperationSelect(
-      name,
-      canPropagate,
-      operationExecutor,
+    final (op, resolutionRulesResolved) = newSelectOperation(
+      transaction,
       matcher,
-      transaction: transaction,
+      resolutionRules,
     );
 
     try {
@@ -1888,18 +1941,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     var ids = matcher.idsValues.nonNulls.toList();
     if (ids.isEmpty) return <O>[];
 
-    final resolutionRulesResolved = resolveEntityResolutionRules(
-      resolutionRules,
-    );
-
-    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
-
-    var op = TransactionOperationSelect(
-      name,
-      canPropagate,
-      operationExecutor,
+    final (op, resolutionRulesResolved) = newSelectOperation(
+      transaction,
       matcher,
-      transaction: transaction,
+      resolutionRules,
     );
 
     try {
@@ -1938,18 +1983,10 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     bool? orderByID,
     OrderDirection? orderDirection,
   }) {
-    final resolutionRulesResolved = resolveEntityResolutionRules(
-      resolutionRules,
-    );
-
-    var canPropagate = hasReferencedEntities(resolutionRulesResolved);
-
-    var op = TransactionOperationSelect(
-      name,
-      canPropagate,
-      operationExecutor,
+    final (op, resolutionRulesResolved) = newSelectOperation(
+      transaction,
       matcher,
-      transaction: transaction,
+      resolutionRules,
     );
 
     try {
@@ -2300,10 +2337,16 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
   int get _fieldsListEntityNoRefLength => _fieldsListEntityNoRefLengthCache ??=
       _fieldsListEntity.length - _fieldsListEntityRef.length;
 
-  Map<String, EntityRepository<Object>>? _fieldsEntityRepositories;
+  /// The [EntityRepository] of each entity field (by field name), for the
+  /// fields whose repository resolves. The entity fields are fixed per
+  /// [entityHandler], so the (provider lookup) resolution is done once and
+  /// reused by every select that resolves the sub-entities.
+  Map<String, EntityRepository<Object>>? _fieldsEntityRepositoriesCache;
 
+  /// The [EntityRepository] of each entity field (see
+  /// [_fieldsEntityRepositoriesCache]).
   Map<String, EntityRepository<Object>> _fieldsEntityRepositoriesAll() =>
-      _fieldsEntityRepositories ??= _fieldsEntity.entries
+      _fieldsEntityRepositoriesCache ??= _fieldsEntity.entries
           .map((e) {
             var repo = _resolveEntityRepository(e.value);
             return repo != null ? MapEntry(e.key, repo) : null;
@@ -2482,6 +2525,17 @@ class DBEntityRepository<O extends Object> extends EntityRepository<O>
     return tableField;
   });
 
+  /// The relationship of each list-of-entities field (see
+  /// [_getRelationshipFieldsImpl]), by the [TableScheme] they were resolved
+  /// from: the key is the `fieldsListEntity` map they were resolved for, and
+  /// the value the relationships by field name.
+  ///
+  /// Resolving them looks up each field's target repository and searches the
+  /// scheme's relationship tables; it's needed by every select/store of
+  /// entities with list fields. Keyed by the
+  /// [TableScheme] (an [Expando], weakly), so a reloaded scheme (e.g. after
+  /// a schema change) resolves them again; the `fieldsListEntity` identity
+  /// check ensures the cached entry is for the same fields.
   final Expando<
     MapEntry<Map<String, TypeInfo>, Map<String, TableRelationshipReference>>
   >

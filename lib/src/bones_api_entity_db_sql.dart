@@ -1,6 +1,7 @@
 import 'package:async_extension/async_extension.dart';
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart';
 import 'package:reflection_factory/reflection_factory.dart';
 import 'package:statistics/statistics.dart';
 import 'package:swiss_knife/swiss_knife.dart' show parseBool;
@@ -23,6 +24,7 @@ import 'bones_api_sql_builder.dart';
 import 'bones_api_types.dart';
 import 'bones_api_utils_collections.dart';
 import 'bones_api_utils_json.dart';
+import 'bones_api_utils_timedmap.dart';
 
 export 'bones_api_entity_db.dart' show DBAdapterCapabilityConnectivity;
 
@@ -3312,6 +3314,373 @@ abstract class DBSQLAdapter<C extends Object> extends DBRelationalAdapter<C>
         debugInfo: () => sql.mainSQL.toString(),
       );
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Transactions of the adapters whose driver runs a transaction around a
+  // callback (PostgreSQL, MySQL, SQLite): the transaction stays open while
+  // the callback's `Future` (the [Transaction.transactionFuture]) runs, and
+  // the driver commits or rolls back when it completes.
+  // -------------------------------------------------------------------------
+
+  /// Opens the database transaction of [transaction] with a connection of the
+  /// pool, returning its transaction context (connection) [T].
+  ///
+  /// [openDriverTransaction] opens the transaction in the driver's
+  /// `connection` and must call `onTransactionContext` with the transaction
+  /// context as soon as the driver provides it, returning the driver's
+  /// transaction `Future` (that completes with [transaction]'s result).
+  ///
+  /// The driver's transaction `Future` is the [Transaction.transactionResult]:
+  /// its errors are notified to [transaction] (resolved with
+  /// [resolveError]). A pooled connection isn't used if the transaction was
+  /// already aborted.
+  @protected
+  Future<T> openTransactionWithPool<T extends C>(
+    Transaction transaction,
+    FutureOr<Object?> Function(
+      C connection,
+      void Function(T transactionContext) onTransactionContext,
+    )
+    openDriverTransaction,
+  ) {
+    var contextCompleter = Completer<T>();
+
+    var result = executeWithPool(
+      (connection) =>
+          openDriverTransaction(connection, contextCompleter.complete),
+      validator: (c) => !transaction.isAborted,
+      onError: (e, s) => transaction.notifyExecutionError(
+        e,
+        s,
+        errorResolver: resolveError,
+        debugInfo: () => transaction.toString(withExecutedOperations: false),
+      ),
+    );
+
+    transaction.transactionResult = result;
+
+    return contextCompleter.future;
+  }
+
+  /// Default for the [openTransactionWithPool] adapters: an aborted
+  /// transaction is not canceled by [resolveTransactionResult] (the driver
+  /// rolls it back when its callback throws).
+  @override
+  bool get cancelTransactionResultWithError => false;
+
+  /// Default for the [openTransactionWithPool] adapters: an aborted
+  /// transaction's result is thrown, so the driver's callback fails and the
+  /// driver rolls back.
+  @override
+  bool get throwTransactionResultWithError => true;
+
+  /// Default for the [openTransactionWithPool] adapters: nothing to cancel,
+  /// the driver rolls back the transaction when its callback throws.
+  @override
+  FutureOr<bool> cancelTransaction(
+    Transaction transaction,
+    C? connection,
+    Object? error,
+    StackTrace? stackTrace,
+  ) => true;
+
+  /// Default for the [openTransactionWithPool] adapters: the driver closes
+  /// (commits) the transaction when its callback completes.
+  @override
+  bool get callCloseTransactionRequired => false;
+
+  /// Default for the [openTransactionWithPool] adapters: nothing to close
+  /// (see [callCloseTransactionRequired]).
+  @override
+  FutureOr<void> closeTransaction(Transaction transaction, C? connection) {}
+
+  /// Handles an update that affected no row (the entity isn't stored): if
+  /// [allowAutoInsert], inserts the [updateSQL]'s fields, returning the
+  /// insert's result; otherwise throws a [StateError].
+  ///
+  /// Shared by the `doUpdateSQL` of the adapters whose auto-insert is a plain
+  /// insert (MySQL, SQLite). [logger] is the adapter's logger, which logs the
+  /// auto-insert.
+  @protected
+  FutureOr<dynamic> autoInsertAfterNoopUpdate(
+    Transaction transaction,
+    String entityName,
+    String table,
+    SQL updateSQL,
+    C connection, {
+    required bool allowAutoInsert,
+    required logging.Logger logger,
+  }) {
+    if (!allowAutoInsert) {
+      var entry = updateSQL.parametersByPlaceholder;
+      throw StateError(
+        "Can't update not stored entity into table `$table`: $entry",
+      );
+    }
+
+    var fields = updateSQL.namedParameters!;
+
+    return generateInsertSQL(
+      transaction,
+      entityName,
+      table,
+      fields,
+    ).resolveMapped((insertSQL) {
+      logger.info('Update not affecting any row! Auto inserting: $insertSQL');
+      return doInsertSQL(entityName, table, insertSQL, transaction, connection);
+    });
+  }
+
+  /// [value] (e.g. a table name) as a SQL string literal: quoted with `'`,
+  /// with its `'` doubled (the standard SQL escape), so a `'` in [value]
+  /// can't end the literal (and change the query).
+  ///
+  /// Used by the schema introspection queries, which compare names with
+  /// literals (e.g. `WHERE table_name = 'user'`).
+  static String sqlStringLiteral(String value) =>
+      "'${value.replaceAll("'", "''")}'";
+
+  // -------------------------------------------------------------------------
+  // Schema introspection shared by the adapters that read their schema from
+  // the database (PostgreSQL, MySQL, SQLite), over [listTablesNamesImpl] and
+  // [findFieldsReferencedTablesImpl].
+  // -------------------------------------------------------------------------
+
+  /// Lists the names of the database tables, with [connection].
+  ///
+  /// Implemented by the adapters that introspect their schema (see
+  /// [findRelationshipTables]). Default: throws [UnsupportedError] (an
+  /// adapter that doesn't introspect a database, e.g. [DBSQLMemoryAdapter],
+  /// never calls it).
+  @protected
+  FutureOr<List<String>> listTablesNamesImpl(C connection) =>
+      throw UnsupportedError("Can't list the tables names of: $this");
+
+  /// Finds the foreign keys of [table], with [connection]: the referenced
+  /// table (and field) of each referencing field, by the field name.
+  ///
+  /// Implemented by the adapters that introspect their schema (see
+  /// [listTablesNamesImpl]). Default: throws [UnsupportedError].
+  @protected
+  FutureOr<Map<String, TableFieldReference>> findFieldsReferencedTablesImpl(
+    C connection,
+    String table,
+  ) => throw UnsupportedError(
+    "Can't find the fields referenced tables of `$table`: $this",
+  );
+
+  /// The tables names ([listTablesNamesImpl]) by context ID (the resolution
+  /// of a set of [TableScheme]s): resolving the schemes of a context lists
+  /// the tables once (once per table scheme without it), while a new context
+  /// sees the tables created since.
+  final Expando<FutureOr<List<String>>> _listTablesNamesContextCache =
+      Expando();
+
+  /// [listTablesNamesImpl], cached per [contextID] (see
+  /// [_listTablesNamesContextCache]).
+  @protected
+  FutureOr<List<String>> listTablesNamesCached(
+    C connection, {
+    Object? contextID,
+  }) => _listTablesNamesContextCache.putIfAbsentAsync(
+    contextID,
+    () => listTablesNamesImpl(connection),
+  );
+
+  /// How long a table's fields references stay in
+  /// [_findFieldsReferencedTablesCache]: long enough to share them between
+  /// the [TableScheme]s resolved together (each one scans the references of
+  /// all the tables, see [findRelationshipTables]), short enough to see a
+  /// schema change without disposing the caches.
+  static const Duration _findFieldsReferencedTablesCacheTimeout = Duration(
+    seconds: 30,
+  );
+
+  /// The fields references of each table ([findFieldsReferencedTablesImpl]),
+  /// by table name, for [_findFieldsReferencedTablesCacheTimeout]: resolving
+  /// a table scheme reads the references of all the tables (to find its
+  /// relationship tables), so without it each table scheme would query them
+  /// all again. Disposed with the table schemes (see
+  /// [disposeTableSchemeCache]).
+  final TimedMap<String, Map<String, TableFieldReference>>
+  _findFieldsReferencedTablesCache =
+      TimedMap<String, Map<String, TableFieldReference>>(
+        _findFieldsReferencedTablesCacheTimeout,
+      );
+
+  @override
+  TableScheme? disposeTableSchemeCache(
+    String table, {
+    bool fieldsTypes = false,
+  }) {
+    _findFieldsReferencedTablesCache.remove(table);
+    return super.disposeTableSchemeCache(table, fieldsTypes: fieldsTypes);
+  }
+
+  @override
+  void disposeTablesSchemesCaches({bool fieldsTypes = false}) {
+    _findFieldsReferencedTablesCache.clear();
+    super.disposeTablesSchemesCaches(fieldsTypes: fieldsTypes);
+  }
+
+  /// The fields references of each table by context ID (as
+  /// [_listTablesNamesContextCache]): inside a context, a table's references
+  /// are queried once, even when concurrently requested (the pending
+  /// `Future` is cached), and are consistent with the listed tables
+  /// (not expired by [_findFieldsReferencedTablesCacheTimeout]).
+  final Expando<Map<String, FutureOr<Map<String, TableFieldReference>>>>
+  _findFieldsReferencedTablesContextCache = Expando();
+
+  /// [findFieldsReferencedTablesImpl], cached per [contextID] (see
+  /// [_findFieldsReferencedTablesContextCache]), and in
+  /// [_findFieldsReferencedTablesCache] (also without a context).
+  @protected
+  FutureOr<Map<String, TableFieldReference>> findFieldsReferencedTablesCached(
+    C connection,
+    String table, {
+    Object? contextID,
+  }) {
+    if (contextID != null) {
+      var cache = _findFieldsReferencedTablesContextCache[contextID] ??= {};
+      var cached = cache[table];
+      if (cached != null) return cached;
+
+      var ret = findFieldsReferencedTablesImpl(connection, table).resolveMapped(
+        (r) {
+          cache[table] = r;
+          _findFieldsReferencedTablesCache[table] = r;
+          return r;
+        },
+      );
+
+      // A pending `Future` is cached, so a concurrent request waits for it
+      // (if resolved synchronously, `ret` is the already cached result):
+      cache[table] = ret;
+      return ret;
+    }
+
+    return _findFieldsReferencedTablesCache.putIfAbsentCheckedAsync(
+      table,
+      () => findFieldsReferencedTablesImpl(connection, table),
+    );
+  }
+
+  /// Finds the relationship tables of [table]: the tables with exactly 2
+  /// foreign keys, one referencing [table] and the other another table (a
+  /// many-to-many relationship table).
+  ///
+  /// Reads the fields references of all the tables
+  /// ([findFieldsReferencedTablesCached]), one table at a time (not
+  /// concurrently over the same [connection]).
+  @protected
+  FutureOr<List<TableRelationshipReference>> findRelationshipTables(
+    C connection,
+    String table, {
+    Object? contextID,
+  }) {
+    return listTablesNamesCached(
+      connection,
+      contextID: contextID,
+    ).resolveMapped((tablesNames) {
+      var tablesReferencesRet = _findTablesFieldsReferences(
+        connection,
+        tablesNames,
+        contextID: contextID,
+      );
+
+      return tablesReferencesRet.resolveMapped(
+        (tablesReferences) => tablesReferences
+            .where((refs) => _isRelationshipTableCandidate(refs, table))
+            .map((refs) => _toTableRelationshipReference(refs, table))
+            .nonNulls
+            .toList(),
+      );
+    });
+  }
+
+  /// The fields references of each table of [tablesNames] (in order), read
+  /// sequentially: synchronous if every [findFieldsReferencedTablesCached]
+  /// is (e.g. SQLite). Used by [findRelationshipTables].
+  FutureOr<List<Map<String, TableFieldReference>>> _findTablesFieldsReferences(
+    C connection,
+    List<String> tablesNames, {
+    Object? contextID,
+  }) {
+    var tablesReferences = <Map<String, TableFieldReference>>[];
+
+    FutureOr<List<Map<String, TableFieldReference>>> readFrom(int index) {
+      for (var i = index; i < tablesNames.length; ++i) {
+        var refs = findFieldsReferencedTablesCached(
+          connection,
+          tablesNames[i],
+          contextID: contextID,
+        );
+
+        if (refs is Future<Map<String, TableFieldReference>>) {
+          var nextIndex = i + 1;
+          return refs.then((r) {
+            tablesReferences.add(r);
+            return readFrom(nextIndex);
+          });
+        }
+
+        tablesReferences.add(refs);
+      }
+
+      return tablesReferences;
+    }
+
+    return readFrom(0);
+  }
+
+  /// If a table with the fields references [refs] may be a relationship
+  /// table of [table]: more than one reference, some to [table] and some to
+  /// other tables. Used by [findRelationshipTables].
+  static bool _isRelationshipTableCandidate(
+    Map<String, TableFieldReference> refs,
+    String table,
+  ) =>
+      refs.length > 1 &&
+      refs.values.any((r) => r.targetTable == table) &&
+      refs.values.any((r) => r.targetTable != table);
+
+  /// The [TableRelationshipReference] of a relationship table of [table]
+  /// (with the fields references [refs]), or `null` if it doesn't have
+  /// exactly one reference to [table] and one to another table. The
+  /// references' index names (only set by PostgreSQL) are the relationship
+  /// fields' indexes. Used by [findRelationshipTables].
+  static TableRelationshipReference? _toTableRelationshipReference(
+    Map<String, TableFieldReference> refs,
+    String table,
+  ) {
+    var refToTables = refs.values
+        .where((r) => r.targetTable == table)
+        .toList(growable: false);
+    var otherRefs = refs.values
+        .where((r) => r.targetTable != table)
+        .toList(growable: false);
+
+    if (refToTables.length != 1 || otherRefs.length != 1) {
+      return null;
+    }
+
+    var refToTable = refToTables.single;
+    var otherRef = otherRefs.single;
+
+    return TableRelationshipReference(
+      refToTable.sourceTable,
+      refToTable.targetTable,
+      refToTable.targetField,
+      refToTable.targetFieldType,
+      refToTable.sourceField,
+      otherRef.targetTable,
+      otherRef.targetField,
+      otherRef.targetFieldType,
+      otherRef.sourceField,
+      sourceRelationshipFieldIndex: refToTable.indexName,
+      targetRelationshipFieldIndex: otherRef.indexName,
+    );
   }
 
   /// Builds the ` ORDER BY ... LIMIT ... OFFSET ...` tail of a `SELECT`,
