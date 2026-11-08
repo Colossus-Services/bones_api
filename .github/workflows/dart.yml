@@ -79,6 +79,12 @@ jobs:
         run: |
           dart --version
           uname -a
+      # TEMPORARY: sqlite3 3.9.0's build hook rejects its native library
+      # download (a hash mismatch, since 2026-11-08; it passed earlier that
+      # day): the tests' runs pin 3.8.0 until it's fixed upstream. (Not the
+      # package's constraint, `^3.8.0`: only CI.)
+      - name: Pin sqlite3 3.8.0 (temporary)
+        run: printf 'dependency_overrides:\n  sqlite3: 3.8.0\n' > pubspec_overrides.yaml
       - name: Install dependencies
         run: dart pub get
       - name: Upgrade dependencies
@@ -121,6 +127,10 @@ jobs:
         run: |
           dart --version
           uname -a
+      # TEMPORARY: sqlite3 3.9.0's native library download fails its hash
+      # check (see `test_vm`): pin 3.8.0 until it's fixed upstream.
+      - name: Pin sqlite3 3.8.0 (temporary)
+        run: printf 'dependency_overrides:\n  sqlite3: 3.8.0\n' > pubspec_overrides.yaml
       - name: Install dependencies
         run: dart pub get
       - name: Upgrade dependencies
