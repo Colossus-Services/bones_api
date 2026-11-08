@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:args_simple/args_simple.dart';
 import 'package:bones_api/bones_api_server.dart';
 import 'package:bones_api/src/bones_api_server_cache.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:path/path.dart' as pack_path;
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
@@ -536,6 +537,64 @@ void main() {
       if (defaultDir != null) {
         expect(defaultDir.existsSync(), isTrue);
       }
+    });
+
+    test('resolveUserDirectory', () {
+      var home = tmpDir.absolute.path;
+      var other = pack_path.join(home, 'other');
+      Directory(other).createSync();
+
+      expect(
+        APIServerConfig.resolveUserDirectory({
+          'HOME': home,
+        }, isWindows: false)!.path,
+        equals(home),
+      );
+      expect(
+        APIServerConfig.resolveUserDirectory({
+          'USERPROFILE': home,
+          'HOME': other,
+        }, isWindows: true)!.path,
+        equals(home),
+      );
+      expect(
+        APIServerConfig.resolveUserDirectory({
+          'UserProfile': home,
+        }, isWindows: true)!.path,
+        equals(home),
+      );
+      // Fallback to the other variable:
+      expect(
+        APIServerConfig.resolveUserDirectory({
+          'USERPROFILE': home,
+        }, isWindows: false)!.path,
+        equals(home),
+      );
+
+      // Not defined, blank or not existing: `null`. Never a literal `~`
+      // directory (the shell's `~` is not expanded by `Directory`):
+      var cwd = Directory.current;
+      Directory.current = tmpDir;
+      try {
+        Directory('~').createSync();
+        expect(
+          APIServerConfig.resolveUserDirectory({}, isWindows: false),
+          isNull,
+        );
+      } finally {
+        Directory.current = cwd;
+      }
+
+      expect(
+        APIServerConfig.resolveUserDirectory({'HOME': '  '}, isWindows: false),
+        isNull,
+      );
+      expect(
+        APIServerConfig.resolveUserDirectory({
+          'HOME': pack_path.join(home, 'nope'),
+        }, isWindows: false),
+        isNull,
+      );
     });
 
     test('resolve* from APIConfig', () {
@@ -1356,15 +1415,37 @@ void main() {
         }),
       );
 
-      var invalid = await toAPIRequest(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/a'),
-          headers: {'content-type': 'application/json'},
-          body: '{invalid',
-        ),
-      );
+      // The error log shows the invalid payload (the `catch` variable
+      // shadowed it, logging the stack trace in its place):
+      var records = <logging.LogRecord>[];
+      var sub = logging.Logger.root.onRecord.listen((r) {
+        if (r.message.contains('Error decoding JSON')) records.add(r);
+      });
+
+      var prevLevel = logging.Logger.root.level;
+      logging.Logger.root.level = logging.Level.ALL;
+
+      APIRequest invalid;
+      try {
+        invalid = await toAPIRequest(
+          Request(
+            'POST',
+            Uri.parse('http://localhost/a'),
+            headers: {'content-type': 'application/json'},
+            body: '{invalid',
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+      } finally {
+        logging.Logger.root.level = prevLevel;
+        await sub.cancel();
+      }
+
       expect(invalid.payload, isNull);
+      expect(records, hasLength(1));
+      expect(records.first.message, contains('<<{invalid>>'));
+      expect(records.first.error, isA<FormatException>());
+      expect(records.first.stackTrace, isNotNull);
 
       var blank = await toAPIRequest(
         Request(

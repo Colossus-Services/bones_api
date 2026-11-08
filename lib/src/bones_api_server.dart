@@ -10,6 +10,7 @@ import 'package:brotli_fast/brotli_fast.dart'
     show BrotliErrorCode, BrotliException;
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:meta/meta.dart' show visibleForTesting;
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as pack_path;
 import 'package:reflection_factory/reflection_factory.dart';
@@ -1053,28 +1054,35 @@ class APIServerConfig {
     return null;
   }
 
-  static Directory? _getUserDirectory() {
-    var envVars = Platform.environment;
+  static Directory? _getUserDirectory() =>
+      resolveUserDirectory(Platform.environment, isWindows: Platform.isWindows);
 
-    String? home;
-    if (Platform.isMacOS) {
-      home = envVars['HOME'];
-    } else if (Platform.isLinux) {
-      home = envVars['HOME'];
-    } else if (Platform.isWindows) {
-      home = envVars['UserProfile'];
-    }
+  /// Resolves the user's home directory from the environment variables
+  /// [envVars]: `USERPROFILE` on Windows, else `HOME` (each with the other as
+  /// fallback). Returns `null` if not defined or not an existing directory.
+  ///
+  /// The shell's `~` is not used as a fallback: `Directory('~/')` is a
+  /// literal directory named `~` (relative to the current directory), not
+  /// the home directory.
+  @visibleForTesting
+  static Directory? resolveUserDirectory(
+    Map<String, String> envVars, {
+    required bool isWindows,
+  }) {
+    // `Platform.environment` keys are case-insensitive on Windows, but a
+    // plain `Map` (tests) is not: try both spellings of `USERPROFILE`.
+    var userProfile = envVars['USERPROFILE'] ?? envVars['UserProfile'];
+    var home = envVars['HOME'];
 
-    if (home != null) {
-      var dir = Directory(home);
+    var candidates = isWindows ? [userProfile, home] : [home, userProfile];
+
+    for (var path in candidates) {
+      if (path == null || path.trim().isEmpty) continue;
+
+      var dir = Directory(path);
       if (dir.existsSync()) {
         return dir.absolute;
       }
-    }
-
-    var dir = Directory('~/');
-    if (dir.existsSync()) {
-      return dir.absolute;
     }
 
     return null;
@@ -2147,11 +2155,12 @@ class APIServer extends _APIServerBase {
           if (s.isEmpty) return null;
           try {
             payload = json.decode(s);
-          } catch (e, s) {
+          } catch (e, stackTrace) {
+            // Not `s`: it would shadow the payload `s` logged below.
             _log.severe(
               "_resolvePayloadFromString> Error decoding JSON: <<$s>>",
               e,
-              s,
+              stackTrace,
             );
             return null;
           }
