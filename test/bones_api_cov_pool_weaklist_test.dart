@@ -455,6 +455,27 @@ void main() {
         f.getFieldsKeysInMap(['id', 'email'], {'ID': 1}),
         equals({'id': 'ID', 'email': null}),
       );
+
+      // The normalized forms are computed per field: a `fieldLC` /
+      // `fieldSimple` (of one field) is not used for every field. The
+      // `mapLC`/`mapSimple` indexes are shared:
+      var mapLC = <String, String>{};
+      var mapSimple = <String, String>{};
+      expect(
+        f.getFieldsKeysInMap(
+          ['userId', 'emailAddress'],
+          {'USERID': 1, 'email_address': 'e'},
+          // ignore: deprecated_member_use_from_same_package
+          fieldLC: 'userid',
+          // ignore: deprecated_member_use_from_same_package
+          fieldSimple: 'userid',
+          mapLC: mapLC,
+          mapSimple: mapSimple,
+        ),
+        equals({'userId': 'USERID', 'emailAddress': 'email_address'}),
+      );
+      expect(mapLC, isNotEmpty);
+      expect(mapSimple, isNotEmpty);
     });
   });
 

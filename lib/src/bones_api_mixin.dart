@@ -705,13 +705,18 @@ mixin FieldsFromMap {
     return MapEntry(field, value);
   }
 
-  /// Returns a [Map] of [field] keys from [map].
-  /// - [field] is case insensitive.
+  /// Returns a [Map] of [fields] keys from [map].
+  /// - The [fields] are case insensitive.
+  /// - [mapLC] and [mapSimple] (indexes of [map], see [getFieldKeyInMap])
+  ///   are shared by all the [fields].
+  /// - [fieldLC] and [fieldSimple] are ignored: they are the normalized
+  ///   forms of ONE field, computed per field (passing them used the same
+  ///   normalized key for every field).
   Map<String, String?> getFieldsKeysInMap(
     List<String> fields,
     Map<String, Object?> map, {
-    String? fieldLC,
-    String? fieldSimple,
+    @Deprecated("Ignored: computed per field") String? fieldLC,
+    @Deprecated("Ignored: computed per field") String? fieldSimple,
     Map<String, String>? mapLC,
     Map<String, String>? mapSimple,
   }) {
@@ -719,14 +724,7 @@ mixin FieldsFromMap {
         .map(
           (f) => MapEntry(
             f,
-            getFieldKeyInMap(
-              f,
-              map,
-              fieldLC: fieldLC,
-              fieldSimple: fieldSimple,
-              mapLC: mapLC,
-              mapSimple: mapSimple,
-            ),
+            getFieldKeyInMap(f, map, mapLC: mapLC, mapSimple: mapSimple),
           ),
         )
         .toMapFromEntries();
