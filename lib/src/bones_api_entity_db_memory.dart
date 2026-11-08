@@ -238,14 +238,20 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       <String, MapHistory<Object, Map<String, dynamic>>>{};
 
   void _onTablesModification() {
-    _tablesVersions = null;
-    _tablesIndexesVersions = null;
+    _tablesVersionsCache = null;
+    _tablesIndexesVersionsCache = null;
   }
 
-  Map<String, int>? _tablesVersions;
+  /// A cache of [tablesVersions], filled on its first call and reset by
+  /// [_onTablesModification].
+  ///
+  /// Why: each new connection ([DBSQLMemoryAdapterContext]) snapshots the
+  /// versions (to roll the tables back to them), usually more often than
+  /// the tables change: the map isn't rebuilt for each one.
+  Map<String, int>? _tablesVersionsCache;
 
   Map<String, int> get tablesVersions =>
-      _tablesVersions ??= UnmodifiableMapView(
+      _tablesVersionsCache ??= UnmodifiableMapView(
         _tables.map((table, map) => MapEntry(table, map.version)),
       );
 
@@ -609,10 +615,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   final _tablesIndexes =
       <String, Map<String, MapHistory<Object, Set<Object>>>>{};
 
-  Map<String, Map<String, int>>? _tablesIndexesVersions;
+  /// A cache of [tablesIndexesVersions], filled on its first call and reset
+  /// by [_onTablesModification]. As [_tablesVersionsCache].
+  Map<String, Map<String, int>>? _tablesIndexesVersionsCache;
 
   Map<String, Map<String, int>> get tablesIndexesVersions =>
-      _tablesIndexesVersions ??= UnmodifiableMapView(
+      _tablesIndexesVersionsCache ??= UnmodifiableMapView(
         _tablesIndexes.map(
           (table, fieldIndex) => MapEntry(
             table,
@@ -1046,26 +1054,28 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       // Resolved by ID or by an index.
     } else if (condition == null) {
       itr = map.values;
-    } else if (tableScheme == null ||
-        (tableScheme.fieldsReferencedTablesLength == 0 &&
-            tableScheme.tableRelationshipReferenceLength == 0) ||
-        condition.isIDCondition) {
-      itr = map.values.where((e) {
-        return condition.matchesEntityMap(
-          e,
-          positionalParameters: sql.positionalParameters,
-          namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
-          entityHandler: entityHandler,
-        );
-      });
     } else {
+      // The table's scheme to resolve each row's references with before
+      // matching it (`null`: matched as stored): not needed without
+      // references, nor by an ID condition (the row's own ID).
+      var resolveReferencesScheme =
+          _hasNoReferences(tableScheme) || condition.isIDCondition
+          ? null
+          : tableScheme;
+
+      // A select prefers the SQL's `namedParameters` (a delete only uses the
+      // `parametersByPlaceholder`: see `doDeleteSQL`).
+      var namedParameters = sql.namedParameters ?? sql.parametersByPlaceholder;
+
       itr = map.values.where((obj) {
-        obj = _resolveEntityMap(obj, entityHandler, tableScheme);
+        if (resolveReferencesScheme != null) {
+          obj = _resolveEntityMap(obj, entityHandler, resolveReferencesScheme);
+        }
 
         return condition.matchesEntityMap(
           obj,
           positionalParameters: sql.positionalParameters,
-          namedParameters: sql.namedParameters ?? sql.parametersByPlaceholder,
+          namedParameters: namedParameters,
           entityHandler: entityHandler,
         );
       });
@@ -1136,10 +1146,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     // As a select: also a to-many relationship (a table without to-one
     // references) needs its references resolved to be matched.
-    final noReferences =
-        tableScheme == null ||
-        (tableScheme.fieldsReferencedTablesLength == 0 &&
-            tableScheme.tableRelationshipReferenceLength == 0);
+    final noReferences = _hasNoReferences(tableScheme);
 
     // A delete by ID needs neither a scan nor resolving every row (below):
     // only the deleted row. A miss falls back to the scan, as in a select.
@@ -1150,13 +1157,11 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
             ? byID
             : MapEntry(
                 byID.key,
-                _resolveEntityMap(byID.value, entityHandler, tableScheme),
+                _resolveEntityMap(byID.value, entityHandler, tableScheme!),
               ),
       ];
 
-      _checkNotReferencedEntities(entries, table, sql);
-
-      return _removeEntries(table, entries, map);
+      return _deleteMatchedEntries(table, entries, map, sql);
     }
 
     // A relationship delete (e.g. the roles a user no longer has) only needs
@@ -1172,6 +1177,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       if (byIndex != null) candidates = byIndex;
     }
 
+    // Unlike a select (`sql.namedParameters ?? sql.parametersByPlaceholder`,
+    // see `_selectEntries`), a delete matches with the
+    // `parametersByPlaceholder` only: intentionally not unified (it's the
+    // established behavior of each).
     if (noReferences) {
       var entries = candidates.where((e) {
         return sql.condition!.matchesEntityMap(
@@ -1182,14 +1191,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         );
       }).toList();
 
-      _checkNotReferencedEntities(entries, table, sql);
-
-      return _removeEntries(table, entries, map);
+      return _deleteMatchedEntries(table, entries, map, sql);
     }
 
     var entries = candidates
         .map((e) {
-          var obj = _resolveEntityMap(e.value, entityHandler, tableScheme);
+          var obj = _resolveEntityMap(e.value, entityHandler, tableScheme!);
 
           var match = sql.condition!.matchesEntityMap(
             obj,
@@ -1203,9 +1210,30 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         .nonNulls
         .toList(growable: false);
 
-    _checkNotReferencedEntities(entries, table, sql);
+    return _deleteMatchedEntries(table, entries, map, sql);
+  }
 
-    return _removeEntries(table, entries, map);
+  /// If [tableScheme] has no references (to-one fields referencing other
+  /// tables, or relationship tables), or is unknown: its rows are matched as
+  /// stored, without resolving their references ([_resolveEntityMap]). Used
+  /// by [_selectEntries] and [doDeleteSQL].
+  static bool _hasNoReferences(TableScheme? tableScheme) =>
+      tableScheme == null ||
+      (tableScheme.fieldsReferencedTablesLength == 0 &&
+          tableScheme.tableRelationshipReferenceLength == 0);
+
+  /// Deletes the matched [entries] of [table] (its [tableMap]), after
+  /// checking that no other table references them (see
+  /// [_checkNotReferencedEntities]). Returns the deleted rows. Used by the
+  /// branches of [doDeleteSQL].
+  List<Map<String, dynamic>> _deleteMatchedEntries(
+    String table,
+    List<MapEntry<Object, Map<String, dynamic>>> entries,
+    Map<Object, Map<String, dynamic>> tableMap,
+    SQL sql,
+  ) {
+    _checkNotReferencedEntities(entries, table, sql);
+    return _removeEntries(table, entries, tableMap);
   }
 
   void _checkNotReferencedEntities(
