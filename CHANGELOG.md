@@ -1,3 +1,51 @@
+## 1.35.0
+
+API/server layer clean-up (behavior-preserving):
+
+- `APIServerWorker`: both branches of `_processAPIResponse` end in one
+  `_finishResponse`; helpers renamed to what they do (`_buildShelfResponse`,
+  `_disposeAndCompressResponse`, `_startServersAndInitializeAPIRoot`,
+  `_errorResponse`). The `CORS` headers are set once (they were set again
+  when building the headers).
+- Request payload: one `_readPayloadBytes` for text and binary payloads, one
+  `maxPayloadLength` check (no copy of a single `Uint8List` block).
+- `APIServer.toAPIRequest`: headers and query parameters flattened by one
+  helper. New constants: `APIServer.sessionIDCookieName` (`SESSIONID`),
+  `headerServerTiming`, `headerKeepAlive`, `headerContentLength`,
+  `headerXAPIServerWorker`; `APIRoot.apiInfoRoute` (`API-INFO`) and
+  `APIRoot.defaultAuthenticationRoute` (`authenticate`).
+- `APIServerConfig.normalizeHeaderValue`: the `k3` path key is used (it was
+  ignored).
+- `APISecurity`: one `resolveMapped` chain resolving a token's credential;
+  the `disposeAuthentication*` methods share one helper.
+- `APIRoot`: the default-module fallback shared by `acceptsRequest` and the
+  call.
+- `APIServerResponseCache`: an evicted entry is removed once (not per
+  alternative); one `GET` check in `cacheResponse`.
+- `APICronScheduler._execute` split (`_runCalls`, `_storeRunResult`).
+- `FieldsFromMap`: one lookup helper for the lower-case and simple keys.
+- Private cache fields named `*Cache`, documented, declared before their
+  users.
+
+Fixes:
+
+- `APIServerResponseCache`: the eviction (`maxMemorySize` reached) sorted
+  the cached values, which hold a `List` for an entry with compressed
+  alternatives: a `TypeError`. The entries are now sorted with all their
+  alternatives (by total usage and memory size).
+- `APIServerResponseCache`: an expired entry (file modified) was removed
+  without subtracting its memory size from `totalMemorySize`.
+- `APIServerConfig`: the user directory (Let's Encrypt paths) fell back to
+  `Directory('~/')`, a literal `~` directory, not the home: it's resolved
+  from `HOME`/`USERPROFILE` only (`resolveUserDirectory`).
+- `APIServer`: the JSON-decode error log printed the stack trace in place
+  of the invalid payload (a shadowed `catch` variable).
+- `IdenticalSet`: grouped elements by `hashCode`, missing an element whose
+  `hashCode` changed: now by `identityHashCode`.
+- `FieldsFromMap.getFieldsKeysInMap`: the given `fieldLC`/`fieldSimple`
+  (of one field) were used for every field: now computed per field (the
+  parameters are ignored and `@Deprecated`).
+
 ## 1.34.0
 
 `null` and `[]` mean the same in a condition: an empty set for `=~`/`!~`, a
