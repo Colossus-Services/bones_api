@@ -465,6 +465,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
         valueAsList,
         negated: c.isNegated,
         nullable: !_isMainTableIDKey(c, context),
+        condition: c,
       );
     });
   }
@@ -503,6 +504,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
     bool valueAsList, {
     bool negated = false,
     bool nullable = true,
+    Condition? condition,
   }) {
     // The encoding value rather than only its text: a null supplied as a
     // parameter encodes to a placeholder, so the text alone cannot say whether
@@ -569,6 +571,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
             {
               context.write(' $tableKey IS NULL ');
               _markPlaceholderInlinedAsNull(value, context);
+              _markOuterCondition(condition, context);
               return context;
             }
           case '!=':
@@ -589,6 +592,7 @@ class ConditionSQLEncoder extends ConditionEncoder {
         nullSQL = negated
             ? 'AND $tableKey IS NOT NULL'
             : 'OR $tableKey IS NULL';
+        if (!negated) _markOuterCondition(condition, context);
       } else if (negated && nullable) {
         nullSQL = 'OR $tableKey IS NULL';
       }
@@ -608,6 +612,14 @@ class ConditionSQLEncoder extends ConditionEncoder {
 
       return context;
     });
+  }
+
+  /// A [condition] that matches a `NULL` column (`IS NULL`) needs an outer
+  /// join: a missing related entity (a missing to-one, or no row of a
+  /// to-many relationship) is a `null` field, which it matches (as in
+  /// memory, and as the negated operators already do).
+  void _markOuterCondition(Condition? condition, EncodingContext context) {
+    if (condition != null) context.markOuterCondition(condition);
   }
 
   /// If an element of an `IN` list is `null` (a value or a parameter's).

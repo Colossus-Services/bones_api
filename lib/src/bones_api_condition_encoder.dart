@@ -1121,9 +1121,20 @@ class EncodingContext {
     }
   }
 
+  /// The [Condition]s that need an outer join although [Condition.isInner]
+  /// (known only once encoded, with the parameters' values: a comparison
+  /// with `null`, which also matches a missing related entity).
+  final Set<Condition> _outerConditions = Set<Condition>.identity();
+
+  /// Marks [c] as needing an outer join (see [isInnerFieldReference]).
+  void markOuterCondition(Condition c) => _outerConditions.add(c);
+
+  bool _isInnerCondition(Condition c) =>
+      c.isInner && !_outerConditions.contains(c);
+
   bool isInnerFieldReference(TableFieldReference ref) {
     var l = _fieldReferencesConditions[ref];
-    return l?.every((c) => c.isInner) ?? true;
+    return l?.every(_isInnerCondition) ?? true;
   }
 
   /// The relationship tables fields in the encoded [Condition].
@@ -1152,7 +1163,7 @@ class EncodingContext {
 
   bool isInnerRelationshipTable(TableRelationshipReference relationship) {
     var l = _relationshipsConditions[relationship];
-    return l?.every((c) => c.isInner) ?? true;
+    return l?.every(_isInnerCondition) ?? true;
   }
 
   String get tableNameOrEntityName => tableName ?? entityName;
@@ -1800,6 +1811,18 @@ abstract class ConditionEncoder {
         return value.index.toDouble();
       } else if (valueType == BigInt) {
         return value.index.toBigInt();
+      }
+    }
+
+    // A `DECIMAL` column (a `Decimal` field) has no `TypeParser`: a number or
+    // a decimal `String` (`roles.value == "1.5"`) would be resolved as an
+    // entity ID below (`null`, so `IS NULL`).
+    if (valueType == Decimal || valueType == DynamicNumber) {
+      if (value is DynamicNumber) return value;
+      if (value is num) return Decimal.fromNum(value);
+      if (value is String) {
+        var d = Decimal.from(value.trim());
+        if (d != null) return d;
       }
     }
 

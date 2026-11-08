@@ -1,4 +1,5 @@
 import 'package:reflection_factory/reflection_factory.dart';
+import 'package:statistics/statistics.dart' show Decimal, DynamicNumber;
 
 import 'bones_api_condition_parser.dart';
 import 'bones_api_entity.dart';
@@ -1496,6 +1497,105 @@ abstract class KeyCondition<O, V> extends Condition<O> {
   @override
   bool get isInner => !isNegated && super.isInner;
 
+  /// If [keyValue] is an empty list reached through a to-many relationship
+  /// (see [hasToManyInKeyPath]): an entity without related entities.
+  bool _isEmptyToMany(Object? keyValue, EntityHandler? entityHandler) =>
+      keyValue is Iterable &&
+      keyValue.isEmpty &&
+      hasToManyInKeyPath(entityHandler);
+
+  /// A cache of [hasToManyInKeyPath]: the [EntityHandler] whose result is cached in
+  /// [_hasToManyInKeyPathCacheResult].
+  ///
+  /// Why: [hasToManyInKeyPath] is called for every entity matched (an in-memory
+  /// select checks each row), and resolving it walks the [keys] through the
+  /// entity handlers' field types. The result depends only on the [keys]
+  /// (fixed) and the [EntityHandler] (the same for every row of a query), so
+  /// it's computed once per handler. A different handler (the same parsed
+  /// [Condition] used for another entity type, or none) recomputes it.
+  EntityHandler? _hasToManyInKeyPathCacheHandler;
+
+  /// The cached [hasToManyInKeyPath] of [_hasToManyInKeyPathCacheHandler] (`null`: not
+  /// computed yet).
+  bool? _hasToManyInKeyPathCacheResult;
+
+  /// If any key of the [keys] path, not only the last one, is a to-many
+  /// relationship (a field declared as a list of entities or references):
+  /// `roles` (the last key), `roles.type` and `owner.roles.type` (a key
+  /// before the last). Then the key's value is a list, one value per
+  /// related entity.
+  ///
+  /// Resolved by the declared field types of [entityHandler]'s entity (not
+  /// by the values: a to-many without related entities is an empty list, as
+  /// an empty list field).
+  ///
+  /// A list field that is not a relationship (`List<String> tags`, a
+  /// `Uint8List`) is not a to-many: its value is compared as a whole.
+  ///
+  /// Cached per [entityHandler] (see [_hasToManyInKeyPathCacheHandler]).
+  bool hasToManyInKeyPath(EntityHandler? entityHandler) {
+    if (identical(entityHandler, _hasToManyInKeyPathCacheHandler)) {
+      return _hasToManyInKeyPathCacheResult ?? false;
+    }
+
+    var toMany = false;
+    var handler = entityHandler;
+    for (var key in keys) {
+      if (handler == null || key is! ConditionKeyField) break;
+
+      var type = handler.getFieldType(null, key.name, resolveFiledName: true);
+      if (type == null) break;
+
+      if (type.isListEntityOrReference) {
+        toMany = true;
+        break;
+      }
+
+      handler = _resolveValueEntityHandler(type, handler);
+    }
+
+    _hasToManyInKeyPathCacheHandler = entityHandler;
+    _hasToManyInKeyPathCacheResult = toMany;
+    return toMany;
+  }
+
+  /// Matches the left side of a comparison with [compare], one value at a
+  /// time through a to-many relationship (as a SQL join of its rows).
+  ///
+  /// In `roles.type == "admin"`:
+  /// - [keyValue] is the left side: the value of the [keys] (`roles.type`)
+  ///   in the entity being matched. Through a to-many relationship (see
+  ///   [hasToManyInKeyPath]) it's a list, one value per related entity
+  ///   (`[admin, guest]`).
+  /// - [compare] compares one left-side value with the right side: this
+  ///   condition's [value] (`"admin"`), or its [ConditionParameter]'s value
+  ///   (`?`, `?:name`).
+  ///
+  /// Through a to-many relationship, matches if [compare] matches any of its
+  /// values; without related entities (an empty list), [compare] gets a
+  /// single `null`. Otherwise (a field, also a list field), [keyValue] is
+  /// compared as a whole.
+  ///
+  /// Why: on SQL, a to-many relationship is an outer join, one row per
+  /// related entity, and an entity without related entities joins one row of
+  /// `NULL`s. So `roles.type == null` matches a user without roles (`IS
+  /// NULL`), and `roles.type == ?` with `['guest']` compares each role's
+  /// type with the parameter (as a field's `number == ?` does).
+  ///
+  /// Used by [KeyConditionEQ] (`==`). [KeyConditionNotEQ] (`!=`) and
+  /// [KeyConditionINBase] (`=~`/`!~`) handle a to-many the same way,
+  /// directly (see `_notEquals` and `_matchesIn`).
+  bool _matchesToManyOrValue(
+    Object? keyValue,
+    EntityHandler? entityHandler,
+    bool Function(Object? leftValue) compare,
+  ) {
+    if (keyValue is Iterable && hasToManyInKeyPath(entityHandler)) {
+      return keyValue.isEmpty ? compare(null) : keyValue.any(compare);
+    }
+    return compare(keyValue);
+  }
+
   @override
   void resolve({
     Condition? parent,
@@ -1661,7 +1761,24 @@ abstract class KeyCondition<O, V> extends Condition<O> {
       }
     }
 
-    return KeyConditionValue(value, valueType, valueEntityHandler);
+    return KeyConditionValue(
+      _parseDecimalValue(value, valueType),
+      valueType,
+      valueEntityHandler,
+    );
+  }
+
+  /// A [Decimal] field is kept as a `String` in an entity's `Map` (as in
+  /// memory): parsed (also each of a to-many relationship's), so it's
+  /// compared as a number (as SQL compares a `DECIMAL` column).
+  static Object _parseDecimalValue(Object value, TypeInfo? valueType) {
+    var type = valueType?.type;
+    if (type != Decimal && type != DynamicNumber) return value;
+
+    Object? parse(Object? v) => v is String ? (Decimal.from(v.trim()) ?? v) : v;
+
+    if (value is List) return value.map(parse).toList();
+    return parse(value)!;
   }
 
   EntityHandler? _resolveValueEntityHandler(
@@ -1754,12 +1871,18 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityKeyValue(o, entityHandler);
 
-    return equalsConditionValue(
+    // Through a to-many relationship, each related entity's value (or a
+    // `null` without any):
+    return _matchesToManyOrValue(
       keyValue,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
+      entityHandler,
+      (v) => equalsConditionValue(
+        v,
+        value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+      ),
     );
   }
 
@@ -1773,14 +1896,20 @@ class KeyConditionEQ<O> extends KeyCondition<O, Object?> {
   }) {
     var keyValue = getEntityMapKeyValue(o, entityHandler);
 
-    return equalsConditionValue(
+    // Through a to-many relationship, each related entity's value (or a
+    // `null` without any):
+    return _matchesToManyOrValue(
       keyValue?.value,
-      value,
-      parameters: parameters,
-      positionalParameters: positionalParameters,
-      namedParameters: namedParameters,
-      keyType: keyValue?.type,
-      keyEntityHandler: keyValue?.entityHandler,
+      entityHandler,
+      (v) => equalsConditionValue(
+        v,
+        value,
+        parameters: parameters,
+        positionalParameters: positionalParameters,
+        namedParameters: namedParameters,
+        keyType: keyValue?.type,
+        keyEntityHandler: keyValue?.entityHandler,
+      ),
     );
   }
 
@@ -1817,6 +1946,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     return _notEquals(
       keyValue,
       null,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -1836,6 +1966,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     return _notEquals(
       keyValue?.value,
       keyValue,
+      entityHandler,
       parameters,
       positionalParameters,
       namedParameters,
@@ -1843,10 +1974,13 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
   }
 
   /// The values of a to-many relationship are compared one by one (as a SQL
-  /// join of its rows): any of them not equal, or none (a `NULL` row).
+  /// join of its rows): any of them not equal; without any (see
+  /// [_isEmptyToMany]), as a `NULL` row (not equal to a value, but not
+  /// `!= null`).
   bool _notEquals(
     Object? keyValue,
     KeyConditionValue? keyConditionValue,
+    EntityHandler? entityHandler,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
@@ -1862,6 +1996,7 @@ class KeyConditionNotEQ<O> extends KeyCondition<O, Object?> {
     );
 
     if (keyValue is Iterable && value is! Iterable) {
+      if (_isEmptyToMany(keyValue, entityHandler)) return notEquals(null);
       return keyValue.isEmpty || keyValue.any(notEquals);
     }
 
@@ -2137,6 +2272,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 
     return _matchesIn(
       keyValue,
+      _isEmptyToMany(keyValue, entityHandler),
       parameters,
       positionalParameters,
       namedParameters,
@@ -2156,6 +2292,7 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
 
     return _matchesIn(
       keyValue?.value,
+      _isEmptyToMany(keyValue?.value, entityHandler),
       parameters,
       positionalParameters,
       namedParameters,
@@ -2163,11 +2300,13 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
     );
   }
 
-  /// With [not] (`NOT IN`), the values of a to-many relationship are
-  /// compared one by one (as a SQL join of its rows): any of them not in, or
-  /// none (a `NULL` row).
+  /// The values of a to-many relationship are compared one by one (as a SQL
+  /// join of its rows), with [not] (`NOT IN`): any of them not in. Without
+  /// any ([emptyToMany], see [_isEmptyToMany]), as a `NULL` row (in a list
+  /// with a `null`; also `NOT IN` a list without one).
   bool _matchesIn(
     Object? keyValue,
+    bool emptyToMany,
     Object? parameters,
     List? positionalParameters,
     Map<String, Object?>? namedParameters,
@@ -2181,6 +2320,8 @@ abstract class KeyConditionINBase<O> extends KeyCondition<O, List<Object?>> {
       namedParameters: namedParameters,
       entityHandler: entityHandler,
     );
+
+    if (emptyToMany) return inValues(null) != not;
 
     if (not && keyValue is Iterable) {
       return keyValue.isEmpty || keyValue.any((v) => !inValues(v));

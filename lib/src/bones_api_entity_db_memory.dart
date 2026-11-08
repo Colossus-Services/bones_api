@@ -1134,8 +1134,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     var entityHandler = getEntityHandler(tableName: table);
 
+    // As a select: also a to-many relationship (a table without to-one
+    // references) needs its references resolved to be matched.
     final noReferences =
-        tableScheme == null || tableScheme.fieldsReferencedTablesLength == 0;
+        tableScheme == null ||
+        (tableScheme.fieldsReferencedTablesLength == 0 &&
+            tableScheme.tableRelationshipReferenceLength == 0);
 
     // A delete by ID needs neither a scan nor resolving every row (below):
     // only the deleted row. A miss falls back to the scan, as in a select.

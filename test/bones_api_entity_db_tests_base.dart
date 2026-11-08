@@ -4756,8 +4756,8 @@ Future<bool> runAdapterTests(
           unorderedEquals(userIDs),
         );
         expect(
-          // (Only one row of a user's roles matches: the SQL adapters return
-          // a user once per matching row of a list relationship.)
+          // (Each user once, also with more than one matching role: see
+          // 'Operators: the same results on every adapter'.)
           await selectUsers('roles.type !~ /^(admin|guest)\$/'),
           equals([userIDs[1]]),
         );
@@ -5069,6 +5069,695 @@ Future<bool> runAdapterTests(
         expect(deleted.map((e) => e.id), equals([d1ID]));
         expect(await storeRepo.selectByID(d1ID), isNull);
         expect((await storeRepo.selectByID(d2ID))?.id, equals(d2ID));
+      });
+
+      test('Operators: the same results on every adapter', () async {
+        final userRepo = entityRepositoryProvider.userAPIRepository;
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        // Users: `level` (a nullable int), `creationTime` (a date),
+        // `address.city`, and `roles` (a to-many relationship, `uC` without
+        // any; an enum, a bool and a nullable decimal).
+        var alpha = Address('OX', 'OX Alpha', 'OX Street', 1);
+        var beta = Address('OX', 'OX Beta', 'OX Street', 2);
+
+        var uA = User(
+          'ox-a@$testDomain',
+          'p',
+          alpha,
+          [Role(RoleType.admin, value: Decimal.parse('1.5'))],
+          level: 10,
+          creationTime: DateTime.utc(2020),
+        );
+        var uB = User('ox-b@$testDomain', 'p', beta, [
+          Role(RoleType.guest, enabled: false),
+          Role(RoleType.unknown, value: Decimal.parse('3')),
+        ], creationTime: DateTime.utc(2021));
+        var uC = User(
+          'ox-c@$testDomain',
+          'p',
+          alpha,
+          [],
+          level: 5,
+          creationTime: DateTime.utc(2022),
+        );
+
+        var userNames = <Object, String>{};
+        for (var (u, n) in [(uA, 'a'), (uB, 'b'), (uC, 'c')]) {
+          userNames[(await userRepo.store(u))!] = n;
+        }
+        var allUsers = userNames.values.toSet();
+        var (ea, eb, ec) = (uA.email, uB.email, uC.email);
+
+        // Stores: `name` (text), `number` (a nullable int) and `owner` (a
+        // nullable to-one relationship, with `owner.address.city` 2 levels
+        // away).
+        var stores = [
+          (Store('ox-apple', 1, owner: uA), 's1'),
+          (Store('ox-banana', null), 's2'),
+          (Store('ox-cherry', 3, owner: uB), 's3'),
+          (Store('OX-Date', 30, owner: uC), 's4'),
+          (Store('ox-elder', 1, owner: uB), 's5'),
+        ];
+        var storeNames = <Object, String>{};
+        for (var (s, n) in stores) {
+          storeNames[(await storeRepo.store(s))!] = n;
+        }
+        var allStores = storeNames.values.toSet();
+
+        // The names of the selected entities, sorted: a list, not a set, so
+        // an entity selected more than once (a to-many relationship's join)
+        // is a failure too.
+        Future<List<String>> selectStores(
+          String query,
+          Object? parameters,
+        ) async => (await storeRepo.selectByQuery(
+          query,
+          parameters: parameters,
+        )).map((e) => storeNames[e.id]).nonNulls.toList()..sort();
+
+        Future<List<String>> selectUsers(
+          String query,
+          Object? parameters,
+        ) async => (await userRepo.selectByQuery(
+          query,
+          parameters: parameters,
+        )).map((e) => userNames[e.id]).nonNulls.toList()..sort();
+
+        var failures = <String>[];
+
+        Future<void> check(
+          Future<List<String>> Function(String, Object?) select,
+          Set<String> all,
+          String query,
+          Object? parameters,
+          Set<String> expected,
+        ) async {
+          var p = parameters == null ? '' : '  $parameters';
+          // The condition, and `!(...)` its complement:
+          for (var (q, exp) in [
+            (query, expected),
+            ('!($query)', all.difference(expected)),
+          ]) {
+            var expList = exp.toList()..sort();
+            try {
+              var got = await select(q, parameters);
+              if (got.join(',') != expList.join(',')) {
+                failures.add('`$q`$p: [${got.join(',')}], expected [$expList]');
+              }
+            } catch (e) {
+              failures.add('`$q`$p: ERROR $e');
+            }
+          }
+        }
+
+        // `x == null` and `x != null` split the entities (none in both, none
+        // in neither), as `cond` and `!(cond)`.
+        Future<void> nullSplit(
+          Future<List<String>> Function(String, Object?) select,
+          Set<String> all,
+          String key,
+          Set<String> isNull,
+        ) async {
+          await check(select, all, '$key == null', null, isNull);
+          await check(
+            select,
+            all,
+            '$key != null',
+            null,
+            all.difference(isNull),
+          );
+          await check(select, all, '$key == ?', [null], isNull);
+          await check(select, all, '$key =~ [null]', null, isNull);
+          await check(
+            select,
+            all,
+            '$key !~ [null]',
+            null,
+            all.difference(isNull),
+          );
+        }
+
+        Future<void> s(String q, Set<String> exp, [Object? params]) =>
+            check(selectStores, allStores, q, params, exp);
+
+        Future<void> u(String q, Set<String> exp, [Object? params]) =>
+            check(selectUsers, allUsers, q, params, exp);
+
+        // A text field, never `null`:
+        await s('name == "ox-apple"', {'s1'});
+        await s('name != "ox-apple"', {'s2', 's3', 's4', 's5'});
+        await s('name =~ ["ox-apple", "ox-cherry"]', {'s1', 's3'});
+        await s('name !~ ["ox-apple", "ox-cherry"]', {'s2', 's4', 's5'});
+        await s('name =~ /^ox-[ab]/', {'s1', 's2'});
+        await s('name !~ /^ox-[ab]/', {'s3', 's4', 's5'});
+        await s('name =~ /^ox-d/', {});
+        await s('name =~ /^ox-d/i', {'s4'});
+        await s('name !~ /^ox-d/i', {'s1', 's2', 's3', 's5'});
+        await s('name =~ /e/', {'s1', 's3', 's4', 's5'});
+        await s('name == null', {});
+        await s('name != null', allStores);
+        await s('name =~ null', {});
+        await s('name !~ null', allStores);
+        await s('name =~ []', {});
+        await s('name !~ []', allStores);
+        await s('name == ?', {'s3'}, ['ox-cherry']);
+        await s('name != ?:n', {'s1', 's2', 's4', 's5'}, {'n': 'ox-cherry'});
+        await s(
+          'name =~ ?',
+          {'s2', 's4'},
+          [
+            ['ox-banana', 'OX-Date'],
+          ],
+        );
+        await s(
+          'name !~ ?',
+          {'s1', 's3', 's5'},
+          [
+            ['ox-banana', 'OX-Date'],
+          ],
+        );
+        await s(
+          'name =~ ?:n',
+          {'s2', 's4'},
+          {
+            'n': ['ox-banana', 'OX-Date'],
+          },
+        );
+        await s(
+          'name !~ ?:n',
+          {'s1', 's3', 's5'},
+          {
+            'n': ['ox-banana', 'OX-Date'],
+          },
+        );
+        await s('name =~ ?', {}, [<String>[]]);
+        await s('name !~ ?:n', allStores, {'n': <String>[]});
+        await s('name =~ ?', {}, [null]);
+        await s('name !~ ?', allStores, [null]);
+        await s('name =~ /?/', {'s3'}, ['^ox-c']);
+        await s('name !~ /?:r/i', {'s4', 's5'}, {'r': '^ox-[a-c]'});
+
+        // A nullable number (`s2` is `null`):
+        await s('number == 1', {'s1', 's5'});
+        await s('number != 1', {'s2', 's3', 's4'});
+        await s('number == null', {'s2'});
+        await s('number != null', {'s1', 's3', 's4', 's5'});
+        await s('number =~ [1, 3]', {'s1', 's3', 's5'});
+        await s('number !~ [1, 3]', {'s2', 's4'});
+        await s('number =~ null', {'s2'});
+        await s('number !~ null', {'s1', 's3', 's4', 's5'});
+        await s('number =~ [null]', {'s2'});
+        await s('number !~ [null]', {'s1', 's3', 's4', 's5'});
+        await s('number =~ [3, null]', {'s2', 's3'});
+        await s('number !~ [3, null]', {'s1', 's4', 's5'});
+        await s('number =~ []', {});
+        await s('number !~ []', allStores);
+        await s('number =~ /^3/', {'s3', 's4'});
+        await s('number !~ /^3/', {'s1', 's2', 's5'});
+        await s(r'number =~ /0$/', {'s4'});
+        await s('number > 1', {'s3', 's4'});
+        await s('number >= 3', {'s3', 's4'});
+        await s('number < 3', {'s1', 's5'});
+        await s('number <= 1', {'s1', 's5'});
+        await s('number == ?', {'s3'}, [3]);
+        await s('number != ?:n', {'s1', 's2', 's4', 's5'}, {'n': 3});
+        await s('number == ?', {'s2'}, [null]);
+        await s('number != ?', {'s1', 's3', 's4', 's5'}, [null]);
+        await s(
+          'number =~ ?',
+          {'s1', 's4', 's5'},
+          [
+            [1, 30],
+          ],
+        );
+        await s(
+          'number !~ ?:n',
+          {'s2', 's3'},
+          {
+            'n': [1, 30],
+          },
+        );
+        await s('number =~ ?', {'s2'}, [null]);
+        await s('number !~ ?', {'s1', 's3', 's4', 's5'}, [null]);
+        await s(
+          'number =~ ?',
+          {'s2', 's3'},
+          [
+            [3, null],
+          ],
+        );
+        await s(
+          'number !~ ?',
+          {'s1', 's4', 's5'},
+          [
+            [3, null],
+          ],
+        );
+        await s('number =~ ?:n', {}, {'n': <int>[]});
+        await s('number !~ ?', allStores, [<int>[]]);
+        await s('number =~ /?/', {'s1', 's5'}, [r'^1$']);
+        await s('number !~ /?:r/', {'s2', 's3', 's4'}, {'r': r'^1$'});
+        await s('number > ? && number < ?', {'s3'}, [1, 30]);
+
+        // A to-one relationship, by its ID (`s2` has no owner):
+        var (ia, ib, ic) = (uA.id, uB.id, uC.id);
+        await s('owner == ?', {'s1'}, [ia]);
+        await s('owner != ?', {'s2', 's3', 's4', 's5'}, [ia]);
+        await s('owner == null', {'s2'});
+        await s('owner != null', {'s1', 's3', 's4', 's5'});
+        await s('owner =~ null', {'s2'});
+        await s('owner !~ null', {'s1', 's3', 's4', 's5'});
+        await s(
+          'owner =~ ?',
+          {'s1', 's4'},
+          [
+            [ia, ic],
+          ],
+        );
+        await s(
+          'owner !~ ?:o',
+          {'s2', 's3', 's5'},
+          {
+            'o': [ia, ic],
+          },
+        );
+        await s('owner =~ ?', {}, [<int>[]]);
+        await s('owner !~ ?:o', allStores, {'o': <int>[]});
+
+        // A field of a to-one relationship (a join):
+        await s('owner.email == ?', {'s1'}, [ea]);
+        await s('owner.email != ?', {'s2', 's3', 's4', 's5'}, [ea]);
+        await s(
+          'owner.email =~ ?',
+          {'s1', 's4'},
+          [
+            [ea, ec],
+          ],
+        );
+        await s(
+          'owner.email !~ ?:e',
+          {'s2', 's3', 's5'},
+          {
+            'e': [ea, ec],
+          },
+        );
+        await s('owner.email =~ /^ox-[ab]@/', {'s1', 's3', 's5'});
+        await s('owner.email !~ /^ox-[ab]@/', {'s2', 's4'});
+        await s('owner.email =~ /^OX-C@/i', {'s4'});
+        await s('owner.email =~ /?:r/', {'s3', 's5'}, {'r': '^ox-b@'});
+        await s('owner.email =~ ?', {}, [<String>[]]);
+        await s('owner.email !~ ?', allStores, [<String>[]]);
+        await s('owner.email !~ ?:e', {'s2', 's3', 's4', 's5'}, {'e': ea});
+        await s('owner.email =~ ?', {'s1'}, [ea]);
+        // A missing owner (`s2`) is a `null` field: `== null` matches it (as
+        // `!=` does):
+        await nullSplit(selectStores, allStores, 'owner.email', {'s2'});
+        await s('owner.email =~ null', {'s2'});
+        await s(
+          'owner.email =~ ?',
+          {'s1', 's2'},
+          [
+            [ea, null],
+          ],
+        );
+
+        // A nullable field of a to-one relationship (`uB` has no level, `s2`
+        // no owner):
+        await s('owner.level == 10', {'s1'});
+        await s('owner.level != 10', {'s2', 's3', 's4', 's5'});
+        await s('owner.level =~ [5, 10]', {'s1', 's4'});
+        await s('owner.level !~ [10]', {'s2', 's3', 's4', 's5'});
+        await s('owner.level > 1', {'s1', 's4'});
+        await s('owner.level < 10', {'s4'});
+        await s('owner.level =~ ?', {}, [<int>[]]);
+        await s('owner.level !~ ?', allStores, [<int>[]]);
+        await s('owner.level =~ /^1/', {'s1'});
+        await s('owner.level !~ /^1/', {'s2', 's3', 's4', 's5'});
+        await s(r'owner.level =~ /?:r/', {'s4'}, {'r': r'^5$'});
+        await nullSplit(selectStores, allStores, 'owner.level', {
+          's2',
+          's3',
+          's5',
+        });
+        await s('owner.level =~ null', {'s2', 's3', 's5'});
+        await s('owner.level =~ [5, null]', {'s2', 's3', 's4', 's5'});
+        await s('owner.level !~ [5, null]', {'s1'});
+        await s('owner.level == ?:l', {'s2', 's3', 's5'}, {'l': null});
+        await s('owner.level != ?:l', {'s1', 's4'}, {'l': null});
+
+        // A field 2 relationships away (`owner.address.city`):
+        await s('owner.address.city == "OX Alpha"', {'s1', 's4'});
+        await s('owner.address.city != "OX Alpha"', {'s2', 's3', 's5'});
+        await s('owner.address.city =~ /beta/i', {'s3', 's5'});
+        await s('owner.address.city !~ /beta/i', {'s1', 's2', 's4'});
+        await s(
+          'owner.address.city =~ ?:c',
+          {'s3', 's5'},
+          {
+            'c': ['OX Beta'],
+          },
+        );
+        await s(
+          'owner.address.city !~ ?:c',
+          {'s1', 's2', 's4'},
+          {
+            'c': ['OX Beta'],
+          },
+        );
+        await s('owner.address.city =~ ?', {}, [<String>[]]);
+        await s('owner.address.city !~ ?', allStores, [<String>[]]);
+        await s('owner.address.state == "OX"', {'s1', 's3', 's4', 's5'});
+        await s(
+          'owner.address.city !~ /?:r/i',
+          {'s2', 's3', 's5'},
+          {'r': 'alpha'},
+        );
+        await s('owner.address.city =~ /?/', {'s3', 's5'}, ['Beta\$']);
+        await nullSplit(selectStores, allStores, 'owner.address.city', {'s2'});
+        await s('owner.address.city =~ null', {'s2'});
+
+        // A to-many relationship through a to-one one (`owner.roles`): `s2`
+        // has no owner, `s4`'s owner (`uC`) no roles.
+        await s('owner.roles.type == "guest"', {'s3', 's5'});
+        await s('owner.roles.type == "admin"', {'s1'});
+        await s('owner.roles.type != "admin"', {'s2', 's3', 's4', 's5'});
+        await s('owner.roles.type =~ ["admin", "unknown"]', {'s1', 's3', 's5'});
+        await s('owner.roles.type =~ /^gu/', {'s3', 's5'});
+        await s('owner.roles.type !~ /^(admin|guest)\$/', {
+          's2',
+          's3',
+          's4',
+          's5',
+        });
+        await s('owner.roles.enabled == false', {'s3', 's5'});
+        await nullSplit(selectStores, allStores, 'owner.roles.type', {
+          's2',
+          's4',
+        });
+        await s('owner.roles.type =~ ?:t', {}, {'t': <String>[]});
+        await s('owner.roles.type !~ ?:t', allStores, {'t': <String>[]});
+
+        // Each entity's own `null`s:
+        await nullSplit(selectStores, allStores, 'name', {});
+        await nullSplit(selectStores, allStores, 'number', {'s2'});
+        await nullSplit(selectStores, allStores, 'owner', {'s2'});
+
+        // A single value (not a list) with `=~`/`!~`:
+        await s('name =~ "ox-apple"', {'s1'});
+        await s('name =~ ?', {'s1'}, ['ox-apple']);
+        await s('name !~ ?:n', {'s2', 's3', 's4', 's5'}, {'n': 'ox-apple'});
+        await s('number =~ 3', {'s3'});
+        await s('number =~ ?', {'s3'}, [3]);
+        await s('number !~ 3', {'s1', 's2', 's4', 's5'});
+
+        // `!`, and groups:
+        await s('!name == "ox-apple"', {'s2', 's3', 's4', 's5'});
+        await s('!!(number == 1)', {'s1', 's5'});
+        await s('!(number == 1 || owner.level == 5)', {'s2', 's3'});
+        await s('!(number =~ [1, 3] && owner.email =~ /^ox-b@/)', {
+          's1',
+          's2',
+          's4',
+        });
+        await s('number == 1 && !(owner.email =~ /^ox-a@/)', {'s5'});
+        await s('number == null || owner.level == null', {'s2', 's3', 's5'});
+        await s('(number == 1 || number == 3) && owner.level != 10', {
+          's3',
+          's5',
+        });
+        await s(
+          '!(owner =~ ?)',
+          {'s1', 's2', 's4'},
+          [
+            [ib],
+          ],
+        );
+        await s(
+          // (`OX-Date` doesn't match the case-sensitive `^ox-`.)
+          'name =~ /?/ && !(number =~ ?)',
+          {'s1', 's2', 's5'},
+          [
+            '^ox-',
+            [3],
+          ],
+        );
+        await s(
+          'name =~ /?:r/i && number !~ ?:n',
+          {'s2', 's3', 's4'},
+          {
+            'r': '^ox-',
+            'n': [1],
+          },
+        );
+
+        // The users: a to-many relationship (`roles`), compared row by row
+        // (as a SQL outer join): `==`/`=~` are "some role is", `!=`/`!~`
+        // "some role is not", and `!(...)` "no role is". A user without any
+        // (`uC`) is one row of `null`s: `roles.type == null` and
+        // `roles.type != "admin"` match it, `roles.type != null` doesn't.
+        // Each user is selected once (not once per matching role).
+        await u('roles.type == "admin"', {'a'});
+        await u('roles.type != "admin"', {'b', 'c'});
+        await u('roles.type =~ ["guest", "unknown"]', {'b'});
+        await u('roles.type !~ ["guest"]', {'a', 'b', 'c'});
+        await u('roles.type =~ /^(adm|unk)/', {'a', 'b'});
+        await u('roles.type !~ /^(adm|unk)/', {'b', 'c'});
+        await u('roles.type =~ ?:t', {}, {'t': <String>[]});
+        await u('roles.type !~ ?:t', allUsers, {'t': <String>[]});
+        await u(
+          'roles.type =~ ?',
+          {'a', 'b'},
+          [
+            ['admin', 'guest'],
+          ],
+        );
+        await u('roles.enabled == false', {'b'});
+        await u('roles.enabled == true', {'a', 'b'});
+        await u('!(roles.type =~ ["admin", "guest"])', {'c'});
+        await u(
+          'roles =~ ?',
+          {'a'},
+          [
+            [uA.roles.first.id],
+          ],
+        );
+        await u('roles =~ ?', {}, [<int>[]]);
+        await u(
+          '!(roles =~ ?)',
+          {'a', 'c'},
+          [
+            [uB.roles.first.id],
+          ],
+        );
+        await nullSplit(selectUsers, allUsers, 'roles.type', {'c'});
+        await u('roles.type =~ null', {'c'});
+        await u('roles.type =~ ["admin", null]', {'a', 'c'});
+        await u('roles.type !~ ["admin", null]', {'b'});
+        await u(
+          'roles.type !~ ?:t',
+          {'b', 'c'},
+          {
+            't': ['admin'],
+          },
+        );
+        await u('roles.type =~ /?:r/', {'a'}, {'r': '^adm'});
+        await u('roles.type !~ /?:r/i', {'b', 'c'}, {'r': '^ADM'});
+        // An enum parameter:
+        await u('roles.type == ?', {'a'}, [RoleType.admin]);
+        await u(
+          'roles.type =~ ?',
+          {'a', 'b'},
+          [
+            [RoleType.admin, RoleType.guest],
+          ],
+        );
+        await u('roles.type != ?:t', {'b', 'c'}, {'t': RoleType.admin});
+        // A bool:
+        await u('roles.enabled =~ [false]', {'b'});
+        await u('roles.enabled != true', {'b', 'c'});
+        await nullSplit(selectUsers, allUsers, 'roles.enabled', {'c'});
+        // A nullable decimal (`uB`'s guest and `uC` are `null`):
+        await u('roles.value == 1.5', {'a'});
+        await u('roles.value > 1', {'a', 'b'});
+        await u('roles.value >= 3', {'b'});
+        await u('roles.value < 2', {'a'});
+        await u('roles.value != 3', {'a', 'b', 'c'});
+        await u('roles.value =~ [1.5, 3]', {'a', 'b'});
+        // (Not split by `null`: `uB` has a role with and one without.)
+        await u('roles.value == null', {'b', 'c'});
+        await u('roles.value != null', {'a', 'b'});
+        await u('roles.value =~ [null]', {'b', 'c'});
+        await u('roles.value =~ [3, null]', {'b', 'c'});
+        await u('roles.value !~ [3, null]', {'a'});
+        await u('roles.value == ?', {'b'}, [Decimal.parse('3')]);
+
+        // A decimal as a `String`:
+        await u('roles.value == "1.5"', {'a'});
+        await u('roles.value =~ ["1.5", "3"]', {'a', 'b'});
+        await u('roles.value == ?', {'b'}, ['3']);
+        // A list parameter with `==`, through a to-many relationship (`uC`
+        // without roles) and of a field:
+        await u(
+          'roles.type == ?',
+          {'c'},
+          [
+            [null],
+          ],
+        );
+        await u(
+          'roles.type == ?',
+          {'b'},
+          [
+            ['guest'],
+          ],
+        );
+        await s(
+          'number == ?',
+          {'s2'},
+          [
+            [null],
+          ],
+        );
+        await s(
+          'number == ?',
+          {'s3'},
+          [
+            [3],
+          ],
+        );
+
+        // A date:
+        await u('creationTime == ?', {'b'}, [DateTime.utc(2021)]);
+        await u('creationTime != ?', {'a', 'c'}, [DateTime.utc(2021)]);
+        await u('creationTime > ?', {'b', 'c'}, [DateTime.utc(2020)]);
+        await u('creationTime <= ?:t', {'a', 'b'}, {'t': DateTime.utc(2021)});
+        await u(
+          'creationTime =~ ?',
+          {'a', 'c'},
+          [
+            [DateTime.utc(2020), DateTime.utc(2022)],
+          ],
+        );
+
+        // The user's own fields:
+        await nullSplit(selectUsers, allUsers, 'level', {'b'});
+        await u('level == null', {'b'});
+        await u('level =~ null', {'b'});
+        await u('level !~ null', {'a', 'c'});
+        await u('level !~ [10]', {'b', 'c'});
+        await u('level =~ [5, null]', {'b', 'c'});
+        await u('address.city =~ /alpha/i', {'a', 'c'});
+        await u(
+          'address.city !~ ?',
+          {'a', 'c'},
+          [
+            ['OX Beta'],
+          ],
+        );
+        await u(
+          'email =~ ?:e',
+          {'a', 'b'},
+          {
+            'e': [ea, eb],
+          },
+        );
+        await u('email !~ /^ox-a@/', {'b', 'c'});
+        await u('email =~ /^ox-/ && roles.type =~ /^gu/', {'b'});
+        await u('level == 10 || !(roles.type == "admin")', {'a', 'b', 'c'});
+        await u('level == 5 || roles.type == "guest"', {'b', 'c'});
+
+        // Counted once each, as selected (a to-many relationship's join):
+        for (var (q, n) in [
+          ('roles.type != "admin"', 2),
+          ('roles.type =~ ["guest", "unknown"]', 1),
+          ('roles.enabled == true', 2),
+        ]) {
+          var count = await userRepo.countByQuery('email =~ /^ox-/ && ($q)');
+          if (count != n) failures.add('count `$q`: $count, expected $n');
+        }
+
+        // Paginated once each (a to-many relationship's join):
+        for (var (limit, offset, exp) in [
+          (1, null, ['b']),
+          (2, null, ['b', 'c']),
+          (1, 1, ['c']),
+        ]) {
+          var page = await userRepo.selectByQuery(
+            'email =~ /^ox-/ && roles.type != "admin"',
+            limit: limit,
+            offset: offset,
+            orderByID: true,
+          );
+          var names = page.map((e) => userNames[e.id]).toList();
+          if (names.join(',') != exp.join(',')) {
+            failures.add('limit $limit offset $offset: $names, expected $exp');
+          }
+        }
+
+        // A `DELETE` through a to-one (a `JOIN`) and a to-many relationship:
+        var d1 = Store('oxd-1', 1, owner: uA);
+        var d2 = Store('oxd-2', 2, owner: uB);
+        var d3 = Store('oxd-3', 3);
+        var dIDs = [
+          for (var d in [d1, d2, d3]) (await storeRepo.store(d))!,
+        ];
+        for (var (q, params, exp) in [
+          ('name =~ /^oxd-/ && owner.email == ?', [eb], [dIDs[1]]),
+          ('name =~ /^oxd-/ && owner.roles.type == "admin"', null, [dIDs[0]]),
+          ('name =~ /^oxd-/ && owner.level == null', null, [dIDs[2]]),
+        ]) {
+          try {
+            var deleted = await storeRepo.deleteByQuery(q, parameters: params);
+            var ids = deleted.map((e) => e.id).toList();
+            if (ids.join(',') != exp.join(',')) {
+              failures.add('delete `$q`: $ids, expected $exp');
+            }
+          } catch (e) {
+            failures.add('delete `$q`: ERROR $e');
+          }
+        }
+        var left = await storeRepo.selectByQuery('name =~ /^oxd-/');
+        if (left.isNotEmpty) {
+          failures.add('delete: left ${left.map((e) => e.name).toList()}');
+        }
+
+        // A `DELETE` through a to-many relationship, of a table without
+        // to-one references (`address.stores`):
+        final addressRepo = entityRepositoryProvider.addressAPIRepository;
+        var ax1 = Address(
+          'PX',
+          'PX City',
+          'PX Street',
+          1,
+          stores: [Store('px-1', 1)],
+        );
+        var ax2 = Address(
+          'PX',
+          'PX City',
+          'PX Street',
+          2,
+          stores: [Store('px-2', 2), Store('px-3', 3)],
+        );
+        var ax1ID = (await addressRepo.store(ax1))!;
+        var ax2ID = (await addressRepo.store(ax2))!;
+        try {
+          var deleted = await addressRepo.deleteByQuery(
+            'state == "PX" && stores.name == ?',
+            parameters: ['px-3'],
+          );
+          var ids = deleted.map((e) => e.id).toList();
+          if (ids.join(',') != '$ax2ID') {
+            failures.add('delete address: $ids, expected [$ax2ID]');
+          }
+        } catch (e) {
+          failures.add('delete address: ERROR $e');
+        }
+        if ((await addressRepo.selectByID(ax1ID))?.id != ax1ID) {
+          failures.add('delete address: $ax1ID was deleted');
+        }
+
+        expect(failures, isEmpty, reason: failures.join('\n'));
       });
 
       test('populate', () async {

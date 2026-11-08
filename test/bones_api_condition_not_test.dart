@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:bones_api/bones_api.dart';
 import 'package:test/test.dart';
 
@@ -607,6 +609,34 @@ void main() {
       sub.markPlaceholderInlinedAsNull('k');
       expect(parent.nullInlinedPlaceholders, equals(['k']));
       expect(sub.nullInlinedPlaceholders, equals(['k']));
+    });
+  });
+
+  group('An empty list field (not a to-many relationship)', () {
+    // Only an empty to-many relationship is a `null` row (see
+    // `KeyCondition.hasToManyInKeyPath`): an empty list field is a value, not a
+    // `null`.
+    bool matches(String query, Object? value, [Object? parameters]) =>
+        Condition.parse(query)
+            .matchesEntityMap({'tags': value}, parameters: parameters);
+
+    test('is not `null`', () {
+      for (var v in [<String>[], Uint8List(0)]) {
+        expect(matches('tags == null', v), isFalse, reason: '$v');
+        expect(matches('tags != null', v), isTrue, reason: '$v');
+        expect(matches('tags =~ [null]', v), isFalse, reason: '$v');
+        expect(matches('tags !~ [null]', v), isTrue, reason: '$v');
+        expect(matches('!(tags == null)', v), isTrue, reason: '$v');
+        expect(matches('tags == ?', v, [null]), isFalse, reason: '$v');
+      }
+    });
+
+    test('`!=` / `!~` a value', () {
+      expect(matches('tags != "a"', <String>[]), isTrue);
+      expect(matches('tags !~ ["a"]', <String>[]), isTrue);
+      expect(matches('tags =~ ["a"]', <String>[]), isFalse);
+      expect(matches('tags != "a"', ['a']), isFalse);
+      expect(matches('tags != "a"', ['a', 'b']), isTrue);
     });
   });
 }
