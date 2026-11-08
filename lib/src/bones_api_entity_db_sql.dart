@@ -4465,7 +4465,7 @@ class _DBTableCheck {
       var column = sqlGenerator.normalizeColumnName(f.name);
       return sqlGenerator.generateAddUniqueConstraintSQL(
         table,
-        '${table}__${column}__unique',
+        SQLGenerator.uniqueConstraintName(table, column),
         [column],
         comment: '${f.type.toString(withT: false)} ${f.name} UNIQUE',
       );

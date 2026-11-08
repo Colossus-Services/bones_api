@@ -1660,7 +1660,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
                 ?.type ??
             int;
 
-        var relTable = '${sourceTable}__${sourceField}__rel';
+        var relTable = SQLGenerator.relationshipTableName(
+          sourceTable,
+          sourceField,
+        );
         var relSourceField = '${sourceTable}__$sourceFieldId';
         var relTargetField = '${targetTable}__$targetField';
 
