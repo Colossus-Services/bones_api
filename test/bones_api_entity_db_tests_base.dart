@@ -5224,6 +5224,10 @@ Future<bool> runAdapterTests(
         // `== []` is `== null`:
         await s('name == []', {});
         await s('name != []', allStores);
+        // `== [v]` is `== v`:
+        await s('name == ["ox-apple"]', {'s1'});
+        await s('name != ["ox-apple"]', {'s2', 's3', 's4', 's5'});
+        await s('name =~ ["ox-apple"]', {'s1'});
         await s('name == ?', {}, [<String>[]]);
         await s('name != ?:n', allStores, {'n': <String>[]});
         await s('name == ?', {'s3'}, ['ox-cherry']);
@@ -5283,6 +5287,11 @@ Future<bool> runAdapterTests(
         // `== []` is `== null`:
         await s('number == []', {'s2'});
         await s('number != []', {'s1', 's3', 's4', 's5'});
+        // `== [v]` is `== v`:
+        await s('number == [3]', {'s3'});
+        await s('number != [3]', {'s1', 's2', 's4', 's5'});
+        await s('number =~ [3]', {'s3'});
+        await s('number !~ [3]', {'s1', 's2', 's4', 's5'});
         await s('number == ?', {'s2'}, [<int>[]]);
         await s('number != ?:n', {'s1', 's3', 's4', 's5'}, {'n': <int>[]});
         await s('number =~ /^3/', {'s3', 's4'});
@@ -5834,6 +5843,9 @@ Future<bool> runAdapterTests(
           required Object id2,
           required List<Object> entityParams,
           List<Object>? referenceParams,
+          Future<int> Function(String q, Object? params)? count,
+          Future<int> Function(String q, Object? params, int limit, int offset)?
+          pageLength,
         }) async {
           var all = model.keys.toSet();
 
@@ -5933,11 +5945,60 @@ Future<bool> runAdapterTests(
             {id1, null},
           ], notInSet([id1]));
 
-          // `== [id]` (a single element) is `== id`:
+          // `== [id]` (a single element) is `== id`; an entity as a `==`
+          // parameter is its ID:
           await check('$field == [${lit(id1)}]', null, inSet([id1]));
           await check('$field == ?', [
             [id1],
           ], inSet([id1]));
+          await check('$field == ?', [entityParams.first], inSet([id1]));
+          await check('$field != ?', [
+            entityParams.first,
+          ], where((r) => r.isEmpty || r.any((v) => v != id1)));
+
+          // Counted and paginated once each (a to-many's join):
+          var inBoth = inSet([id1, id2]);
+          if (count != null) {
+            var n = await count('$field =~ ?', [
+              [id1, id2],
+            ]);
+            if (n != inBoth.length) {
+              failures.add(
+                'count `$field =~ [id1, id2]`: $n, expected '
+                '${inBoth.length}',
+              );
+            }
+            var page = await select('$field =~ ?', [
+              [id1, id2],
+            ]);
+            if (page.length != inBoth.length) {
+              failures.add('select `$field =~ [id1, id2]`: $page');
+            }
+          }
+          if (pageLength != null) {
+            // Each page has as many entities as its `limit` (none repeated):
+            for (var (limit, offset, exp) in [
+              (1, 0, 1),
+              (1, 1, 1),
+              (2, 0, inBoth.length),
+              (2, 1, inBoth.length - 1),
+            ]) {
+              var n = await pageLength(
+                '$field =~ ?',
+                [
+                  [id1, id2],
+                ],
+                limit,
+                offset,
+              );
+              if (n != exp) {
+                failures.add(
+                  'page `$field =~ [id1, id2]` limit $limit offset $offset: '
+                  '$n, expected $exp',
+                );
+              }
+            }
+          }
 
           // With another condition (`&&`, `||`):
           await check('$field =~ ? && $field !~ ?', [
@@ -6017,6 +6078,23 @@ Future<bool> runAdapterTests(
               parameters: params,
             )).map((e) => addressNames[e.id]).nonNulls.toList()..sort();
 
+        // (The IDs of this test's stores: only its addresses are counted.)
+        Future<int> countAddresses(String q, Object? params) async =>
+            await addressRepo.countByQuery(q, parameters: params);
+
+        Future<int> pageAddresses(
+          String q,
+          Object? params,
+          int limit,
+          int offset,
+        ) async => (await addressRepo.selectByQuery(
+          q,
+          parameters: params,
+          limit: limit,
+          offset: offset,
+          orderByID: true,
+        )).length;
+
         Set<Object> ids(Iterable<Store> stores) =>
             stores.map((s) => s.id!).toSet();
 
@@ -6031,6 +6109,8 @@ Future<bool> runAdapterTests(
           id1: sc1.id!,
           id2: sc2.id!,
           entityParams: [sc1, sc2],
+          count: countAddresses,
+          pageLength: pageAddresses,
         );
 
         // An `EntityReferenceList` as a parameter (its IDs):
@@ -6054,6 +6134,8 @@ Future<bool> runAdapterTests(
           id1: aStores.first.id!,
           id2: bStores.first.id!,
           entityParams: [aStores.first, bStores.first],
+          count: countAddresses,
+          pageLength: pageAddresses,
         );
 
         // A to-one entity (`Store.owner`) and a to-one `EntityReference`
