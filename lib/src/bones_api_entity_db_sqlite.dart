@@ -1025,30 +1025,15 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     var affectedRows = connection.updatedRows;
 
     if (affectedRows == 0 && results.isEmpty) {
-      var entry = sql.parametersByPlaceholder;
-      if (!allowAutoInsert) {
-        throw StateError(
-          "Can't update not stored entity into table `$table`: $entry",
-        );
-      }
-
-      var fields = sql.namedParameters!;
-
-      return generateInsertSQL(
+      return autoInsertAfterNoopUpdate(
         transaction,
         entityName,
         table,
-        fields,
-      ).resolveMapped((insertSQL) {
-        _log.info('Update not affecting any row! Auto inserting: $insertSQL');
-        return doInsertSQL(
-          entityName,
-          table,
-          insertSQL,
-          transaction,
-          connection,
-        );
-      });
+        sql,
+        connection,
+        allowAutoInsert: allowAutoInsert,
+        logger: _log,
+      );
     }
 
     return _resolveResultID(connection, results, sql, id);
@@ -1238,30 +1223,16 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
   // -------------------------------------------------------------------------
 
   @override
-  Future<DBSQLiteConnectionWrapper> openTransaction(Transaction transaction) {
-    var contextCompleter = Completer<DBSQLiteConnectionWrapper>();
+  Future<DBSQLiteConnectionWrapper> openTransaction(Transaction transaction) =>
+      openTransactionWithPool<DBSQLiteConnectionWrapper>(
+        transaction,
+        (connection, onTransactionContext) =>
+            connection.openTransaction((transactionWrap) {
+              onTransactionContext(transactionWrap);
 
-    var result = executeWithPool(
-      (connection) {
-        return connection.openTransaction((transactionWrap) {
-          contextCompleter.complete(transactionWrap);
-
-          return _runTransaction(transaction, connection);
-        });
-      },
-      validator: (c) => !transaction.isAborted,
-      onError: (e, s) => transaction.notifyExecutionError(
-        e,
-        s,
-        errorResolver: resolveError,
-        debugInfo: () => transaction.toString(withExecutedOperations: false),
-      ),
-    );
-
-    transaction.transactionResult = result;
-
-    return contextCompleter.future;
-  }
+              return _runTransaction(transaction, connection);
+            }),
+      );
 
   /// Unlike the PostgreSQL/MySQL drivers, SQLite has no `runTx` helper that
   /// commits or rolls back around a callback, so the `COMMIT`/`ROLLBACK` is
@@ -1280,32 +1251,9 @@ class DBSQLiteAdapter extends DBSQLAdapter<DBSQLiteConnectionWrapper>
     return await resolveTransactionResult(res, transaction, connection);
   }
 
-  @override
-  bool get cancelTransactionResultWithError => false;
-
-  @override
-  bool get throwTransactionResultWithError => true;
-
-  @override
-  bool cancelTransaction(
-    Transaction transaction,
-    DBSQLiteConnectionWrapper? connection,
-    Object? error,
-    StackTrace? stackTrace,
-  ) {
-    // The `ROLLBACK` is issued by `_DBSQLiteConnectionWrapped.openTransaction`
-    // when the transaction block throws.
-    return true;
-  }
-
-  @override
-  bool get callCloseTransactionRequired => false;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    DBSQLiteConnectionWrapper? connection,
-  ) {}
+  // `cancelTransaction` is the `DBSQLAdapter` default (nothing to cancel):
+  // the `ROLLBACK` is issued by `_DBSQLiteConnectionWrapped.openTransaction`
+  // when the transaction block throws.
 
   @override
   String toString() {

@@ -949,32 +949,15 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
         .resolveMapped((results) {
           var affectedRows = results.affectedRows;
           if (affectedRows == 0) {
-            var entry = sql.parametersByPlaceholder;
-            if (!allowAutoInsert) {
-              throw StateError(
-                "Can't update not stored entity into table `$table`: $entry",
-              );
-            }
-
-            var fields = sql.namedParameters!;
-
-            return generateInsertSQL(
+            return autoInsertAfterNoopUpdate(
               transaction,
               entityName,
               table,
-              fields,
-            ).resolveMapped((insertSQL) {
-              _log.info(
-                'Update not affecting any row! Auto inserting: $insertSQL',
-              );
-              return doInsertSQL(
-                entityName,
-                table,
-                insertSQL,
-                transaction,
-                connection,
-              );
-            });
+              sql,
+              connection,
+              allowAutoInsert: allowAutoInsert,
+              logger: _log,
+            );
           }
 
           return _resolveResultID(results, table, sql, id);
@@ -1081,61 +1064,22 @@ class DBMySQLAdapter extends DBSQLAdapter<DBMySqlConnectionWrapper>
   }
 
   @override
-  Future<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) {
-    var contextCompleter = Completer<DBMySqlConnectionWrapper>();
+  Future<DBMySqlConnectionWrapper> openTransaction(Transaction transaction) =>
+      openTransactionWithPool<DBMySqlConnectionWrapper>(
+        transaction,
+        (connection, onTransactionContext) =>
+            connection.openTransaction((transactionWrap) {
+              onTransactionContext(transactionWrap);
 
-    var result = executeWithPool(
-      (connection) {
-        return connection.openTransaction((transactionWrap) {
-          contextCompleter.complete(transactionWrap);
-
-          return transaction.transactionFuture.then(
-            (res) => resolveTransactionResult(res, transaction, connection),
-            onError: (e, s) {
-              cancelTransaction(transaction, connection, e, s);
-              throw e;
-            },
-          );
-        });
-      },
-      validator: (c) => !transaction.isAborted,
-      onError: (e, s) => transaction.notifyExecutionError(
-        e,
-        s,
-        errorResolver: resolveError,
-        debugInfo: () => transaction.toString(withExecutedOperations: false),
-      ),
-    );
-
-    transaction.transactionResult = result;
-
-    return contextCompleter.future;
-  }
-
-  @override
-  bool get cancelTransactionResultWithError => false;
-
-  @override
-  bool get throwTransactionResultWithError => true;
-
-  @override
-  bool cancelTransaction(
-    Transaction transaction,
-    DBMySqlConnectionWrapper? connection,
-    Object? error,
-    StackTrace? stackTrace,
-  ) {
-    return true;
-  }
-
-  @override
-  bool get callCloseTransactionRequired => false;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    DBMySqlConnectionWrapper? connection,
-  ) {}
+              return transaction.transactionFuture.then(
+                (res) => resolveTransactionResult(res, transaction, connection),
+                onError: (e, s) {
+                  cancelTransaction(transaction, connection, e, s);
+                  throw e;
+                },
+              );
+            }),
+      );
 
   @override
   String toString() {

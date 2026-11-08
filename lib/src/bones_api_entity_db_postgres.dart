@@ -1540,13 +1540,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
   @override
   Future<PostgreSQLConnectionTransactionWrapper> openTransaction(
     Transaction transaction,
-  ) {
-    var contextCompleter = Completer<PostgreSQLConnectionTransactionWrapper>();
-
-    var result = executeWithPool(
-      (connection) {
-        return connection.openTransaction((connTransaction) {
-          contextCompleter.complete(connTransaction);
+  ) => openTransactionWithPool<PostgreSQLConnectionTransactionWrapper>(
+    transaction,
+    (connection, onTransactionContext) =>
+        connection.openTransaction((connTransaction) {
+          onTransactionContext(connTransaction);
 
           return transaction.transactionFuture.then(
             (res) => resolveTransactionResult(res, transaction, connection),
@@ -1555,28 +1553,11 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
               throw e;
             },
           );
-        });
-      },
-      validator: (c) => !transaction.isAborted,
-      onError: (e, s) => transaction.notifyExecutionError(
-        e,
-        s,
-        errorResolver: resolveError,
-        debugInfo: () => transaction.toString(withExecutedOperations: false),
-      ),
-    );
+        }),
+  );
 
-    transaction.transactionResult = result;
-
-    return contextCompleter.future;
-  }
-
-  @override
-  bool get cancelTransactionResultWithError => false;
-
-  @override
-  bool get throwTransactionResultWithError => true;
-
+  /// Cancels the driver's transaction (see
+  /// [PostgreSQLConnectionTransactionWrapper.cancelTransaction]).
   @override
   bool cancelTransaction(
     Transaction transaction,
@@ -1588,15 +1569,6 @@ class DBPostgreSQLAdapter extends DBSQLAdapter<PostgreSQLConnectionWrapper>
     connTransaction?.cancelTransaction();
     return true;
   }
-
-  @override
-  bool get callCloseTransactionRequired => false;
-
-  @override
-  FutureOr<void> closeTransaction(
-    Transaction transaction,
-    PostgreSQLConnectionWrapper? connection,
-  ) {}
 
   @override
   String toString() {
