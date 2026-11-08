@@ -8,6 +8,10 @@
   `APIRequest._requesterAddressResolved` (its getter's name is taken by the
   given address). Caches filled by a private helper or a differently named
   member keep `*Cache`. Behavior unchanged (private names only).
+- `sqlite3: ^3.9.1` (was `^3.8.0`): its build hook now reports a failed
+  native-library download from GitHub releases as the HTTP error (e.g.
+  `504`), not as a hash mismatch (simolus3/sqlite3.dart#435). 3.9.0 also
+  added `CommonDatabase.trace` and `Database.interrupt()`.
 
 ## 1.35.0
 
