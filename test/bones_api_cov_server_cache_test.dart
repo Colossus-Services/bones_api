@@ -1050,6 +1050,44 @@ void main() {
       expect(cache.cachedResponsesLength, lessThan(8));
     });
 
+    test('max memory size cleaning: the most used entry is kept', () async {
+      // The eviction removes the least used entries first (it removed the
+      // most used first). Usage counts in buckets of 1000.
+      var cache = APIServerResponseCache(
+        maxMemorySize: 1024 * 1024,
+        fileStatTimeout: Duration(days: 2),
+      );
+
+      var inner = _FakeStaticHandler(tmpDir);
+      for (var i = 0; i < 5; ++i) {
+        inner.overrides['u$i.bin'] = (request) => Response.ok(
+          List<int>.filled(300 * 1024, i),
+          headers: {'content-type': 'application/octet-stream'},
+        );
+      }
+
+      var handler = cache.middleware(inner.call);
+
+      // `u0` cached and used 1000+ times:
+      for (var n = 0; n < 1001; ++n) {
+        var r = await handler(_get('u0.bin'));
+        expect(r.statusCode, equals(200));
+      }
+      expect(inner.calls, equals(1));
+
+      // Filling the cache evicts the others, not `u0`:
+      for (var i = 1; i < 5; ++i) {
+        var r = await handler(_get('u$i.bin'));
+        expect(r.statusCode, equals(200));
+      }
+      expect(cache.cachedResponsesLength, lessThan(5));
+
+      var callsBefore = inner.calls;
+      var r = await handler(_get('u0.bin'));
+      expect(r.statusCode, equals(200));
+      expect(inner.calls, equals(callsBefore), reason: '`u0` was evicted');
+    });
+
     test('expired entries: memory size subtracted', () async {
       var file = writeFile('e.txt', 'Hello E');
 

@@ -50,6 +50,9 @@ Fixes:
   the cached values, which hold a `List` for an entry with compressed
   alternatives: a `TypeError`. The entries are now sorted with all their
   alternatives (by total usage and memory size).
+- `APIServerResponseCache`: the eviction removed the most used entries
+  first (usage sorted descending): now the least used first, and among
+  equally used, the largest first.
 - `APIServerResponseCache`: an expired entry (file modified) was removed
   without subtracting its memory size from `totalMemorySize`.
 - `APIServerConfig`: the user directory (Let's Encrypt paths) fell back to

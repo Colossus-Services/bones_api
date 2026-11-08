@@ -989,15 +989,21 @@ abstract class _CachedResponse
     entries2.map((e) => e.memorySize).sum,
   );
 
-  /// The order of [compareTo] and [compareEntries]: by usage (in buckets of
-  /// 1000) then by memory size (in buckets of 8 KB), both descending.
+  /// The order of [compareTo] and [compareEntries], the eviction order of
+  /// `APIServerResponseCache._checkMaxMemorySize` (it evicts from the
+  /// first): the least used first (usage in buckets of 1000, ascending),
+  /// then, among equally used, the largest first (memory size in buckets of
+  /// 8 KB, descending: fewer evictions free the memory).
+  ///
+  /// The usage was descending, so the most used responses were evicted
+  /// first: the opposite of a cache.
   static int _compareUsageAndMemory(
     int usage1,
     int memory1,
     int usage2,
     int memory2,
   ) {
-    var cmp = (usage2 ~/ 1000).compareTo(usage1 ~/ 1000);
+    var cmp = (usage1 ~/ 1000).compareTo(usage2 ~/ 1000);
 
     if (cmp == 0) {
       var m1 = memory1 ~/ (1024 * 8);
