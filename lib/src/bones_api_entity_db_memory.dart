@@ -401,60 +401,47 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       o,
     );
 
-    var uniques =
-        fieldsEntityAnnotations?.entries
-            .where((e) => e.value.hasUnique)
-            .toList() ??
-        [];
+    // The unique constraints, by their fields: the single-field ones
+    // (`@EntityField.unique()`) and the composite ones
+    // (`@EntityIndex(unique: true)`), checked the same way.
+    var uniquesFields = <List<String>>[
+      ...?fieldsEntityAnnotations?.entries
+          .where((e) => e.value.hasUnique)
+          .map((e) => [e.key]),
+      for (var entityIndex in entityHandler.getEntityIndexes())
+        if (entityIndex.unique) entityIndex.fields,
+    ];
+    if (uniquesFields.isEmpty) return;
 
-    for (var e in uniques) {
-      var field = e.key;
-      var value = entityHandler.getField(o, field);
-      if (value == null) continue;
+    // The entity's values in their stored form (normalized as an entry: e.g.
+    // an `EntityReference` as its referenced ID, not the reference object),
+    // so they are comparable with the stored entries. Normalized once for
+    // all the constraints.
+    var values = _normalizeEntityJSON(
+      {
+        for (var f in uniquesFields.expand((fields) => fields))
+          f: entityHandler.getField(o, f),
+      },
+      entityName: entityName,
+      table: table,
+    );
 
-      if (_containsEntryWithConflictFieldValue(
+    for (var fields in uniquesFields) {
+      // As the SQL databases: a `null` value never conflicts.
+      if (fields.any((f) => values[f] == null)) continue;
+
+      if (_containsEntryWithConflictFieldsValues(
         map,
-        entityHandler,
         entityId,
-        field,
-        value,
+        fields,
+        values,
       )) {
+        var single = fields.length == 1;
         throw EntityFieldInvalid(
           'unique',
-          value,
-          fieldName: field,
-          entityType: entityHandler.type,
-          tableName: table,
-        );
-      }
-    }
-
-    // The composite unique constraints (`@EntityIndex(unique: true)`), as
-    // the SQL databases: a `null` value never conflicts.
-    for (var entityIndex in entityHandler.getEntityIndexes()) {
-      if (!entityIndex.unique) continue;
-
-      var fields = entityIndex.fields;
-
-      var values = _normalizeEntityJSON({
-        for (var f in fields) f: entityHandler.getField(o, f),
-      }, table: table);
-      if (values.values.any((v) => v == null)) continue;
-
-      var conflict = map.entries.any((e) {
-        if (entityId != null && entityId == e.key) return false;
-        var elem = e.value;
-        return fields.every(
-          (f) => _sameValue(_entryFieldValue(elem, f), values[f]),
-        );
-      });
-
-      if (conflict) {
-        throw EntityFieldInvalid(
-          'unique',
-          fields.map((f) => values[f]).toList(),
+          single ? values[fields.first] : fields.map((f) => values[f]).toList(),
           fieldName: fields.join(', '),
-          fieldsNames: fields,
+          fieldsNames: single ? null : fields,
           entityType: entityHandler.type,
           tableName: table,
         );
@@ -464,9 +451,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   /// Whether a stored value [a] and an entity's value [b] are the same, as
   /// stored (e.g. an `enum` by its name).
+  ///
+  /// The stored forms are compared only when the types differ (an entity's
+  /// `Enum` against its stored name): values of the same type are only the
+  /// same by `==` (two distinct values of a class without a distinctive
+  /// `toString` are not the same).
   static bool _sameValue(Object? a, Object? b) {
     if (a == b) return true;
     if (a == null || b == null) return false;
+    if (a.runtimeType == b.runtimeType) return false;
     return _storedForm(a) == _storedForm(b);
   }
 
@@ -482,22 +475,24 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       ? entry[field]
       : entry[normalizeColumnName(field)];
 
-  bool _containsEntryWithConflictFieldValue<O>(
+  /// Whether a stored entry of [map], other than [entityId]'s own, has the
+  /// same [values] in all the [fields] (a unique constraint conflict).
+  ///
+  /// Used by [checkEntityFields] for each unique constraint (single-field or
+  /// composite), with the entity's [values] already in their stored form:
+  /// each entry's field is read by name or column ([_entryFieldValue]) and
+  /// compared with [_sameValue].
+  bool _containsEntryWithConflictFieldsValues(
     Map<Object, Map<String, dynamic>> map,
-    EntityHandler<O> entityHandler,
     Object? entityId,
-    String field,
-    value,
+    List<String> fields,
+    Map<String, dynamic> values,
   ) => map.entries.any((e) {
-    if (entityId != null) {
-      var id = e.key;
-      if (entityId == id) return false;
-    }
-
+    if (entityId != null && entityId == e.key) return false;
     var elem = e.value;
-    var elemValue = elem[field];
-    var conflict = elemValue == value;
-    return conflict;
+    return fields.every(
+      (f) => _sameValue(_entryFieldValue(elem, f), values[f]),
+    );
   });
 
   @override

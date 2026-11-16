@@ -45,6 +45,198 @@ class _RoleTestProvider extends EntityRepositoryProvider {
   }
 }
 
+/// A referenced entity, for the unique `EntityReference` field of
+/// [_Withdrawal].
+class _Wallet extends Entity {
+  int? id;
+  String name;
+
+  _Wallet({this.id, this.name = ''});
+
+  @override
+  String get idFieldName => 'id';
+
+  @override
+  List<String> get fieldsNames => const ['id', 'name'];
+
+  @override
+  V? getField<V>(String key) => switch (key) {
+    'id' => id as V?,
+    'name' => name as V?,
+    _ => null,
+  };
+
+  @override
+  TypeInfo? getFieldType(String key) => switch (key) {
+    'id' => TypeInfo.tInt,
+    'name' => TypeInfo.tString,
+    _ => null,
+  };
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        id = value as int?;
+      case 'name':
+        name = value as String;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
+}
+
+final _walletHandler = GenericEntityHandler<_Wallet>(
+  instantiatorDefault: _Wallet.new,
+  sampleEntity: _Wallet(),
+);
+
+/// An entity with single-field unique fields (`@EntityField.unique()`): an
+/// `EntityReference` (`pendingWallet`), a `String` (`externalCode`) and an
+/// `enum` (`kind`). All named in camelCase, so their columns
+/// (`pending_wallet`, `external_code`) differ from the field names.
+class _Withdrawal extends Entity {
+  int? id;
+  EntityReference<_Wallet> pendingWallet;
+  String? externalCode;
+  RoleType? kind;
+  int amount;
+
+  _Withdrawal({
+    this.id,
+    Object? pendingWallet,
+    this.externalCode,
+    this.kind,
+    this.amount = 0,
+  }) : pendingWallet = EntityReference<_Wallet>.from(
+         pendingWallet,
+         entityHandler: _walletHandler,
+       );
+
+  @override
+  String get idFieldName => 'id';
+
+  @override
+  List<String> get fieldsNames => const [
+    'id',
+    'pendingWallet',
+    'externalCode',
+    'kind',
+    'amount',
+  ];
+
+  @override
+  V? getField<V>(String key) => switch (key) {
+    'id' => id as V?,
+    'pendingWallet' => pendingWallet as V?,
+    'externalCode' => externalCode as V?,
+    'kind' => kind as V?,
+    'amount' => amount as V?,
+    _ => null,
+  };
+
+  @override
+  TypeInfo? getFieldType(String key) => switch (key) {
+    'id' || 'amount' => TypeInfo.tInt,
+    'pendingWallet' => TypeInfo<EntityReference<_Wallet>>.fromType(
+      EntityReference,
+      [TypeInfo<_Wallet>(_Wallet)],
+    ),
+    'externalCode' => TypeInfo.tString,
+    'kind' => TypeInfo<RoleType>(RoleType),
+    _ => null,
+  };
+
+  @override
+  List<EntityAnnotation>? getFieldEntityAnnotations(String key) =>
+      switch (key) {
+        'pendingWallet' ||
+        'externalCode' ||
+        'kind' => const [EntityField.unique()],
+        _ => null,
+      };
+
+  @override
+  void setField<V>(String key, V? value) {
+    switch (key) {
+      case 'id':
+        id = value as int?;
+      case 'pendingWallet':
+        pendingWallet = EntityReference<_Wallet>.from(
+          value,
+          entityHandler: _walletHandler,
+        );
+      case 'externalCode':
+        externalCode = value as String?;
+      case 'kind':
+        kind = value == null
+            ? null
+            : (value is RoleType ? value : RoleType.values.byName('$value'));
+      case 'amount':
+        amount = value as int;
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'pendingWallet': pendingWallet.toJson(),
+    'externalCode': externalCode,
+    'kind': kind?.name,
+    'amount': amount,
+  };
+}
+
+final _withdrawalHandler = GenericEntityHandler<_Withdrawal>(
+  instantiatorDefault: _Withdrawal.new,
+  sampleEntity: _Withdrawal(),
+);
+
+/// A provider with a [DBSQLMemoryAdapter] and the [_Wallet] and
+/// [_Withdrawal] repositories.
+class _WithdrawalTestProvider extends EntityRepositoryProvider {
+  late final DBSQLMemoryAdapter sqlAdapter;
+
+  _WithdrawalTestProvider() {
+    sqlAdapter = DBSQLMemoryAdapter(parentRepositoryProvider: this);
+    DBSQLEntityRepository<_Wallet>(sqlAdapter, 'wallet', _walletHandler);
+    DBSQLEntityRepository<_Withdrawal>(
+      sqlAdapter,
+      'withdrawal',
+      _withdrawalHandler,
+    );
+
+    addTearDown(() {
+      sqlAdapter.close();
+      close();
+    });
+  }
+}
+
+/// A provider with [SetEntityRepository]s for [_Wallet] and [_Withdrawal]
+/// (the in-memory repository without an adapter).
+class _WithdrawalSetTestProvider extends EntityRepositoryProvider {
+  _WithdrawalSetTestProvider() {
+    var wallets = SetEntityRepository<_Wallet>(
+      'wallet',
+      _walletHandler,
+      provider: this,
+    )..ensureInitialized();
+    var withdrawals = SetEntityRepository<_Withdrawal>(
+      'withdrawal',
+      _withdrawalHandler,
+      provider: this,
+    )..ensureInitialized();
+
+    addTearDown(() {
+      wallets.close();
+      withdrawals.close();
+      close();
+    });
+  }
+}
+
 /// An entity with a hidden field (`secret`), for [GenericEntityHandler].
 class _SecretEntity extends Entity {
   int? id;
@@ -1248,6 +1440,146 @@ void main() {
         unorderedEquals(['admin/true', 'admin/false', 'guest/true']),
       );
     });
+
+    for (var (repositoryKind, newProvider)
+        in <(String, EntityRepositoryProvider Function())>[
+          ('DBSQLMemoryAdapter', _WithdrawalTestProvider.new),
+          ('SetEntityRepository', _WithdrawalSetTestProvider.new),
+        ]) {
+      test(
+        '$repositoryKind: unique camelCase `String` and `enum` fields (`@EntityField.unique()`)',
+        () async {
+          var provider = newProvider();
+          var withdrawals = provider.getEntityRepositoryByType<_Withdrawal>(
+            _Withdrawal,
+          )!;
+
+          Future<EntityFieldInvalid?> storeError(_Withdrawal o) async {
+            try {
+              await withdrawals.store(o);
+            } on EntityFieldInvalid catch (e) {
+              return e;
+            }
+            return null;
+          }
+
+          expect(
+            await withdrawals.store(
+              _Withdrawal(externalCode: 'A', kind: RoleType.admin),
+            ),
+            isNotNull,
+          );
+          expect(
+            await withdrawals.store(
+              _Withdrawal(externalCode: 'B', kind: RoleType.guest),
+            ),
+            isNotNull,
+          );
+          // `null` values never conflict:
+          expect(await withdrawals.store(_Withdrawal()), isNotNull);
+          expect(await withdrawals.store(_Withdrawal()), isNotNull);
+
+          var codeError = await storeError(_Withdrawal(externalCode: 'A'));
+          expect(codeError?.reason, 'unique');
+          expect(codeError?.fieldName, 'externalCode');
+          expect(codeError?.value, 'A');
+
+          var kindError = await storeError(_Withdrawal(kind: RoleType.guest));
+          expect(kindError?.reason, 'unique');
+          expect(kindError?.fieldName, 'kind');
+
+          expect((await withdrawals.selectAll()).length, 4);
+        },
+      );
+
+      test(
+        '$repositoryKind: a unique `EntityReference` field (`@EntityField.unique()`)',
+        () async {
+          var provider = newProvider();
+          var wallets = provider.getEntityRepositoryByType<_Wallet>(_Wallet)!;
+          var withdrawals = provider.getEntityRepositoryByType<_Withdrawal>(
+            _Withdrawal,
+          )!;
+
+          var w1 = _Wallet(name: 'w1');
+          var w2 = _Wallet(name: 'w2');
+          expect(await wallets.store(w1), isNotNull);
+          expect(await wallets.store(w2), isNotNull);
+
+          Future<EntityFieldInvalid?> storeError(_Withdrawal o) async {
+            try {
+              await withdrawals.store(o);
+            } on EntityFieldInvalid catch (e) {
+              return e;
+            }
+            return null;
+          }
+
+          // Referenced by entity:
+          var d1 = _Withdrawal(pendingWallet: w1, amount: 10);
+          expect(await withdrawals.store(d1), isNotNull);
+
+          // Another wallet: OK.
+          var d2 = _Withdrawal(pendingWallet: w2.id, amount: 20);
+          expect(await withdrawals.store(d2), isNotNull);
+
+          // `null` references never conflict (as the SQL databases):
+          expect(await withdrawals.store(_Withdrawal(amount: 1)), isNotNull);
+          expect(await withdrawals.store(_Withdrawal(amount: 2)), isNotNull);
+
+          // The same wallet, referenced by ID: a violation.
+          var error = await storeError(_Withdrawal(pendingWallet: w1.id));
+          expect(error, isNotNull);
+          expect(error!.reason, 'unique');
+          expect(error.fieldName, 'pendingWallet');
+          expect(error.value, w1.id);
+          expect(error.tableName, 'withdrawal');
+
+          // The same wallet, referenced by entity: a violation.
+          expect(
+            (await storeError(_Withdrawal(pendingWallet: w2)))?.reason,
+            'unique',
+          );
+
+          // Updating itself (the same wallet): OK.
+          d1.amount = 11;
+          expect(await withdrawals.store(d1), d1.id);
+
+          // Updating into the other's wallet: a violation.
+          d2.pendingWallet = EntityReference<_Wallet>.from(
+            w1,
+            entityHandler: _walletHandler,
+          );
+          expect((await storeError(d2))?.fieldName, 'pendingWallet');
+          // Not stored: back to its wallet.
+          d2.pendingWallet = EntityReference<_Wallet>.from(
+            w2.id,
+            entityHandler: _walletHandler,
+          );
+
+          // A reference to a not stored wallet (no ID yet): never the same as
+          // a stored wallet's.
+          expect(
+            await storeError(
+              _Withdrawal(pendingWallet: _Wallet(name: 'new'), amount: 3),
+            ),
+            isNull,
+          );
+
+          expect(
+            (await withdrawals.selectAll())
+                .where((e) => e.amount != 3)
+                .map((e) => '${e.pendingWallet.id}/${e.amount}')
+                .toList(),
+            unorderedEquals(['${w1.id}/11', '${w2.id}/20', 'null/1', 'null/2']),
+          );
+          expect(
+            (await withdrawals.selectAll()).where((e) => e.amount == 3).length,
+            1,
+          );
+        },
+      );
+    }
 
     test('SQLite: the columns of a composite constraint message', () {
       var (table, columns) = DBSQLiteAdapter.parseConstraintTableFields(

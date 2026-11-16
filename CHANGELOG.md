@@ -1,3 +1,28 @@
+## 1.35.2
+
+- `DBSQLMemoryAdapter`: single-field unique constraints
+  (`@EntityField.unique()`) are now enforced as by the SQL databases:
+  - On an `EntityReference` field: the entity's value (the `EntityReference`
+    object) was compared with the stored value (the referenced ID), so it
+    never conflicted. `EntityFieldInvalid.value` of such a violation is the
+    referenced ID.
+  - On a camelCase field (e.g. `externalCode`, stored as `external_code`):
+    the stored entry was read by the field name only, so it never
+    conflicted. **In-memory tests storing duplicates of such a field now
+    fail, as they would on PostgreSQL/MySQL/SQLite.**
+  - An `enum` field is compared by its stored name.
+
+  The single-field and composite (`@EntityIndex(unique: true)`) constraints
+  are now checked together: the entity's values normalized once, in their
+  stored form, and a `null` value never conflicting. Values of the same
+  type are now the same only by `==` (no longer also by `toString()`).
+- `SetEntityRepository`: a unique `EntityReference` field compares the
+  referenced ID, and a null reference never conflicts (two rows with a null
+  reference were a violation; a reference by entity and one by ID could
+  differ).
+- Test: the unsendable-`Zone` isolate test accepts Dart 3.14's message
+  (`Class: Zone`, was `_CustomZone`).
+
 ## 1.35.1
 
 - Private fields that only memoize a public getter or method of the same
