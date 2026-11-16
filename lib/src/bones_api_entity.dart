@@ -8818,7 +8818,9 @@ abstract class IterableEntityRepository<O extends Object>
 
     for (var e in uniques) {
       var field = e.key;
-      var value = getField(o, field);
+      var value = _uniqueComparableValue(getField(o, field));
+      // As the SQL databases: a `null` value (or a null reference) never
+      // conflicts.
       if (value == null) continue;
 
       if (_containsOtherEntryWithFieldValue(o, field, value)) {
@@ -8833,8 +8835,21 @@ abstract class IterableEntityRepository<O extends Object>
     }
   }
 
+  /// The [value] of a unique field as compared by [checkEntityFields] and
+  /// [_containsOtherEntryWithFieldValue]: an `EntityReference` by its
+  /// referenced ID (or its entity, if not stored yet), and `null` for a null
+  /// reference (that, as `null`, never conflicts). `EntityReference.==` would
+  /// make two null references equal, and a reference set by entity differ
+  /// from one set by ID.
+  static Object? _uniqueComparableValue(Object? value) => switch (value) {
+    EntityReference() => value.isNull ? null : (value.id ?? value.entity),
+    EntityReferenceList() => value.isNull ? null : value,
+    _ => value,
+  };
+
   /// Whether an entry other than [o] (not the same instance, nor with the
-  /// same ID: a re-stored entity) has the [field] [value].
+  /// same ID: a re-stored entity) has the [field] [value] (already as
+  /// [_uniqueComparableValue]).
   bool _containsOtherEntryWithFieldValue(O o, String field, Object value) {
     var id = entityHandler.getID(o);
 
@@ -8842,7 +8857,7 @@ abstract class IterableEntityRepository<O extends Object>
       if (identical(elem, o)) return false;
       if (id != null && entityHandler.getID(elem) == id) return false;
 
-      var elemValue = getField(elem, field);
+      var elemValue = _uniqueComparableValue(getField(elem, field));
       return elemValue == value;
     });
   }
