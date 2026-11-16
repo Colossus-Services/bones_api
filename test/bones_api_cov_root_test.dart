@@ -605,11 +605,14 @@ void main() {
         await root.ensureInitialized();
         var zoneField = root.currentAPIRequest;
 
+        // The unsendable object is a `Zone`. The SDK names its class in the
+        // message: `_CustomZone` (Dart < 3.14) or `Zone` (Dart 3.14), so only
+        // `Zone` is matched (as a class name, not just the word "zone").
         Matcher unsendable() => throwsA(
           isA<ArgumentError>().having(
             (e) => e.toString(),
             'message',
-            contains('_CustomZone'),
+            matches(RegExp(r'Class: _?\w*Zone\b|_CustomZone')),
           ),
         );
 

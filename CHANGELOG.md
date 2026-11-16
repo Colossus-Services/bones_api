@@ -20,6 +20,8 @@
   referenced ID, and a null reference never conflicts (two rows with a null
   reference were a violation; a reference by entity and one by ID could
   differ).
+- Test: the unsendable-`Zone` isolate test accepts Dart 3.14's message
+  (`Class: Zone`, was `_CustomZone`).
 
 ## 1.35.1
 
