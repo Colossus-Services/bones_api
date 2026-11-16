@@ -1,3 +1,15 @@
+## 1.35.2
+
+- `DBSQLMemoryAdapter`: a single-field unique constraint
+  (`@EntityField.unique()`) on an `EntityReference` field is now enforced,
+  as by the SQL databases. The entity's value (the `EntityReference`
+  object) was compared with the stored value (the referenced ID), so it
+  never conflicted. The single-field check now shares the composite
+  (`@EntityIndex(unique: true)`) check's comparison: values in their stored
+  form, the entry's field read by name or column, and a `null` value never
+  conflicting. `EntityFieldInvalid.value` of such a violation is the
+  referenced ID.
+
 ## 1.35.1
 
 - Private fields that only memoize a public getter or method of the same

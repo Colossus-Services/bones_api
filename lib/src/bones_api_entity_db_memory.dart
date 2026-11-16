@@ -407,21 +407,21 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
             .toList() ??
         [];
 
+    // The single-field unique constraints (`@EntityField.unique()`): checked
+    // as a one-field composite constraint, so an `EntityReference` value is
+    // compared by its stored form (the referenced ID), like the SQL databases.
     for (var e in uniques) {
       var field = e.key;
-      var value = entityHandler.getField(o, field);
-      if (value == null) continue;
 
-      if (_containsEntryWithConflictFieldValue(
-        map,
-        entityHandler,
-        entityId,
+      var values = _uniqueFieldsValues(o, entityHandler, table, [field]);
+      if (values == null) continue;
+
+      if (_containsEntryWithConflictFieldsValues(map, entityId, [
         field,
-        value,
-      )) {
+      ], values)) {
         throw EntityFieldInvalid(
           'unique',
-          value,
+          values[field],
           fieldName: field,
           entityType: entityHandler.type,
           tableName: table,
@@ -436,20 +436,15 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
       var fields = entityIndex.fields;
 
-      var values = _normalizeEntityJSON({
-        for (var f in fields) f: entityHandler.getField(o, f),
-      }, table: table);
-      if (values.values.any((v) => v == null)) continue;
+      var values = _uniqueFieldsValues(o, entityHandler, table, fields);
+      if (values == null) continue;
 
-      var conflict = map.entries.any((e) {
-        if (entityId != null && entityId == e.key) return false;
-        var elem = e.value;
-        return fields.every(
-          (f) => _sameValue(_entryFieldValue(elem, f), values[f]),
-        );
-      });
-
-      if (conflict) {
+      if (_containsEntryWithConflictFieldsValues(
+        map,
+        entityId,
+        fields,
+        values,
+      )) {
         throw EntityFieldInvalid(
           'unique',
           fields.map((f) => values[f]).toList(),
@@ -482,22 +477,40 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       ? entry[field]
       : entry[normalizeColumnName(field)];
 
-  bool _containsEntryWithConflictFieldValue<O>(
-    Map<Object, Map<String, dynamic>> map,
+  /// The values of the unique constraint [fields] of entity [o], in their
+  /// stored form (normalized as an entry, e.g. an `EntityReference` as its
+  /// referenced ID), or `null` if any of them is `null`: as the SQL
+  /// databases, a `null` value never conflicts.
+  ///
+  /// Used by [checkEntityFields] for both the single-field and the composite
+  /// unique constraints, so the entity's values are comparable with the
+  /// stored entries (see [_containsEntryWithConflictFieldsValues]).
+  Map<String, dynamic>? _uniqueFieldsValues<O>(
+    O o,
     EntityHandler<O> entityHandler,
-    Object? entityId,
-    String field,
-    value,
-  ) => map.entries.any((e) {
-    if (entityId != null) {
-      var id = e.key;
-      if (entityId == id) return false;
-    }
+    String table,
+    List<String> fields,
+  ) {
+    var values = _normalizeEntityJSON({
+      for (var f in fields) f: entityHandler.getField(o, f),
+    }, table: table);
+    if (values.values.any((v) => v == null)) return null;
+    return values;
+  }
 
+  /// Whether a stored entry of [map], other than [entityId]'s own, has the
+  /// same [values] in all the [fields] (a unique constraint conflict).
+  bool _containsEntryWithConflictFieldsValues(
+    Map<Object, Map<String, dynamic>> map,
+    Object? entityId,
+    List<String> fields,
+    Map<String, dynamic> values,
+  ) => map.entries.any((e) {
+    if (entityId != null && entityId == e.key) return false;
     var elem = e.value;
-    var elemValue = elem[field];
-    var conflict = elemValue == value;
-    return conflict;
+    return fields.every(
+      (f) => _sameValue(_entryFieldValue(elem, f), values[f]),
+    );
   });
 
   @override
