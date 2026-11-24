@@ -1473,7 +1473,8 @@ void main() {
       );
       expect(jsonReq.payload, equals({'b': 1.5, 'a': 'x'}));
       expect(jsonReq.payloadBytes, equals(utf8.encode(body)));
-      expect(jsonReq.payloadAsBytes, isNot(equals(utf8.encode(body))));
+      // A text body: `payloadAsBytes` is the body as received too.
+      expect(jsonReq.payloadAsBytes, equals(utf8.encode(body)));
 
       // Kept even when the JSON fails to decode (no payload):
       var invalid = await toAPIRequest(
@@ -1498,6 +1499,28 @@ void main() {
       );
       expect(text.payload, equals('olá'));
       expect(text.payloadBytes, equals(utf8.encode('olá')));
+      expect(text.payloadAsBytes, equals(utf8.encode('olá')));
+
+      // Not UTF-8: decoded as `latin1`, whose UTF-8 re-encoding differs from
+      // the body; `payloadAsBytes` is the body as received.
+      var latin1Bytes = latin1.encode('olá');
+      var latin1Text = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'text/plain'},
+          body: latin1Bytes,
+        ),
+      );
+      expect(latin1Text.payload, equals('olá'));
+      expect(latin1Text.payloadAsBytes, equals(latin1Bytes));
+      expect(latin1Text.payloadAsBytes, isNot(equals(utf8.encode('olá'))));
+
+      // Built in code (no bytes): the payload encoded, as before.
+      expect(
+        APIRequest.post('/a', payload: 'olá').payloadAsBytes,
+        equals(utf8.encode('olá')),
+      );
 
       var binary = await toAPIRequest(
         Request(

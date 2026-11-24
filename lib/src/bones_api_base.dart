@@ -1901,7 +1901,19 @@ class APIRequest extends APIMetricSet with APIPayload {
   @override
   final dynamic payload;
 
-  /// Returns [payload] as bytes ([Uint8List]).
+  /// The [payload] as bytes, or `null` when there is no payload.
+  ///
+  /// When the request came over HTTP with a text body (plain text or JSON),
+  /// you get the body exactly as it arrived ([payloadBytes]). The decoded
+  /// payload is not encoded again, because that would not give back the same
+  /// bytes: a JSON object would lose its original spacing and key order, and
+  /// text sent in another charset (such as `latin1`) would come back as
+  /// UTF-8.
+  ///
+  /// A binary payload is returned as it is. For a request built in code
+  /// there are no received bytes, so the payload itself is encoded: a list
+  /// of bytes is copied, and any other value becomes the UTF-8 of its
+  /// `toString()`.
   Uint8List? get payloadAsBytes {
     var payload = this.payload;
 
@@ -1913,8 +1925,34 @@ class APIRequest extends APIMetricSet with APIPayload {
       return payload;
     }
 
+    final payloadBytes = this.payloadBytes;
+
     if (payload is List<int>) {
+      // The received bytes when they are this payload's (same length),
+      // instead of a copy of it.
+      if (payloadBytes != null && payloadBytes.length == payload.length) {
+        return payloadBytes;
+      }
+
       return Uint8List.fromList(payload);
+    }
+
+    // A body received as text: its bytes as received, not a re-encoding of
+    // the decoded [payload]. A JSON `Map`'s `toString` isn't even JSON, and
+    // a body decoded as `latin1` differs when re-encoded as UTF-8.
+    if (payloadBytes != null) {
+      // A text body, decoded to this `String`:
+      if (payload is String) {
+        return payloadBytes;
+      }
+
+      // A JSON body (a decoded `Map`/`List`/value), or another text MIME
+      // type:
+      final payloadMimeType = this.payloadMimeType;
+      if (payloadMimeType != null &&
+          (payloadMimeType.isJSON || payloadMimeType.isText)) {
+        return payloadBytes;
+      }
     }
 
     var s = payload.toString();
@@ -1927,11 +1965,12 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// decompression), when this request was built from an HTTP request by the
   /// [APIServer]; otherwise `null`.
   ///
-  /// Unlike [payloadAsBytes], which re-encodes the decoded [payload] (a JSON
-  /// body is already a `Map` at this point), these are the original bytes:
-  /// needed to verify a signature computed over the raw body, such as a
-  /// webhook HMAC, since re-encoding changes whitespace, key order and
-  /// number formats. It is kept even when the JSON body fails to decode.
+  /// These are the original bytes, not an encoding of the decoded [payload]
+  /// (a JSON body is already a `Map` at this point): needed to verify a
+  /// signature computed over the raw body, such as a webhook HMAC, since
+  /// re-encoding changes whitespace, key order and number formats. Kept
+  /// even when the JSON body fails to decode (then [payload] is `null`).
+  /// [payloadAsBytes] returns them for a text body.
   final Uint8List? payloadBytes;
 
   MimeType? _payloadMimeType;

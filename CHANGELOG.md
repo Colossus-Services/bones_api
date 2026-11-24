@@ -2,10 +2,18 @@
 
 - `APIRequest.payloadBytes`: the request body bytes exactly as received
   (after any `Content-Encoding` decompression), set by `APIServer` for
-  every HTTP request. Unlike `payloadAsBytes`, which re-encodes the decoded
-  `payload`, these are the original bytes, needed to verify a signature
-  computed over the raw body (e.g. a webhook HMAC). Kept even when a JSON
-  body fails to decode; `null` for an `APIRequest` built in code.
+  every HTTP request. These are the original bytes, not an encoding of the
+  decoded `payload`, needed to verify a signature computed over the raw
+  body (e.g. a webhook HMAC). Kept even when a JSON body fails to decode;
+  `null` for an `APIRequest` built in code.
+- `APIRequest.payloadAsBytes`: for a body received as text (JSON, or a text
+  MIME type), the bytes as received (`payloadBytes`), instead of a
+  re-encoding of the decoded `payload`: a JSON body gave the `toString` of
+  its `Map` (not JSON), and a body decoded as `latin1` differed once
+  re-encoded as UTF-8. **Behavior change**: a route's `Uint8List`
+  parameter filled from a text body (`APIModule`) now gets the body as
+  received, e.g. a `text/plain; charset=latin1` body keeps its `latin1`
+  bytes.
 - `APIServer`: the payload helpers pass the body bytes along with the
   decoded payload (a named record), instead of discarding them.
 

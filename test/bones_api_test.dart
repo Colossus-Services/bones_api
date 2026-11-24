@@ -483,6 +483,8 @@ void main() {
       );
     });
 
+    // `payloadAsBytes` of a text body is the body as received (10 bytes),
+    // not the decoded text re-encoded as UTF-8 (14 bytes).
     test('upload(text:latin1) /base', () async {
       var res = await _getURL(
         '${apiServer.url}base/upload',
@@ -493,7 +495,7 @@ void main() {
       expect(
         res.toString(),
         equals(
-          '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 14<<utf8: Ã¡Ã>>)',
+          '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 10<<utf8: Ã¡Ã>>)',
         ),
       );
     });
@@ -505,10 +507,11 @@ void main() {
         payload: convert.latin1.encode('utf8: áÁ'),
         payloadType: 'text/plain; charset=latin1',
       );
+      // The latin1 body as received: 8 bytes (its UTF-8 re-encoding has 10).
       expect(
         res.toString(),
         equals(
-          '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 10<<utf8: áÁ>>)',
+          '(200, Payload> mimeType: text/plain; charset=latin1 ; length: 8<<utf8: áÁ>>)',
         ),
       );
     });
