@@ -199,6 +199,76 @@ void main() {
       expect(APIPayload.resolveMimeType('application/json')?.isJSON, isTrue);
     });
 
+    test('payloadAsBytes: the received bytes (payloadBytes)', () {
+      // As `APIServer` builds it: the decoded payload and the body received.
+      APIRequest received(Object payload, Object mimeType, List<int> body) =>
+          APIRequest(
+            APIRequestMethod.POST,
+            '/a',
+            payload: payload,
+            payloadMimeType: mimeType,
+            payloadBytes: Uint8List.fromList(body),
+          );
+
+      // JSON: the body as received, not the `toString` of the decoded `Map`.
+      var jsonBody = utf8.encode('{ "a" : 1.50 }');
+      var json = received({'a': 1.5}, 'application/json', jsonBody);
+      expect(json.payloadAsBytes, same(json.payloadBytes));
+      expect(json.payloadAsBytes, equals(jsonBody));
+
+      // A decoded JSON value that is not a `Map` (a `List<dynamic>`, as
+      // `jsonDecode` gives: not a `List<int>` of bytes):
+      var array = received(
+        jsonDecode('[1, 2]') as Object,
+        'application/json',
+        utf8.encode('[1, 2]'),
+      );
+      expect(array.payloadAsBytes, same(array.payloadBytes));
+
+      // Text: the body as received (here `latin1`), not its UTF-8.
+      var latin1Body = latin1.encode('olá');
+      var text = received('olá', 'text/plain', latin1Body);
+      expect(text.payloadAsBytes, same(text.payloadBytes));
+      expect(text.payloadAsBytes, isNot(equals(utf8.encode('olá'))));
+
+      // A `String` payload of any MIME type is text:
+      var html = received('<b>x</b>', 'text/html', utf8.encode('<b>x</b>'));
+      expect(html.payloadAsBytes, same(html.payloadBytes));
+
+      // A `List<int>` payload that is the received bytes (same length):
+      var list = received(
+        <int>[1, 2, 3],
+        'application/octet-stream',
+        [1, 2, 3],
+      );
+      expect(list.payloadAsBytes, same(list.payloadBytes));
+
+      // Not a text MIME type: the payload encoded, the bytes unused.
+      var other = received({'a': 1}, 'image/png', [9, 9]);
+      expect(other.payloadAsBytes, equals(utf8.encode('{a: 1}')));
+
+      // Built in code (no received bytes): the payload encoded, as before.
+      expect(
+        APIRequest.post(
+          '/a',
+          payload: {'a': 1},
+          payloadMimeType: 'application/json',
+        ).payloadAsBytes,
+        equals(utf8.encode('{a: 1}')),
+      );
+      expect(APIRequest.post('/a', payload: 'abc').payloadBytes, isNull);
+
+      // No payload: `null`, even with received bytes (a JSON body that
+      // failed to decode keeps its bytes in `payloadBytes` only).
+      var invalid = APIRequest(
+        APIRequestMethod.POST,
+        '/a',
+        payloadBytes: Uint8List.fromList(utf8.encode('{invalid')),
+      );
+      expect(invalid.payloadAsBytes, isNull);
+      expect(invalid.payloadBytes, equals(utf8.encode('{invalid')));
+    });
+
     test('path parts', () {
       var r = APIRequest.get(' /a/b/c/ ');
       expect(r.pathParts, equals(['a', 'b', 'c']));

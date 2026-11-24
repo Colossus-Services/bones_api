@@ -483,6 +483,23 @@ void main() {
       );
     });
 
+    // Over HTTP: a JSON body's `payloadAsBytes` is the body as sent (15
+    // bytes, with its spacing), not the decoded `Map` re-encoded.
+    test('upload(json) /base', () async {
+      var res = await _getURL(
+        '${apiServer.url}base/upload',
+        method: APIRequestMethod.POST,
+        payload: convert.utf8.encode('{ "a" : 1.50 } '),
+        payloadType: 'application/json',
+      );
+      expect(
+        res.toString(),
+        equals(
+          '(200, Payload> mimeType: application/json ; length: 15<<{a: 1.5}>>)',
+        ),
+      );
+    });
+
     // `payloadAsBytes` of a text body is the body as received (10 bytes),
     // not the decoded text re-encoded as UTF-8 (14 bytes).
     test('upload(text:latin1) /base', () async {

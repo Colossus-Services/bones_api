@@ -1674,6 +1674,26 @@ void main() {
         maxPayloadLength: 1000,
       );
       expect(g.payload, equals(data));
+      // The received bytes are the decompressed body, not the gzip stream:
+      expect(g.payloadBytes, equals(data));
+
+      // A compressed JSON body: decoded, and its bytes decompressed as sent.
+      var jsonBody = utf8.encode('{ "a" : 1.50 }');
+      var gJson = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'gzip',
+          },
+          body: gzip.encode(jsonBody),
+        ),
+        decompressPayload: true,
+      );
+      expect(gJson.payload, equals({'a': 1.5}));
+      expect(gJson.payloadBytes, equals(jsonBody));
+      expect(gJson.payloadAsBytes, equals(jsonBody));
 
       var gNoMax = await toAPIRequest(
         compressed('gzip', gzip.encode(data)),
