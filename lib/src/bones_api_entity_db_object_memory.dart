@@ -24,6 +24,18 @@ class DBObjectMemoryAdapterContext
 
   DBObjectMemoryAdapterContext(this.id, this.tablesVersions);
 
+  /// This context's writes, by table: the [MapHistory] versions they created
+  /// and the IDs they changed.
+  ///
+  /// A canceled transaction reverts only these versions
+  /// ([MapHistory.revertVersions]): rolling the tables back to their
+  /// versions when it began ([tablesVersions]) would also revert what other
+  /// transactions committed meanwhile. Filled by
+  /// [DBObjectMemoryAdapter._putTableEntry] and
+  /// [DBObjectMemoryAdapter._removeTableEntry]. A context is used by one
+  /// transaction only ([DBObjectMemoryAdapter.createConnection]).
+  final Map<String, ({Set<int> versions, Set<Object> ids})> _tablesWrites = {};
+
   bool _closed = false;
 
   bool get isClosed => _closed;
@@ -268,10 +280,87 @@ class DBObjectMemoryAdapter
   @override
   bool get encodeBytesAsDataURL => false;
 
-  /// A canceled transaction rolls back its changes of the tables.
+  /// A canceled transaction reverts only its own writes of the tables (see
+  /// [_revertContextWrites]).
   @override
   void onTransactionContextCanceled(DBObjectMemoryAdapterContext context) {
-    _rollbackTables(context.tablesVersions);
+    _revertContextWrites(context);
+  }
+
+  /// Stores [entry] as [id] of [table] (its [map]), recording the write for
+  /// [context] (see [_recordTableWrite]). Every insert and update of a
+  /// table entry goes through here: the entries are replaced, never changed
+  /// in place, so each write is a [MapHistory] version a cancel can revert.
+  void _putTableEntry(
+    DBObjectMemoryAdapterContext? context,
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Object id,
+    Map<String, dynamic> entry,
+  ) {
+    var versionBefore = _mapVersion(map);
+    map[id] = entry;
+    _recordTableWrite(context, table, map, id, versionBefore);
+  }
+
+  /// Removes [id] from [table] (its [map]), recording the write for
+  /// [context] (see [_recordTableWrite]), and returns the removed entry.
+  /// Every delete of a table entry goes through here.
+  Map<String, dynamic>? _removeTableEntry(
+    DBObjectMemoryAdapterContext? context,
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Object id,
+  ) {
+    var versionBefore = _mapVersion(map);
+    var removed = map.remove(id);
+    _recordTableWrite(context, table, map, id, versionBefore);
+    return removed;
+  }
+
+  /// The [MapHistory.version] of a table [map] (`null` if not a
+  /// [MapHistory]: not a table of [_tables]).
+  static int? _mapVersion(Map<Object, Map<String, dynamic>> map) =>
+      map is MapHistory<Object, Map<String, dynamic>> ? map.version : null;
+
+  /// Records for [context] ([DBObjectMemoryAdapterContext._tablesWrites])
+  /// the versions a write of [id] created in [table]'s [map]: the ones after
+  /// [versionBefore]. Used by [_putTableEntry] and [_removeTableEntry].
+  ///
+  /// None when the version didn't change (a remove of an absent [id]):
+  /// reading the current version then would record another write's
+  /// version, maybe another transaction's, and a cancel would revert it.
+  void _recordTableWrite(
+    DBObjectMemoryAdapterContext? context,
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Object id,
+    int? versionBefore,
+  ) {
+    if (context == null || versionBefore == null) return;
+    var versionAfter = _mapVersion(map)!;
+    if (versionAfter == versionBefore) return;
+
+    var writes = context._tablesWrites[table] ??= (
+      versions: <int>{},
+      ids: <Object>{},
+    );
+    for (var v = versionBefore + 1; v <= versionAfter; ++v) {
+      writes.versions.add(v);
+    }
+    writes.ids.add(id);
+  }
+
+  /// Reverts [context]'s writes ([DBObjectMemoryAdapterContext._tablesWrites])
+  /// with [MapHistory.revertVersions]: only its versions, so what other
+  /// transactions wrote meanwhile stays, even to the same entries.
+  void _revertContextWrites(DBObjectMemoryAdapterContext context) {
+    var tablesWrites = context._tablesWrites;
+    for (var e in tablesWrites.entries) {
+      var writes = e.value;
+      _tables[e.key]?.revertVersions(writes.versions, keys: writes.ids);
+    }
+    tablesWrites.clear();
   }
 
   /// The closed transactions' contexts waiting for the other open
@@ -289,6 +378,10 @@ class DBObjectMemoryAdapter
     DBObjectMemoryAdapterContext context, {
     required bool otherTransactionsOpen,
   }) {
+    // Committed: its writes are no longer to revert (and a queued context
+    // doesn't keep them alive).
+    context._tablesWrites.clear();
+
     if (otherTransactionsOpen) {
       _consolidateContextQueue.add(context);
       return;
@@ -299,6 +392,10 @@ class DBObjectMemoryAdapter
     } else {
       var list = [..._consolidateContextQueue, context];
       list.sort();
+
+      // Consolidated now: not again with the next one (the queue used to
+      // keep growing, every consolidation going over all of them again).
+      _consolidateContextQueue.clear();
 
       for (var c in list) {
         _consolidateTables(c.tablesVersions);
@@ -317,19 +414,6 @@ class DBObjectMemoryAdapter
   void _consolidateTable(String table, int targetVersion) {
     var tableMap = _tables[table];
     tableMap?.consolidate(targetVersion);
-  }
-
-  void _rollbackTables(Map<String, int> tablesVersions) {
-    for (var e in tablesVersions.entries) {
-      var table = e.key;
-      var version = e.value;
-      _rollbackTable(table, version);
-    }
-  }
-
-  void _rollbackTable(String table, int targetVersion) {
-    var tableMap = _tables[table];
-    tableMap?.rollback(targetVersion);
   }
 
   @override
@@ -552,13 +636,19 @@ class DBObjectMemoryAdapter
     PreFinishDBOperation<Iterable<Map<String, dynamic>>, R>? preFinish,
   }) => executeOperation<Iterable<Map<String, dynamic>>, R>(
     op,
-    (conn) =>
-        _doDeleteImpl<R>(op, table, matcher, parameters ?? namedParameters),
+    (conn) => _doDeleteImpl<R>(
+      op,
+      conn,
+      table,
+      matcher,
+      parameters ?? namedParameters,
+    ),
     preFinish,
   );
 
   FutureOr<Iterable<Map<String, dynamic>>> _doDeleteImpl<R>(
     TransactionOperation op,
+    DBObjectMemoryAdapterContext? conn,
     String table,
     EntityMatcher<dynamic> matcher,
     Object? parameters,
@@ -568,7 +658,8 @@ class DBObjectMemoryAdapter
 
     if (matcher is ConditionID) {
       var id = matcher.resolveIDValue(parameters: parameters);
-      var entry = map.remove(id);
+      if (id == null) return [];
+      var entry = _removeTableEntry(conn, table, map, id);
       return entry != null ? [entry] : [];
     }
 
@@ -586,12 +677,13 @@ class DBObjectMemoryAdapter
     PreFinishDBOperation? preFinish,
   }) => executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doInsertImpl<O>(op, table, fields, entityName),
+    (conn) => _doInsertImpl<O>(op, conn, table, fields, entityName),
     preFinish,
   );
 
   Object _doInsertImpl<O>(
     TransactionOperation op,
+    DBObjectMemoryAdapterContext? conn,
     String table,
     Map<String, dynamic> fields,
     String entityName,
@@ -613,7 +705,7 @@ class DBObjectMemoryAdapter
       throw StateError("Can't determine object ID to store it: $fields");
     }
 
-    map[id] = entry;
+    _putTableEntry(conn, table, map, id, entry);
 
     return id;
   }
@@ -641,12 +733,13 @@ class DBObjectMemoryAdapter
     bool allowAutoInsert = false,
   }) => executeOperation<dynamic, dynamic>(
     op,
-    (conn) => _doUpdateImpl(op, table, fields, entityName, id),
+    (conn) => _doUpdateImpl(op, conn, table, fields, entityName, id),
     preFinish,
   );
 
   Object _doUpdateImpl(
     TransactionOperation op,
+    DBObjectMemoryAdapterContext? conn,
     String table,
     Map<String, dynamic> fields,
     String entityName,
@@ -669,7 +762,7 @@ class DBObjectMemoryAdapter
     var idField = getTableIDFieldName(table);
     entry[idField] = id;
 
-    map[id] = entry;
+    _putTableEntry(conn, table, map, id, entry);
 
     return id;
   }

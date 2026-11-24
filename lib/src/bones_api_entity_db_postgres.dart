@@ -1678,8 +1678,11 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     );
   }
 
-  /// Runs a cached prepared [statement] (prepared on the connection). Here,
-  /// outside any transaction, as is: on the connection.
+  /// Runs a cached prepared [statement] (prepared on the connection): called
+  /// by [_run] for a statement of [statementsCache]. Here, outside any
+  /// transaction, as is: on the connection. A transaction's wrapper
+  /// ([PostgreSQLConnectionTransactionWrapper]) runs it in its `runTx`
+  /// callback's zone instead.
   Future<Result> _runStatement(
     Statement statement,
     Map<String, dynamic>? parameters,
@@ -1798,12 +1801,35 @@ class PostgreSQLConnectionTransactionWrapper
   bool get _canPrepare => false;
 
   /// Runs the cached [statement] in the transaction's zone
-  /// ([_transactionZone]), so the driver runs it in this transaction.
+  /// ([_transactionZone]), so the driver runs it in this transaction, and
+  /// returns its outcome to the caller's zone.
+  ///
+  /// The two zones may be different error zones (each API call has its own,
+  /// see `APIRoot`), and Dart never delivers a `Future`'s error across error
+  /// zones: a statement failing (e.g. stale, `0A000`, or a constraint
+  /// violation) would be an uncaught error of the transaction's zone, and
+  /// the caller would wait for it forever. Then the outcome is listened to
+  /// inside the transaction's zone and forwarded to a [Completer] of the
+  /// caller's zone (as `Transaction` does for its own zone).
   @override
   Future<Result> _runStatement(
     Statement statement,
     Map<String, dynamic>? parameters,
-  ) => _transactionZone.run(() => statement.run(parameters));
+  ) {
+    final transactionZone = _transactionZone;
+    if (Zone.current.inSameErrorZone(transactionZone)) {
+      return transactionZone.run(() => statement.run(parameters));
+    }
+
+    // Created here, in the caller's zone, so its future is listened to here:
+    final completer = Completer<Result>();
+    transactionZone.run(
+      () => statement
+          .run(parameters)
+          .then(completer.complete, onError: completer.completeError),
+    );
+    return completer.future;
+  }
 
   @override
   Future openTransaction(

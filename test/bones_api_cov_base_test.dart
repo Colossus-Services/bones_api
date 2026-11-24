@@ -259,14 +259,28 @@ void main() {
         ).payloadAsBytes,
         equals(utf8.encode('{"a":1}')),
       );
-      // Not encodable as JSON: its `toString`.
+      // With the library's encoder: a `DateTime` (not encodable by
+      // `dart:convert`) is still valid JSON, not the `Map`'s `toString`.
+      var withDate = APIRequest.post(
+        '/a',
+        payload: {'a': DateTime.utc(2020)},
+        payloadMimeType: 'application/json',
+      ).payloadAsBytes!;
+      expect(
+        utf8.decode(withDate),
+        equals(Json.encode({'a': DateTime.utc(2020)})),
+      );
+      expect(jsonDecode(utf8.decode(withDate)), isA<Map>());
+
+      // A `String` payload is already the JSON text: not encoded again
+      // (which would quote it).
       expect(
         APIRequest.post(
           '/a',
-          payload: {'a': DateTime.utc(2020)},
+          payload: '{"a":1}',
           payloadMimeType: 'application/json',
         ).payloadAsBytes,
-        equals(utf8.encode('{a: ${DateTime.utc(2020)}}')),
+        equals(utf8.encode('{"a":1}')),
       );
       expect(APIRequest.post('/a', payload: 'abc').payloadBytes, isNull);
 

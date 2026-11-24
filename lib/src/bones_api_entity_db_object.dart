@@ -522,15 +522,31 @@ abstract class DBObjectAdapter<C extends Object> extends DBAdapter<C> {
   @override
   bool get callCloseTransactionRequired => true;
 
+  /// Nothing here: the closer runs before the commit is final (it can still
+  /// fail, e.g. an operation added late, and the transaction is then
+  /// canceled). The transaction is closed ([onTransactionContextClosed]) only
+  /// once committed, by [resolveTransactionResult]: closing it here, a cancel
+  /// after it would find it already consolidated.
   @override
-  FutureOr<void> closeTransaction(Transaction transaction, C? connection) {
-    if (connection != null) {
+  FutureOr<void> closeTransaction(Transaction transaction, C? connection) {}
+
+  /// A committed transaction (not a [TransactionAbortedError]) is closed
+  /// here (see [closeTransaction]); an aborted one is canceled by `super`.
+  @override
+  FutureOr<dynamic> resolveTransactionResult(
+    dynamic result,
+    Transaction transaction,
+    C? connection,
+  ) {
+    if (connection != null && result is! TransactionAbortedError) {
       _consolidateTransactionContext(connection);
     }
+    return super.resolveTransactionResult(result, transaction, connection);
   }
 
-  /// Removes the closed transaction [context] from the open ones, and
-  /// notifies [onTransactionContextClosed]. Used by [closeTransaction].
+  /// Removes the committed transaction [context] from the open ones, and
+  /// notifies [onTransactionContextClosed]. Used by
+  /// [resolveTransactionResult].
   void _consolidateTransactionContext(C context) {
     _openTransactionsContexts.remove(context);
 

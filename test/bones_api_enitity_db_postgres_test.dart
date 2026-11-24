@@ -81,8 +81,81 @@ Future<bool> _runTest(
         _testPreparedStatementOnFinishedTransaction,
     'prepared statements: stale inside a transaction':
         _testStalePreparedStatementInTransaction,
+    'prepared statements: in a transaction, from another error zone':
+        _testPreparedStatementInTransactionFromAnotherErrorZone,
   },
 );
+
+/// Runs [f] in a new error zone (as an API call has its own) and returns its
+/// outcome to the caller's zone: listened to inside the new zone, so its
+/// error is received there and forwarded. Used by
+/// [_testPreparedStatementInTransactionFromAnotherErrorZone], to run a cached
+/// statement in a transaction from another error zone than the driver's
+/// `runTx` callback.
+Future<T> _inAnotherErrorZone<T>(Future<T> Function() f) {
+  final completer = Completer<T>();
+  runZonedGuarded(
+    () => f().then(completer.complete, onError: completer.completeError),
+    (e, s) {
+      if (!completer.isCompleted) completer.completeError(e, s);
+    },
+  );
+  return completer.future;
+}
+
+/// A cached prepared statement run in a transaction from another error zone
+/// than the one that opened it (the driver runs it in the `runTx` callback's
+/// zone): its result, and its error, reach the caller, instead of the error
+/// being lost in the transaction's zone and the caller waiting forever.
+Future<void> _testPreparedStatementInTransactionFromAnotherErrorZone(
+  DBSQLAdapter sqlAdapter,
+) async {
+  var adapter = sqlAdapter as DBPostgreSQLAdapter;
+  var conn = await adapter.catchFromPool();
+
+  const select = 'SELECT * FROM "store" WHERE "id" = @id:int8';
+  var altered = false;
+
+  try {
+    var cache = conn.statementsCache;
+    if (cache == null) return;
+
+    // Prepared on the connection (when it repeats):
+    for (var i = 0; i < 2; ++i) {
+      await conn.query(select, substitutionValues: {'id': 1});
+    }
+    expect(cache.contains(select), isTrue);
+
+    // Its result:
+    var rs = await conn.openTransaction(
+      (tx) => _inAnotherErrorZone(
+        () => tx.query(select, substitutionValues: {'id': 1}),
+      ),
+    );
+    expect(rs, isNotNull);
+
+    // Its error: made stale (`0A000`) by a schema change.
+    await conn.execute('ALTER TABLE "store" ADD COLUMN "ps_ez_extra" INT');
+    altered = true;
+
+    await expectLater(
+      conn
+          .openTransaction(
+            (tx) => _inAnotherErrorZone(
+              () => tx.query(select, substitutionValues: {'id': 1}),
+            ),
+          )
+          .timeout(const Duration(seconds: 20)),
+      throwsA(predicate((e) => '$e'.contains('0A000'))),
+    );
+  } finally {
+    if (altered) {
+      await conn.execute('ALTER TABLE "store" DROP COLUMN "ps_ez_extra"');
+      adapter.disposeTableSchemeCache('store');
+    }
+    await adapter.releaseIntoPool(conn);
+  }
+}
 
 /// A cached prepared statement made stale by a schema change (`0A000`: its
 /// result columns changed), run inside a transaction: the error has aborted

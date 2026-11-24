@@ -123,6 +123,121 @@ void main() {
       expect(zoneField.get(z2), isNull);
     });
 
+    test(
+      'a zone forked from a context zone (any depth) is inside it',
+      () async {
+        var zoneField = ZoneField<String>(Zone.current);
+
+        var ctx = zoneField.createContextZone();
+        var other = zoneField.createContextZone();
+        zoneField.set('ctx', contextZone: ctx);
+        zoneField.set('other', contextZone: other);
+
+        // Forked zones (plain and error zones), nested, see the value:
+        ctx.run(() {
+          runZoned(() {
+            expect(zoneField.get(), equals('ctx'));
+            expect(zoneField.contextZone, same(ctx));
+
+            runZonedGuarded(() {
+              expect(zoneField.get(), equals('ctx'));
+              runZoned(() => expect(zoneField.contextZone, same(ctx)));
+            }, (e, s) => fail('$e'));
+          });
+        });
+
+        // The nearest context zone wins:
+        ctx.run(() {
+          other.run(() => runZoned(() => expect(zoneField.get(), 'other')));
+        });
+
+        // Also in asynchronous continuations started there:
+        var completer = Completer<String?>();
+        ctx.run(() {
+          runZoned(() async {
+            await Future<void>.delayed(Duration.zero);
+            completer.complete(zoneField.get());
+          });
+        });
+        expect(await completer.future, equals('ctx'));
+
+        // Outside any context zone: none, and the current zone is the
+        // context zone (as before).
+        runZoned(() {
+          expect(zoneField.get(), isNull);
+          expect(zoneField.contextZone, same(Zone.current));
+        });
+
+        // Disposed: its forked zones no longer see it.
+        zoneField.disposeContextZone(ctx);
+        ctx.run(() => runZoned(() => expect(zoneField.get(), isNull)));
+
+        zoneField.disposeContextZone(other);
+      },
+    );
+
+    test('runDetached: outside the enclosing context zone', () async {
+      var zoneField = ZoneField<String>(Zone.current);
+      var other = ZoneField<String>(Zone.current);
+
+      var ctx = zoneField.createContextZone();
+      zoneField.set('ctx', contextZone: ctx);
+      var otherCtx = other.createContextZone();
+      other.set('other', contextZone: otherCtx);
+
+      ctx.run(() {
+        expect(zoneField.get(), equals('ctx'));
+
+        var r = zoneField.runDetached(() {
+          // Not the enclosing one, nor in a zone forked from here:
+          expect(zoneField.get(), isNull);
+          runZoned(() => expect(zoneField.get(), isNull));
+          runZonedGuarded(
+            () => expect(zoneField.get(), isNull),
+            (e, s) => fail('$e'),
+          );
+          return 123;
+        });
+        expect(r, equals(123));
+
+        // Back outside it:
+        expect(zoneField.get(), equals('ctx'));
+      });
+
+      // A new context zone entered inside `runDetached` is seen:
+      ctx.run(() {
+        zoneField.runDetached(() {
+          var inner = zoneField.createContextZone();
+          zoneField.set('inner', contextZone: inner);
+          inner.run(() => expect(zoneField.get(), equals('inner')));
+          zoneField.disposeContextZone(inner);
+        });
+      });
+
+      // Only this field is detached: another field's context still is seen
+      // (`runDetached` forks the current zone, inside `otherCtx`).
+      otherCtx.run(() {
+        zoneField.runDetached(() {
+          expect(zoneField.get(), isNull);
+          expect(other.get(), equals('other'));
+          runZoned(() => expect(other.get(), equals('other')));
+        });
+      });
+
+      // Asynchronous continuations stay detached:
+      var completer = Completer<String?>();
+      ctx.run(() {
+        zoneField.runDetached(() async {
+          await Future<void>.delayed(Duration.zero);
+          completer.complete(zoneField.get());
+        });
+      });
+      expect(await completer.future, isNull);
+
+      zoneField.disposeContextZone(ctx);
+      other.disposeContextZone(otherCtx);
+    });
+
     test('createSafeContextZone', () async {
       var zoneField = ZoneField<String>(Zone.current);
 

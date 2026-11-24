@@ -289,8 +289,10 @@ void main() {
       var r = await adapter.resolveTransactionResult(123, t, conn);
       expect(r, equals(123));
 
-      // Consolidated, its context released into the pool (not disposed):
-      expect(adapter.poolDisposedElementsCount, equals(disposed));
+      // Consolidated (here, once the commit is final), its context disposed:
+      // not back into the pool, where its tables versions (from when it was
+      // created) would be the consolidation target of its next transaction.
+      expect(adapter.poolDisposedElementsCount, equals(disposed + 1));
       expect(await provider.ownerRepository.count(), equals(2));
     });
   });

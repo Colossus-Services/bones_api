@@ -10,9 +10,12 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   - Decompressed only when the server decompresses payloads
     (`decompressPayload`); otherwise the compressed bytes, as sent.
   - `null` for an `APIRequest` built in code, and when the server reads no
-    body (a request with neither `Content-Length` nor `Content-Type`).
+    body (a request with neither `Content-Length` nor `Content-Type`, and
+    not chunked).
   - Read-only (an unmodifiable view), so a route can't change what a
-    signature check reads. A binary `payload` is the same buffer.
+    signature check reads. A binary `payload` is the same buffer (not
+    copied), so changing that payload in place shows here too: verify a
+    binary body's signature before changing its payload.
   - Held for the life of the request next to the decoded `payload`: a
     large text or JSON body is in memory twice meanwhile.
 - **Behavior change**, `APIRequest.payloadAsBytes`:
@@ -24,14 +27,33 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
     filled from a text body (`APIModule`) now gets the body as received,
     e.g. a `text/plain; charset=latin1` body keeps its `latin1` bytes.
   - For a request built in code with a JSON MIME type, the payload encoded
-    as JSON (`{"a":1}`), instead of its `toString` (`{a: 1}`); one that
-    can't be encoded as JSON still gives its `toString`.
+    as JSON with the library's `Json` encoder (`{"a":1}`; entities,
+    `DateTime`s and `toJson` objects too), instead of its `toString`
+    (`{a: 1}`); one that can't be encoded as JSON still gives its
+    `toString`. A `String` payload is already the JSON text: its UTF-8, not
+    encoded again.
+  - For a text or JSON body, a copy on each call: keep it rather than
+    calling again for a large body. A binary payload (a binary body, or a
+    compressed one not decompressed) is returned as it is, not a copy: the
+    same buffer as `payloadBytes`.
 - `APIServer`:
   - The payload helpers pass the body bytes along with the decoded payload
     (a named record), instead of discarding them.
-  - A JSON body that fails to decode is logged with its length and only its
-    first 256 characters, instead of all of it (it comes from the client:
-    it may be large, or hold credentials).
+  - A JSON body that fails to decode is logged with its length (before
+    trimming) and only its first 256 characters (not cutting a surrogate
+    pair), instead of all of it (it comes from the client: it may be large,
+    or hold credentials).
+  - A chunked body (`Transfer-Encoding: chunked`) with no `Content-Type` is
+    now read (as `text/plain`), instead of ignored: a webhook sent that way
+    had no `payload` nor `payloadBytes` to verify. One that arrives empty is
+    still no body (`null`).
+  - `Content-Encoding` is matched in any case (`GZIP`, `Identity`). Decoding
+    used to throw "Unknown `Content-Encoding`" for those.
+  - **Behavior change**: a compressed body (`Content-Encoding` other than
+    `identity`) not decompressed (`decompressPayload` off) is now passed as
+    bytes (`application/octet-stream`, `payload` and `payloadBytes` the
+    compressed bytes), instead of decoded as text: garbage text, and a JSON
+    body failed to decode (logged as an error, no payload).
 - `DBPostgreSQLAdapter`: fix a deadlock with `postgres` 3.7 in a transaction
   that runs a cached prepared statement. The driver now picks a prepared
   statement's session by the current zone: run outside the `runTx`
@@ -39,8 +61,63 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   to end (it used to fail). The transaction's operations may run from
   another zone, so the statement waited for its own transaction.
   `PostgreSQLConnectionTransactionWrapper` now runs cached statements in the
-  `runTx` callback's zone, so they run in the transaction.
+  `runTx` callback's zone, so they run in the transaction. When the caller
+  is in another error zone (each API call has its own), the outcome is
+  forwarded to the caller's zone: Dart doesn't deliver a `Future`'s error
+  across error zones, so a failing statement (stale, a constraint) would
+  have left the caller waiting forever.
+- **Behavior change**, `ZoneField` (and so `Transaction.executingTransaction`
+  and `APIRoot.currentAPIRequest`): a zone forked from a context zone, at
+  any depth, is inside it and sees its value, as `zoneValues` are inherited.
+  It used to see it only in the context zone itself, so code run in a zone
+  forked inside a transaction (`runZoned`, `runZonedGuarded`, another error
+  zone) didn't see the transaction:
+  - its repository operations ran outside it, each committed apart and
+    kept when the transaction aborted;
+  - its `Transaction.executeBlock` opened a new transaction instead of
+    joining the executing one.
+
+  Now they join it. A `Transaction().execute` there is refused ("Already
+  executing a Transaction"), as in the transaction's own zone, instead of
+  running a separate transaction.
+
+  **Check fire-and-forget work** started inside a transaction, such as an
+  audit log or a background task in a `runZoned` or `runZonedGuarded`. It
+  now joins the transaction: it's reverted if the transaction aborts. If
+  it's added while the transaction is committing, the commit fails. Run it
+  with the new `Transaction.runDetached` (`ZoneField.runDetached`) to keep
+  it apart, in its own transaction, as before.
+- `DBSQLMemoryAdapter`: a rolled back transaction reverts only its own
+  writes. It used to roll the tables back to their versions when it began,
+  which also reverted what concurrent transactions committed meanwhile.
+  - Each context records the versions its writes create in the tables
+    (`MapHistory`), and a rollback reverts only those
+    (`MapHistory.revertVersions`).
+  - A later write by another transaction to the same entry is kept: no
+    lost update, whichever wrote first.
+  - The next-ID counter isn't reset by a rollback, as a database sequence.
+    An ID given to an aborted insert isn't given again: an entity of that
+    transaction still holds it.
+- `DBObjectMemoryAdapter`: the same for a canceled transaction. It used to
+  roll the tables back to their versions when it began, reverting what
+  concurrent transactions committed meanwhile. It now reverts only its own
+  writes (`MapHistory.revertVersions`).
+- Memory adapters (SQL and object):
+  - A transaction is consolidated only once its commit is final. It used
+    to happen in its closer, before the commit could still fail: the
+    cancel that followed then left its writes in place.
+  - Fixed: the queue of transactions waiting to be consolidated is now
+    emptied after each consolidation. It used to grow for the life of the
+    process, and each consolidation went over all of it again.
+- Tests: transactions across zones and error zones, nested blocks, sub-
+  transactions (another executor) and stress cases (concurrent transactions
+  half aborted, deep nesting, interleaved and failing concurrent operations,
+  concurrent sub-transactions), for every adapter.
+  - For the memory adapters (SQL and object), also concurrent writes to the
+    same entity with one transaction aborted.
 - Dependencies:
+  - `map_history: ^1.0.8` (`revertVersions`, and fixes to `consolidate`
+    and `rollback`).
   - `postgres: ^3.7.0` (the deadlock fix above).
   - `sqlite3: ^3.9.2`, `archive: ^4.7.1`, `googleapis_auth: ^2.3.7`,
     `dart_spawner: ^1.3.1`, `coverage: ^1.16.2`.
