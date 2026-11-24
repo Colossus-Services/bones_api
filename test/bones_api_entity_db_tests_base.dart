@@ -1679,6 +1679,166 @@ Future<bool> runAdapterTests(
         }
       });
 
+      // A commit can still fail after the transaction's closer ran (e.g. an
+      // operation added late): it's then canceled, and its writes must be
+      // reverted. The closer used to consolidate and forget them.
+      test(
+        'memory adapters: a cancel after the closer reverts the writes',
+        () async {
+          var sqlAdapter = await entityRepositoryProvider.adapter;
+          var objectAdapter = await entityRepositoryProvider2.adapter;
+          if (sqlAdapter is! DBSQLMemoryAdapter &&
+              objectAdapter is! DBObjectMemoryAdapter) {
+            markTestSkipped('No memory adapter.');
+            return;
+          }
+
+          await ensureStoreTable();
+          final storeRepo = entityRepositoryProvider.storeAPIRepository;
+          final photoRepo = entityRepositoryProvider2.photoAPIRepository;
+          const photoID = 'MEM-CLOSE-CANCEL';
+
+          /// The closer, then a cancel, of the executing transaction's
+          /// [adapter] context: as a commit that fails after its closer.
+          Future<void> closeThenCancel(DBAdapter adapter) async {
+            var transaction = Transaction.executingTransaction!;
+            var context = transaction.context;
+            await adapter.closeTransaction(transaction, context);
+            await adapter.cancelTransaction(
+              transaction,
+              context,
+              StateError('commit failed'),
+              StackTrace.current,
+            );
+          }
+
+          try {
+            if (sqlAdapter is DBSQLMemoryAdapter) {
+              await expectLater(
+                executeTransaction(() async {
+                  await storeRepo.store(Store('mem-cc', 1));
+                  await closeThenCancel(sqlAdapter);
+                  throw StateError('abort');
+                }),
+                throwsA(isA<StateError>()),
+              );
+              expect(await storesNamed('mem-cc'), isEmpty);
+            }
+
+            if (objectAdapter is DBObjectMemoryAdapter) {
+              await expectLater(
+                executeTransaction(() async {
+                  await photoRepo.store(
+                    Photo.fromData(Uint8List.fromList([1]), id: photoID),
+                  );
+                  await closeThenCancel(objectAdapter);
+                  throw StateError('abort');
+                }),
+                throwsA(isA<StateError>()),
+              );
+              expect(await photoRepo.existsID(photoID), isFalse);
+            }
+          } finally {
+            await deleteStoresWithPrefix('mem-cc');
+            await photoRepo.deleteByID(photoID);
+          }
+        },
+      );
+
+      // As a database sequence: an ID given to an aborted insert isn't given
+      // again (an entity of that transaction still holds it).
+      test('memory adapter: an aborted insert\'s ID is not reused', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        if (sqlAdapter is! DBSQLMemoryAdapter) {
+          markTestSkipped('A database has its own sequences.');
+          return;
+        }
+
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        try {
+          var aborted = Store('mem-id-a', 1);
+          await expectLater(
+            executeTransaction(() async {
+              await storeRepo.store(aborted);
+              throw StateError('abort');
+            }),
+            throwsA(isA<StateError>()),
+          );
+          var abortedID = aborted.id!;
+          expect(await storeRepo.selectByID(abortedID), isNull);
+
+          var next = Store('mem-id-b', 2);
+          await storeRepo.store(next);
+          expect(next.id, greaterThan(abortedID));
+
+          // Storing the aborted entity again is an update of no row (not of
+          // `next`'s): `next` is unchanged.
+          expect(
+            (await storeRepo.selectByID(next.id!))?.name,
+            equals('mem-id-b'),
+          );
+        } finally {
+          await deleteStoresWithPrefix('mem-id-');
+        }
+      });
+
+      // `Transaction.runDetached`: work started inside a transaction that
+      // must not join it (a zone forked inside it otherwise does).
+      test('transaction: runDetached commits apart', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        try {
+          Future<Object?>? detached;
+
+          await expectLater(
+            executeTransaction(() async {
+              var outer = Transaction.executingTransaction;
+              await storeRepo.store(Store('rd-outer', 1));
+
+              detached = Transaction.runDetached(() {
+                // Not the outer one, also in a zone forked here:
+                expect(Transaction.executingTransaction, isNull);
+                runZoned(
+                  () => expect(Transaction.executingTransaction, isNull),
+                );
+                // Not waited for (a database may make it wait for the outer
+                // transaction to end):
+                return Future<Object?>.sync(
+                  () => storeRepo.store(Store('rd-detached', 2)),
+                );
+              });
+
+              // Back outside `runDetached`: still in the outer one.
+              expect(Transaction.executingTransaction, same(outer));
+              throw StateError('outer aborts');
+            }),
+            throwsA(isA<StateError>()),
+          );
+
+          // The outer write rolled back; the detached one committed apart.
+          await detached!.timeout(zonesTimeout);
+          expect(await storesNamed('rd-outer'), isEmpty);
+          expect(await storesNamed('rd-detached'), hasLength(1));
+
+          // A new transaction inside `runDetached` is allowed (not "Already
+          // executing"), and is separate:
+          await executeTransaction(() async {
+            var outer = Transaction.executingTransaction;
+            await Transaction.runDetached(
+              () => Transaction().execute(() async {
+                expect(Transaction.executingTransaction, isNot(same(outer)));
+                return true;
+              }),
+            );
+          });
+        } finally {
+          await deleteStoresWithPrefix('rd-');
+        }
+      });
+
       test('stress: a new transaction inside another one\'s zone is '
           'refused, not run apart', () async {
         await ensureStoreTable();

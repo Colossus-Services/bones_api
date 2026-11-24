@@ -242,6 +242,23 @@ class ZoneField<T extends Object> {
     _values[contextZone] = null;
   }
 
+  /// The zones of [runDetached] (a weak mark: an [Expando] doesn't keep them
+  /// alive), where [contextZone]'s lookup of the ancestors stops.
+  final Expando<bool> _detachedZones = Expando<bool>();
+
+  /// Runs [body] detached from any context zone of this field: in it (and
+  /// in the zones forked from it), [contextZone] is not the enclosing
+  /// context zone, so [get] doesn't see its value.
+  ///
+  /// For work that must not join the enclosing context, as a zone forked
+  /// from a context zone does (see [contextZone]): e.g. a fire-and-forget
+  /// write inside a [Transaction] that must commit on its own (see
+  /// `Transaction.runDetached`).
+  R runDetached<R>(R Function() body) => runZoned(() {
+    _detachedZones[Zone.current] = true;
+    return body();
+  });
+
   /// Returns the current context zone: the one of this field the current
   /// zone is, or is inside of (a zone forked from it, at any depth: e.g. a
   /// `runZoned` or `runZonedGuarded` inside a [Transaction]'s block), as
@@ -249,11 +266,13 @@ class ZoneField<T extends Object> {
   ///
   /// A zone forked from a context zone sees its value: code run there
   /// (another error zone, a driver's callback zone) is still inside it.
+  /// Except inside [runDetached], where the lookup stops.
   Zone get contextZone {
     var currentZone = Zone.current;
 
     for (Zone? zone = currentZone; zone != null; zone = zone.parent) {
       if (_zones.contains(zone)) return zone;
+      if (_detachedZones[zone] == true) break;
     }
 
     return currentZone;

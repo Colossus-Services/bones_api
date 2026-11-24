@@ -2106,10 +2106,12 @@ class APIServer extends _APIServerBase {
   /// `identity`): with payload decompression off, [_resolvePayload] passes it
   /// as bytes instead of decoding the compressed bytes as text.
   static bool _isCompressedBody(Request request) {
-    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader]
+        ?.trim()
+        .toLowerCase();
     return contentEncoding != null &&
         contentEncoding.isNotEmpty &&
-        contentEncoding.toLowerCase() != 'identity';
+        contentEncoding != 'identity';
   }
 
   static final MimeType _mimeTypeOctetStream = MimeType.parse(
@@ -2162,12 +2164,20 @@ class APIServer extends _APIServerBase {
         return (mimeType: mimeType, payload: '', bytes: _emptyPayloadBytes);
       }
 
-      return _resolvePayloadFromString(
+      var resolved = _resolvePayloadFromString(
         mimeType,
         request,
         maxPayloadLength: maxPayloadLength,
         decompressPayload: decompressPayload,
       );
+
+      // Only chunked (neither a length nor a type): an empty one is no body,
+      // as a request without one (`null`, not an empty `text/plain`).
+      if (contentLength == null && contentMimeType == null) {
+        return resolved.then((r) => r.bytes.isEmpty ? null : r);
+      }
+
+      return resolved;
     } else {
       if (contentLength == 0) {
         return (
@@ -2378,7 +2388,10 @@ class APIServer extends _APIServerBase {
 
     if (!decompressPayload || bytes.isEmpty) return bytes;
 
-    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+    // Case-insensitive (`GZIP`, `Identity`), as [_isCompressedBody]:
+    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader]
+        ?.trim()
+        .toLowerCase();
 
     FutureOr<Uint8List> decoded;
 

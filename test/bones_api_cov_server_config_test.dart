@@ -1715,6 +1715,86 @@ void main() {
       );
       expect(none.payload, isNull);
       expect(none.payloadBytes, isNull);
+
+      // Chunked but empty (e.g. a `DELETE` some clients send chunked): no
+      // body, as before (not an empty `text/plain` payload).
+      var emptyChunked = await toAPIRequest(
+        Request(
+          'DELETE',
+          Uri.parse('http://localhost/a'),
+          headers: {'transfer-encoding': 'chunked'},
+          body: Stream<List<int>>.empty(),
+        ),
+      );
+      expect(emptyChunked.payload, isNull);
+      expect(emptyChunked.payloadBytes, isNull);
+
+      // `Chunked` in another case is still chunked:
+      var upper = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'transfer-encoding': 'Chunked'},
+          body: Stream.fromIterable([body]),
+        ),
+      );
+      expect(upper.payloadBytes, equals(body));
+    });
+
+    test('payload: Content-Encoding in any case', () async {
+      var json = utf8.encode('{"a":1}');
+
+      // Decompressing: `GZIP` is gzip, `Identity` is no encoding (they used
+      // to throw "Unknown `Content-Encoding`").
+      for (var (encoding, body) in [
+        ('GZIP', gzip.encode(json)),
+        (' Gzip ', gzip.encode(json)),
+        ('Identity', json),
+      ]) {
+        var req = await toAPIRequest(
+          Request(
+            'POST',
+            Uri.parse('http://localhost/a'),
+            headers: {
+              'content-type': 'application/json',
+              'content-encoding': encoding,
+            },
+            body: body,
+          ),
+          decompressPayload: true,
+        );
+        expect(req.payload, equals({'a': 1}), reason: encoding);
+        expect(req.payloadBytes, equals(json), reason: encoding);
+      }
+
+      // Not decompressing: `IDENTITY` is no encoding (decoded as usual),
+      // `GZIP` is compressed (passed as bytes).
+      var identity = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'IDENTITY',
+          },
+          body: json,
+        ),
+      );
+      expect(identity.payload, equals({'a': 1}));
+
+      var compressed = gzip.encode(json);
+      var gz = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'GZIP',
+          },
+          body: compressed,
+        ),
+      );
+      expect(gz.payload, equals(compressed));
     });
 
     test('payload: compressed and not decompressed: bytes', () async {

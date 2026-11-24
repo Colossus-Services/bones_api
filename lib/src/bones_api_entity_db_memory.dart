@@ -364,21 +364,21 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   /// with [MapHistory.revertVersions]: only its versions, so what other
   /// contexts wrote meanwhile stays, even to the same entries (each entry
   /// gets back its previous value, or a later write not reverted). The
-  /// indexes of the reverted tables are rebuilt, and their next-ID counters
-  /// reset.
+  /// indexes of the reverted tables are rebuilt.
+  ///
+  /// The next-ID counters are kept, as a database sequence: an ID given to
+  /// an aborted insert isn't given again (an entity of that transaction
+  /// still holds it: storing it again must not update another row).
   void _revertConnectionWrites(DBSQLMemoryAdapterContext connection) {
     var tablesWrites = connection._tablesWrites;
     if (tablesWrites.isEmpty) return;
 
     for (var e in tablesWrites.entries) {
-      var table = e.key;
-      var map = _tables[table];
+      var map = _tables[e.key];
       if (map == null) continue;
 
       var writes = e.value;
       map.revertVersions(writes.versions, keys: writes.ids);
-
-      _disposeNextIDCounter(table);
     }
 
     // An index entry is a `Set` of IDs changed in place, which a revert can't
@@ -1869,12 +1869,12 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     // consolidated synchronously, as soon as its `transactionFuture`
     // completes.
     if (connection != null && result is! TransactionAbortedError) {
-      var consolidated = _consolidateTransactionContext(connection);
-      if (consolidated != null && consolidated) {
-        releaseIntoPool(connection);
-      } else {
-        disposePoolElement(connection);
-      }
+      _consolidateTransactionContext(connection);
+      // Not back into the pool: a context's [tablesVersions] are from when
+      // it was created, and a reused one would consolidate its next
+      // transaction's tables to those (older) versions, keeping more history.
+      // ignore: discarded_futures
+      disposePoolElement(connection);
     }
 
     return super.resolveTransactionResult(result, transaction, connection);
@@ -1909,15 +1909,16 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   @override
   bool get callCloseTransactionRequired => true;
 
+  /// Nothing here: the closer runs before the commit is final (it can still
+  /// fail, e.g. an operation added late), and the transaction is then
+  /// canceled. So it's consolidated only once committed, by
+  /// [resolveTransactionResult]: consolidating here, its writes would no
+  /// longer be reverted by that cancel ([cancelTransaction]).
   @override
   FutureOr<void> closeTransaction(
     Transaction transaction,
     DBSQLMemoryAdapterContext? connection,
-  ) {
-    if (connection != null) {
-      _consolidateTransactionContext(connection);
-    }
-  }
+  ) {}
 
   final ListQueue<DBSQLMemoryAdapterContext> _consolidateContextQueue =
       ListQueue<DBSQLMemoryAdapterContext>();
@@ -1939,6 +1940,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     } else {
       var list = [..._consolidateContextQueue, context];
       list.sort();
+
+      // Consolidated now: not again with the next one (the queue used to
+      // keep growing, every consolidation going over all of them again).
+      _consolidateContextQueue.clear();
 
       for (var c in list) {
         _consolidateTables(c.tablesVersions, c.tablesIndexesVersions);

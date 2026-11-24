@@ -176,6 +176,68 @@ void main() {
       },
     );
 
+    test('runDetached: outside the enclosing context zone', () async {
+      var zoneField = ZoneField<String>(Zone.current);
+      var other = ZoneField<String>(Zone.current);
+
+      var ctx = zoneField.createContextZone();
+      zoneField.set('ctx', contextZone: ctx);
+      var otherCtx = other.createContextZone();
+      other.set('other', contextZone: otherCtx);
+
+      ctx.run(() {
+        expect(zoneField.get(), equals('ctx'));
+
+        var r = zoneField.runDetached(() {
+          // Not the enclosing one, nor in a zone forked from here:
+          expect(zoneField.get(), isNull);
+          runZoned(() => expect(zoneField.get(), isNull));
+          runZonedGuarded(
+            () => expect(zoneField.get(), isNull),
+            (e, s) => fail('$e'),
+          );
+          return 123;
+        });
+        expect(r, equals(123));
+
+        // Back outside it:
+        expect(zoneField.get(), equals('ctx'));
+      });
+
+      // A new context zone entered inside `runDetached` is seen:
+      ctx.run(() {
+        zoneField.runDetached(() {
+          var inner = zoneField.createContextZone();
+          zoneField.set('inner', contextZone: inner);
+          inner.run(() => expect(zoneField.get(), equals('inner')));
+          zoneField.disposeContextZone(inner);
+        });
+      });
+
+      // Only this field is detached: another field's context still is seen
+      // (`runDetached` forks the current zone, inside `otherCtx`).
+      otherCtx.run(() {
+        zoneField.runDetached(() {
+          expect(zoneField.get(), isNull);
+          expect(other.get(), equals('other'));
+          runZoned(() => expect(other.get(), equals('other')));
+        });
+      });
+
+      // Asynchronous continuations stay detached:
+      var completer = Completer<String?>();
+      ctx.run(() {
+        zoneField.runDetached(() async {
+          await Future<void>.delayed(Duration.zero);
+          completer.complete(zoneField.get());
+        });
+      });
+      expect(await completer.future, isNull);
+
+      zoneField.disposeContextZone(ctx);
+      other.disposeContextZone(otherCtx);
+    });
+
     test('createSafeContextZone', () async {
       var zoneField = ZoneField<String>(Zone.current);
 

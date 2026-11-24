@@ -378,6 +378,10 @@ class DBObjectMemoryAdapter
     DBObjectMemoryAdapterContext context, {
     required bool otherTransactionsOpen,
   }) {
+    // Committed: its writes are no longer to revert (and a queued context
+    // doesn't keep them alive).
+    context._tablesWrites.clear();
+
     if (otherTransactionsOpen) {
       _consolidateContextQueue.add(context);
       return;
@@ -388,6 +392,10 @@ class DBObjectMemoryAdapter
     } else {
       var list = [..._consolidateContextQueue, context];
       list.sort();
+
+      // Consolidated now: not again with the next one (the queue used to
+      // keep growing, every consolidation going over all of them again).
+      _consolidateContextQueue.clear();
 
       for (var c in list) {
         _consolidateTables(c.tablesVersions);

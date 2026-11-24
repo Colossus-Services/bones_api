@@ -88,7 +88,10 @@ Future<bool> _runTest(
 
 /// Runs [f] in a new error zone (as an API call has its own) and returns its
 /// outcome to the caller's zone: listened to inside the new zone, so its
-/// error is received there and forwarded.
+/// error is received there and forwarded. Used by
+/// [_testPreparedStatementInTransactionFromAnotherErrorZone], to run a cached
+/// statement in a transaction from another error zone than the driver's
+/// `runTx` callback.
 Future<T> _inAnotherErrorZone<T>(Future<T> Function() f) {
   final completer = Completer<T>();
   runZonedGuarded(

@@ -32,7 +32,10 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
     (`{a: 1}`); one that can't be encoded as JSON still gives its
     `toString`. A `String` payload is already the JSON text: its UTF-8, not
     encoded again.
-  - A copy on each call: keep it rather than calling again for a large body.
+  - For a text or JSON body, a copy on each call: keep it rather than
+    calling again for a large body. A binary payload (a binary body, or a
+    compressed one not decompressed) is returned as it is, not a copy: the
+    same buffer as `payloadBytes`.
 - `APIServer`:
   - The payload helpers pass the body bytes along with the decoded payload
     (a named record), instead of discarding them.
@@ -42,7 +45,10 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
     or hold credentials).
   - A chunked body (`Transfer-Encoding: chunked`) with no `Content-Type` is
     now read (as `text/plain`), instead of ignored: a webhook sent that way
-    had no `payload` nor `payloadBytes` to verify.
+    had no `payload` nor `payloadBytes` to verify. One that arrives empty is
+    still no body (`null`).
+  - `Content-Encoding` is matched in any case (`GZIP`, `Identity`). Decoding
+    used to throw "Unknown `Content-Encoding`" for those.
   - **Behavior change**: a compressed body (`Content-Encoding` other than
     `identity`) not decompressed (`decompressPayload` off) is now passed as
     bytes (`application/octet-stream`, `payload` and `payloadBytes` the
@@ -74,6 +80,13 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   Now they join it. A `Transaction().execute` there is refused ("Already
   executing a Transaction"), as in the transaction's own zone, instead of
   running a separate transaction.
+
+  **Check fire-and-forget work** started inside a transaction, such as an
+  audit log or a background task in a `runZoned` or `runZonedGuarded`. It
+  now joins the transaction: it's reverted if the transaction aborts. If
+  it's added while the transaction is committing, the commit fails. Run it
+  with the new `Transaction.runDetached` (`ZoneField.runDetached`) to keep
+  it apart, in its own transaction, as before.
 - `DBSQLMemoryAdapter`: a rolled back transaction reverts only its own
   writes. It used to roll the tables back to their versions when it began,
   which also reverted what concurrent transactions committed meanwhile.
@@ -82,10 +95,20 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
     (`MapHistory.revertVersions`).
   - A later write by another transaction to the same entry is kept: no
     lost update, whichever wrote first.
+  - The next-ID counter isn't reset by a rollback, as a database sequence.
+    An ID given to an aborted insert isn't given again: an entity of that
+    transaction still holds it.
 - `DBObjectMemoryAdapter`: the same for a canceled transaction. It used to
   roll the tables back to their versions when it began, reverting what
   concurrent transactions committed meanwhile. It now reverts only its own
   writes (`MapHistory.revertVersions`).
+- Memory adapters (SQL and object):
+  - A transaction is consolidated only once its commit is final. It used
+    to happen in its closer, before the commit could still fail: the
+    cancel that followed then left its writes in place.
+  - Fixed: the queue of transactions waiting to be consolidated is now
+    emptied after each consolidation. It used to grow for the life of the
+    process, and each consolidation went over all of it again.
 - Tests: transactions across zones and error zones, nested blocks, sub-
   transactions (another executor) and stress cases (concurrent transactions
   half aborted, deep nesting, interleaved and failing concurrent operations,

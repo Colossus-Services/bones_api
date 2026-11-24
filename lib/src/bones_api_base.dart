@@ -1913,11 +1913,14 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// large body, keep the result instead of calling it again, or read
   /// [payloadBytes] (read-only) directly.
   ///
-  /// A binary payload is returned as it is. For a request built in code
-  /// there are no received bytes, so the payload itself is encoded: a list
-  /// of bytes is copied, a JSON payload (not already a `String` of JSON
-  /// text) is encoded as JSON, and any other value becomes the UTF-8 of its
-  /// `toString()`.
+  /// A binary payload (a [Uint8List]: a binary body, or a compressed one
+  /// that isn't decompressed) is returned as it is, **not a copy**: for a
+  /// received body it's the same buffer as [payloadBytes], so changing it
+  /// changes what a signature check reads. Verify a signature before
+  /// changing it, or copy it first. For a request built in code there are
+  /// no received bytes, so the payload itself is encoded: a list of bytes is
+  /// copied, a JSON payload (not already a `String` of JSON text) is encoded
+  /// as JSON, and any other value becomes the UTF-8 of its `toString()`.
   Uint8List? get payloadAsBytes {
     var payload = this.payload;
 

@@ -6543,6 +6543,27 @@ class Transaction extends JsonEntityCacheSimple implements EntityProvider {
   /// See [execute] and [executeBlock].
   static Transaction? get executingTransaction => _executingTransaction.get();
 
+  /// Runs [body] outside the [executingTransaction]: its repository
+  /// operations run in their own transactions (committed on their own), and
+  /// a [Transaction.execute] in it is a new transaction.
+  ///
+  /// Code in a zone forked inside a transaction's block (a `runZoned`,
+  /// `runZonedGuarded`, another error zone) is inside the transaction, and
+  /// joins it. Use this for work that must not: e.g. a fire-and-forget write
+  /// (an audit log) that must commit even if the transaction aborts, or that
+  /// may run after the transaction has committed (an operation added to a
+  /// committing transaction makes its commit fail).
+  ///
+  /// ```dart
+  /// await Transaction().execute(() async {
+  ///   await orderRepository.store(order);
+  ///   // Not waited for, and committed apart:
+  ///   Transaction.runDetached(() => auditRepository.store(auditLog));
+  /// });
+  /// ```
+  static R runDetached<R>(R Function() body) =>
+      _executingTransaction.runDetached(body);
+
   static final WeakList<Transaction> _openInstances = WeakList<Transaction>();
 
   /// Returns the `Transaction` that are open.
