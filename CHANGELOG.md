@@ -32,6 +32,21 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   - A JSON body that fails to decode is logged with its length and only its
     first 256 characters, instead of all of it (it comes from the client:
     it may be large, or hold credentials).
+- `DBPostgreSQLAdapter`: fix a deadlock with `postgres` 3.7 in a transaction
+  that runs a cached prepared statement. The driver now picks a prepared
+  statement's session by the current zone: run outside the `runTx`
+  callback's zone, it is an outside call, which waits for the transaction
+  to end (it used to fail). The transaction's operations may run from
+  another zone, so the statement waited for its own transaction.
+  `PostgreSQLConnectionTransactionWrapper` now runs cached statements in the
+  `runTx` callback's zone, so they run in the transaction.
+- Dependencies:
+  - `postgres: ^3.7.0` (the deadlock fix above).
+  - `sqlite3: ^3.9.2`, `archive: ^4.7.1`, `googleapis_auth: ^2.3.7`,
+    `dart_spawner: ^1.3.1`, `coverage: ^1.16.2`.
+  - `mysql1` stays at `^0.22.0`: 0.23 reads a `DECIMAL` as a `String` and
+    changes how parameters and bytes are written, which the MySQL adapter
+    doesn't support yet.
 
 ## 1.35.2
 
