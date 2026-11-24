@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.35.2';
+  static const String VERSION = '1.36.0';
 
   static bool _boot = false;
 
@@ -1901,7 +1901,20 @@ class APIRequest extends APIMetricSet with APIPayload {
   @override
   final dynamic payload;
 
-  /// Returns [payload] as bytes ([Uint8List]).
+  /// The [payload] as bytes, or `null` when there is no payload.
+  ///
+  /// When the request came over HTTP with a text body (plain text or JSON),
+  /// you get a copy of the body exactly as it arrived ([payloadBytes]). The
+  /// decoded payload is not encoded again, because that would not give back
+  /// the same bytes: a JSON object would lose its original spacing and key
+  /// order, and text sent in another charset (such as `latin1`) would come
+  /// back as UTF-8. It is a copy, so changing it can't change [payloadBytes]
+  /// (which a signature check reads).
+  ///
+  /// A binary payload is returned as it is. For a request built in code
+  /// there are no received bytes, so the payload itself is encoded: a list
+  /// of bytes is copied, a JSON payload is encoded as JSON, and any other
+  /// value becomes the UTF-8 of its `toString()`.
   Uint8List? get payloadAsBytes {
     var payload = this.payload;
 
@@ -1917,11 +1930,57 @@ class APIRequest extends APIMetricSet with APIPayload {
       return Uint8List.fromList(payload);
     }
 
+    final payloadBytes = this.payloadBytes;
+    final payloadMimeType = this.payloadMimeType;
+
+    // A body received as text: its bytes as received, not a re-encoding of
+    // the decoded [payload]. A JSON `Map`'s `toString` isn't even JSON, and
+    // a body decoded as `latin1` differs when re-encoded as UTF-8.
+    if (payloadBytes != null) {
+      // A text body, decoded to this `String`; or a JSON body (a decoded
+      // `Map`/`List`/value), or another text MIME type:
+      if (payload is String ||
+          (payloadMimeType != null &&
+              (payloadMimeType.isJSON || payloadMimeType.isText))) {
+        return Uint8List.fromList(payloadBytes);
+      }
+    }
+
+    // Built in code with a JSON MIME type: encoded as JSON (its `toString`
+    // isn't JSON). A payload that can't be encoded falls back to it.
+    if (payloadMimeType != null && payloadMimeType.isJSON) {
+      try {
+        return dart_convert.utf8.encode(dart_convert.json.encode(payload));
+      } catch (_) {}
+    }
+
     var s = payload.toString();
     var bs = dart_convert.utf8.encode(s);
 
     return Uint8List.fromList(bs);
   }
+
+  /// The body bytes as received, when this request was built from an HTTP
+  /// request by the [APIServer]; otherwise `null`.
+  ///
+  /// These are the original bytes, not an encoding of the decoded [payload]
+  /// (a JSON body is already a `Map` at this point): needed to verify a
+  /// signature computed over the raw body, such as a webhook HMAC, since
+  /// re-encoding changes whitespace, key order and number formats. Kept
+  /// even when the JSON body fails to decode (then [payload] is `null`).
+  /// [payloadAsBytes] returns a copy of them for a text body.
+  ///
+  /// - A compressed body (`Content-Encoding`) is decompressed here only when
+  ///   the server decompresses payloads (`decompressPayload`); otherwise
+  ///   these are the compressed bytes, as sent.
+  /// - `null` also when the server didn't read a body: a request with
+  ///   neither `Content-Length` nor `Content-Type` has no payload.
+  /// - Read-only (an unmodifiable view): nothing in the request can change
+  ///   them. A binary [payload] is the same buffer, so changing that
+  ///   payload in place shows here too.
+  /// - Kept for the life of the request, next to the decoded [payload]:
+  ///   a large text or JSON body is held twice in memory meanwhile.
+  final Uint8List? payloadBytes;
 
   MimeType? _payloadMimeType;
 
@@ -1983,6 +2042,7 @@ class APIRequest extends APIMetricSet with APIPayload {
     this.payload,
     Object? payloadMimeType,
     this.payloadFileExtension,
+    Uint8List? payloadBytes,
     this.sessionID,
     this.newSession = false,
     this.credential,
@@ -1997,6 +2057,9 @@ class APIRequest extends APIMetricSet with APIPayload {
     super.metrics,
   }) : parameters = parameters ?? <String, dynamic>{},
        _payloadMimeType = APIPayload.resolveMimeType(payloadMimeType),
+       // Read-only, so a route can't change the bytes a signature check
+       // reads (see [payloadBytes]).
+       payloadBytes = payloadBytes?.asUnmodifiableView(),
        headers = headers ?? <String, dynamic>{},
        _pathParts = _buildPathParts(path),
        scheme = scheme?.trim(),

@@ -1649,7 +1649,7 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
       var statement = cache.get(sql);
       if (statement != null) {
         try {
-          return await statement.run(parameters);
+          return await _runStatement(statement, parameters);
         } on ServerException catch (e) {
           if (!_isStaleStatementError(e)) rethrow;
           cache.removeStale(sql);
@@ -1677,6 +1677,13 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
       ignoreRows: ignoreRows,
     );
   }
+
+  /// Runs a cached prepared [statement] (prepared on the connection). Here,
+  /// outside any transaction, as is: on the connection.
+  Future<Result> _runStatement(
+    Statement statement,
+    Map<String, dynamic>? parameters,
+  ) => statement.run(parameters);
 
   /// A prepared statement that can't run anymore: a schema change altered
   /// its result columns (`0A000`, "cached plan must not change result
@@ -1762,6 +1769,18 @@ class PostgreSQLConnectionTransactionWrapper
     extends PostgreSQLConnectionWrapper {
   final PostgreSQLConnectionWrapper parent;
 
+  /// The [Zone] of the driver's `runTx` callback, where this wrapper is
+  /// created ([PostgreSQLConnectionWrapper.openTransaction]).
+  ///
+  /// The driver (`postgres` 3.7+) picks the session of a prepared statement
+  /// by the current zone: run inside the `runTx` callback's zone, it runs in
+  /// that transaction; run from any other zone it is an outside call, which
+  /// waits for the transaction to end. The transaction's operations may run
+  /// from another zone (a [Transaction]'s), so a cached statement run there
+  /// would wait for the very transaction it is part of: a deadlock (before
+  /// 3.7 it failed instead). [_runStatement] runs it in this zone.
+  final Zone _transactionZone;
+
   PostgreSQLConnectionTransactionWrapper(
     this.parent,
     super.nativeConnection,
@@ -1771,12 +1790,20 @@ class PostgreSQLConnectionTransactionWrapper
     super.database,
     super.secure, {
     super.statementsCache,
-  });
+  }) : _transactionZone = Zone.current;
 
   /// Uses the connection's prepared statements, but doesn't prepare (they
   /// would be prepared on this transaction's session, and end with it).
   @override
   bool get _canPrepare => false;
+
+  /// Runs the cached [statement] in the transaction's zone
+  /// ([_transactionZone]), so the driver runs it in this transaction.
+  @override
+  Future<Result> _runStatement(
+    Statement statement,
+    Map<String, dynamic>? parameters,
+  ) => _transactionZone.run(() => statement.run(parameters));
 
   @override
   Future openTransaction(

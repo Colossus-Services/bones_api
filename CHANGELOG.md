@@ -1,3 +1,53 @@
+## 1.36.0
+
+A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
+
+- `APIRequest.payloadBytes`: the request body bytes as received, set by
+  `APIServer` when it reads a body. These are the original bytes, not an
+  encoding of the decoded `payload`, needed to verify a signature computed
+  over the raw body (e.g. a webhook HMAC). Kept even when a JSON body fails
+  to decode.
+  - Decompressed only when the server decompresses payloads
+    (`decompressPayload`); otherwise the compressed bytes, as sent.
+  - `null` for an `APIRequest` built in code, and when the server reads no
+    body (a request with neither `Content-Length` nor `Content-Type`).
+  - Read-only (an unmodifiable view), so a route can't change what a
+    signature check reads. A binary `payload` is the same buffer.
+  - Held for the life of the request next to the decoded `payload`: a
+    large text or JSON body is in memory twice meanwhile.
+- **Behavior change**, `APIRequest.payloadAsBytes`:
+  - For a body received as text (a `String` payload, or a JSON or text
+    MIME type), a copy of the bytes as received (`payloadBytes`), instead
+    of a re-encoding of the decoded `payload`. A JSON body gave the
+    `toString` of its `Map` (not JSON), and a body decoded as `latin1`
+    differed once re-encoded as UTF-8. A route's `Uint8List` parameter
+    filled from a text body (`APIModule`) now gets the body as received,
+    e.g. a `text/plain; charset=latin1` body keeps its `latin1` bytes.
+  - For a request built in code with a JSON MIME type, the payload encoded
+    as JSON (`{"a":1}`), instead of its `toString` (`{a: 1}`); one that
+    can't be encoded as JSON still gives its `toString`.
+- `APIServer`:
+  - The payload helpers pass the body bytes along with the decoded payload
+    (a named record), instead of discarding them.
+  - A JSON body that fails to decode is logged with its length and only its
+    first 256 characters, instead of all of it (it comes from the client:
+    it may be large, or hold credentials).
+- `DBPostgreSQLAdapter`: fix a deadlock with `postgres` 3.7 in a transaction
+  that runs a cached prepared statement. The driver now picks a prepared
+  statement's session by the current zone: run outside the `runTx`
+  callback's zone, it is an outside call, which waits for the transaction
+  to end (it used to fail). The transaction's operations may run from
+  another zone, so the statement waited for its own transaction.
+  `PostgreSQLConnectionTransactionWrapper` now runs cached statements in the
+  `runTx` callback's zone, so they run in the transaction.
+- Dependencies:
+  - `postgres: ^3.7.0` (the deadlock fix above).
+  - `sqlite3: ^3.9.2`, `archive: ^4.7.1`, `googleapis_auth: ^2.3.7`,
+    `dart_spawner: ^1.3.1`, `coverage: ^1.16.2`.
+  - `mysql1` stays at `^0.22.0`: 0.23 reads a `DECIMAL` as a `String` and
+    changes how parameters and bytes are written, which the MySQL adapter
+    doesn't support yet.
+
 ## 1.35.2
 
 - `DBSQLMemoryAdapter`: single-field unique constraints

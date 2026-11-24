@@ -1425,6 +1425,10 @@ void main() {
       var prevLevel = logging.Logger.root.level;
       logging.Logger.root.level = logging.Level.ALL;
 
+      // A large invalid body: only its start is logged (it comes from the
+      // client: it may be large, or hold secrets).
+      var largeInvalid = '{"secret":"${'x' * 1000}"';
+
       APIRequest invalid;
       try {
         invalid = await toAPIRequest(
@@ -1435,6 +1439,14 @@ void main() {
             body: '{invalid',
           ),
         );
+        await toAPIRequest(
+          Request(
+            'POST',
+            Uri.parse('http://localhost/a'),
+            headers: {'content-type': 'application/json'},
+            body: largeInvalid,
+          ),
+        );
         await Future.delayed(Duration(milliseconds: 10));
       } finally {
         logging.Logger.root.level = prevLevel;
@@ -1442,10 +1454,17 @@ void main() {
       }
 
       expect(invalid.payload, isNull);
-      expect(records, hasLength(1));
+      expect(records, hasLength(2));
       expect(records.first.message, contains('<<{invalid>>'));
+      expect(records.first.message, contains('(8 chars)'));
       expect(records.first.error, isA<FormatException>());
       expect(records.first.stackTrace, isNotNull);
+
+      var largeLog = records[1].message;
+      expect(largeLog, contains('(${largeInvalid.length} chars)'));
+      expect(largeLog, contains('…>>'));
+      expect(largeLog, isNot(contains(largeInvalid)));
+      expect(largeLog.length, lessThan(400));
 
       var blank = await toAPIRequest(
         Request(
@@ -1456,6 +1475,99 @@ void main() {
         ),
       );
       expect(blank.payload, isNull);
+    });
+
+    test('payloadBytes: the body exactly as received', () async {
+      // Spacing, key order and number format that a `json.encode` of the
+      // decoded payload would not reproduce (needed for a webhook HMAC):
+      var body = '{ "b":1.50,\n  "a" : "x" }';
+
+      var jsonReq = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/json'},
+          body: body,
+        ),
+      );
+      expect(jsonReq.payload, equals({'b': 1.5, 'a': 'x'}));
+      expect(jsonReq.payloadBytes, equals(utf8.encode(body)));
+      // A text body: `payloadAsBytes` is the body as received too.
+      expect(jsonReq.payloadAsBytes, equals(utf8.encode(body)));
+
+      // Kept even when the JSON fails to decode (no payload):
+      var invalid = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/json'},
+          body: '{invalid',
+        ),
+      );
+      expect(invalid.payload, isNull);
+      expect(invalid.payloadMimeType, isNull);
+      expect(invalid.payloadBytes, equals(utf8.encode('{invalid')));
+
+      var text = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'text/plain'},
+          body: 'olá',
+        ),
+      );
+      expect(text.payload, equals('olá'));
+      expect(text.payloadBytes, equals(utf8.encode('olá')));
+      expect(text.payloadAsBytes, equals(utf8.encode('olá')));
+
+      // Not UTF-8: decoded as `latin1`, whose UTF-8 re-encoding differs from
+      // the body; `payloadAsBytes` is the body as received.
+      var latin1Bytes = latin1.encode('olá');
+      var latin1Text = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'text/plain'},
+          body: latin1Bytes,
+        ),
+      );
+      expect(latin1Text.payload, equals('olá'));
+      expect(latin1Text.payloadAsBytes, equals(latin1Bytes));
+      expect(latin1Text.payloadAsBytes, isNot(equals(utf8.encode('olá'))));
+
+      // Built in code (no bytes): the payload encoded, as before.
+      expect(
+        APIRequest.post('/a', payload: 'olá').payloadAsBytes,
+        equals(utf8.encode('olá')),
+      );
+
+      var binary = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/octet-stream'},
+          body: [1, 2, 3],
+        ),
+      );
+      expect(binary.payloadBytes, equals([1, 2, 3]));
+
+      var empty = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/json', 'content-length': '0'},
+        ),
+      );
+      expect(empty.payloadBytes, isEmpty);
+
+      // A shelf `Request` without a body has `contentLength == 0`:
+      var noBody = await toAPIRequest(
+        Request('GET', Uri.parse('http://localhost/a')),
+      );
+      expect(noBody.payloadBytes, isEmpty);
+
+      // Built in code, not from an HTTP request: no bytes.
+      expect(APIRequest.post('/a', payload: {'a': 1}).payloadBytes, isNull);
     });
 
     test('payload: by extension, empty, latin1 fallback', () async {
@@ -1581,6 +1693,26 @@ void main() {
         maxPayloadLength: 1000,
       );
       expect(g.payload, equals(data));
+      // The received bytes are the decompressed body, not the gzip stream:
+      expect(g.payloadBytes, equals(data));
+
+      // A compressed JSON body: decoded, and its bytes decompressed as sent.
+      var jsonBody = utf8.encode('{ "a" : 1.50 }');
+      var gJson = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'gzip',
+          },
+          body: gzip.encode(jsonBody),
+        ),
+        decompressPayload: true,
+      );
+      expect(gJson.payload, equals({'a': 1.5}));
+      expect(gJson.payloadBytes, equals(jsonBody));
+      expect(gJson.payloadAsBytes, equals(jsonBody));
 
       var gNoMax = await toAPIRequest(
         compressed('gzip', gzip.encode(data)),

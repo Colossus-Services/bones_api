@@ -41,6 +41,16 @@ import 'bones_api_utils_sink.dart';
 
 final _log = logging.Logger('APIServer');
 
+/// A request body as resolved by `APIServer._resolvePayload`: the decoded
+/// [payload] and its [mimeType] (both `null` when a JSON body is empty or
+/// fails to decode), and the body [bytes] exactly as received, kept for
+/// [APIRequest.payloadBytes] even when decoding fails.
+typedef _ResolvedPayload = ({
+  MimeType? mimeType,
+  Object? payload,
+  Uint8List bytes,
+});
+
 final _logLetsEncrypt = logging.Logger('LetsEncrypt');
 
 /// The cross-origin configuration of an [APIServer].
@@ -1977,8 +1987,9 @@ class APIServer extends _APIServerBase {
       maxPayloadLength: maxPayloadLength,
       decompressPayload: decompressPayload,
     ).resolveMapped((payloadResolved) {
-      var mimeType = payloadResolved?.$1;
-      var payload = payloadResolved?.$2;
+      var mimeType = payloadResolved?.mimeType;
+      var payload = payloadResolved?.payload;
+      var payloadBytes = payloadResolved?.bytes;
 
       Map<String, dynamic> parametersResolved;
 
@@ -2014,6 +2025,7 @@ class APIServer extends _APIServerBase {
         originalRequest: request,
         payload: payload,
         payloadMimeType: mimeType,
+        payloadBytes: payloadBytes,
         time: requestTime,
         parsingDuration: parsingDuration,
       );
@@ -2059,7 +2071,24 @@ class APIServer extends _APIServerBase {
     MimeType.textPlain,
   )!;
 
-  static FutureOr<(MimeType, Object)?> _resolvePayload(
+  /// The bytes of an empty body (`Content-Length: 0`), shared by every such
+  /// request in [_resolvePayload] instead of a new `Uint8List(0)` each time.
+  /// Safe to share: a 0-length list has no element to change, and its length
+  /// is fixed.
+  static final Uint8List _emptyPayloadBytes = Uint8List(0);
+
+  /// How much of a request body [_logPreview] shows.
+  static const _logPreviewLength = 256;
+
+  /// The start of a client's request body [s], for a log line: at most
+  /// [_logPreviewLength] characters, with `…` when cut. Used by
+  /// [_resolvePayloadFromString] to log a body that fails to decode without
+  /// writing all of it (it may be large, or hold secrets).
+  static String _logPreview(String s) => s.length <= _logPreviewLength
+      ? s
+      : '${s.substring(0, _logPreviewLength)}…';
+
+  static FutureOr<_ResolvedPayload?> _resolvePayload(
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
@@ -2084,7 +2113,7 @@ class APIServer extends _APIServerBase {
 
     if (mimeType.isStringType) {
       if (contentLength == 0) {
-        return (mimeType, '');
+        return (mimeType: mimeType, payload: '', bytes: _emptyPayloadBytes);
       }
 
       return _resolvePayloadFromString(
@@ -2095,7 +2124,11 @@ class APIServer extends _APIServerBase {
       );
     } else {
       if (contentLength == 0) {
-        return (mimeType, Uint8List(0));
+        return (
+          mimeType: mimeType,
+          payload: _emptyPayloadBytes,
+          bytes: _emptyPayloadBytes,
+        );
       }
 
       return _resolvePayloadBytes(
@@ -2135,7 +2168,7 @@ class APIServer extends _APIServerBase {
     return MimeType.byExtension(ext, defaultAsApplication: false);
   }
 
-  static Future<(MimeType, Object)?> _resolvePayloadFromString(
+  static Future<_ResolvedPayload> _resolvePayloadFromString(
     MimeType mimeType,
     Request request, {
     int? maxPayloadLength,
@@ -2146,32 +2179,44 @@ class APIServer extends _APIServerBase {
         request,
         maxPayloadLength: maxPayloadLength,
         decompressPayload: decompressPayload,
-      ).then((s) {
-        if (s == null) return null;
+      ).then((loaded) {
+        var (s, bytes) = loaded;
+
+        // An empty or undecodable JSON body has no payload (as before), but
+        // its bytes are still passed on, for `APIRequest.payloadBytes`.
+        _ResolvedPayload noPayload() =>
+            (mimeType: null, payload: null, bytes: bytes);
 
         Object payload = s;
         if (mimeType.isJSON) {
           s = s.trim();
-          if (s.isEmpty) return null;
+          if (s.isEmpty) return noPayload();
           try {
             payload = json.decode(s);
           } catch (e, stackTrace) {
-            // Not `s`: it would shadow the payload `s` logged below.
+            // Not `s`: it would shadow the payload `s` logged below. Only a
+            // prefix of it: the body comes from the client, so it can be
+            // large or hold credentials and personal data.
             _log.severe(
-              "_resolvePayloadFromString> Error decoding JSON: <<$s>>",
+              "_resolvePayloadFromString> Error decoding JSON "
+              "(${s.length} chars): <<${_logPreview(s)}>>",
               e,
               stackTrace,
             );
-            return null;
+            return noPayload();
           }
         } else if (mimeType.isFormURLEncoded) {
           payload = decodeQueryStringParameters(s, charset: mimeType.charset);
         }
 
-        return (mimeType, payload);
+        return (mimeType: mimeType, payload: payload, bytes: bytes);
       });
 
-  static Future<String?> _loadPayloadString(
+  /// Reads the [request] body and decodes it with the [mimeType] charset
+  /// (`UTF-8` by default, falling back to `latin1` on invalid bytes).
+  /// Returns the decoded text and the bytes it was decoded from, which
+  /// [_resolvePayloadFromString] keeps for [APIRequest.payloadBytes].
+  static Future<(String, Uint8List)> _loadPayloadString(
     MimeType mimeType,
     Request request, {
     int? maxPayloadLength,
@@ -2184,23 +2229,29 @@ class APIServer extends _APIServerBase {
       ).then((allBytes) {
         var encoding = mimeType.charsetEncoding ?? utf8;
 
+        String s;
         try {
-          return encoding.decode(allBytes);
+          s = encoding.decode(allBytes);
         } catch (_) {
-          return latin1.decode(allBytes);
+          s = latin1.decode(allBytes);
         }
+
+        return (s, allBytes);
       });
 
-  static Future<(MimeType, Uint8List)?> _resolvePayloadBytes(
+  static Future<_ResolvedPayload> _resolvePayloadBytes(
     MimeType mimeType,
     Request request, {
     int? maxPayloadLength,
     bool? decompressPayload,
-  }) => _readPayloadBytes(
-    request,
-    maxPayloadLength: maxPayloadLength,
-    decompressPayload: decompressPayload,
-  ).then((allBytes) => (mimeType, allBytes));
+  }) =>
+      _readPayloadBytes(
+        request,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      ).then(
+        (allBytes) => (mimeType: mimeType, payload: allBytes, bytes: allBytes),
+      );
 
   /// Reads the whole [request] body and passes its blocks to
   /// [_loadPayloadBytes] (size check and optional decompression).
