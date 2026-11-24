@@ -10,9 +10,12 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   - Decompressed only when the server decompresses payloads
     (`decompressPayload`); otherwise the compressed bytes, as sent.
   - `null` for an `APIRequest` built in code, and when the server reads no
-    body (a request with neither `Content-Length` nor `Content-Type`).
+    body (a request with neither `Content-Length` nor `Content-Type`, and
+    not chunked).
   - Read-only (an unmodifiable view), so a route can't change what a
-    signature check reads. A binary `payload` is the same buffer.
+    signature check reads. A binary `payload` is the same buffer (not
+    copied), so changing that payload in place shows here too: verify a
+    binary body's signature before changing its payload.
   - Held for the life of the request next to the decoded `payload`: a
     large text or JSON body is in memory twice meanwhile.
 - **Behavior change**, `APIRequest.payloadAsBytes`:
@@ -24,14 +27,27 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
     filled from a text body (`APIModule`) now gets the body as received,
     e.g. a `text/plain; charset=latin1` body keeps its `latin1` bytes.
   - For a request built in code with a JSON MIME type, the payload encoded
-    as JSON (`{"a":1}`), instead of its `toString` (`{a: 1}`); one that
-    can't be encoded as JSON still gives its `toString`.
+    as JSON with the library's `Json` encoder (`{"a":1}`; entities,
+    `DateTime`s and `toJson` objects too), instead of its `toString`
+    (`{a: 1}`); one that can't be encoded as JSON still gives its
+    `toString`. A `String` payload is already the JSON text: its UTF-8, not
+    encoded again.
+  - A copy on each call: keep it rather than calling again for a large body.
 - `APIServer`:
   - The payload helpers pass the body bytes along with the decoded payload
     (a named record), instead of discarding them.
-  - A JSON body that fails to decode is logged with its length and only its
-    first 256 characters, instead of all of it (it comes from the client:
-    it may be large, or hold credentials).
+  - A JSON body that fails to decode is logged with its length (before
+    trimming) and only its first 256 characters (not cutting a surrogate
+    pair), instead of all of it (it comes from the client: it may be large,
+    or hold credentials).
+  - A chunked body (`Transfer-Encoding: chunked`) with no `Content-Type` is
+    now read (as `text/plain`), instead of ignored: a webhook sent that way
+    had no `payload` nor `payloadBytes` to verify.
+  - **Behavior change**: a compressed body (`Content-Encoding` other than
+    `identity`) not decompressed (`decompressPayload` off) is now passed as
+    bytes (`application/octet-stream`, `payload` and `payloadBytes` the
+    compressed bytes), instead of decoded as text: garbage text, and a JSON
+    body failed to decode (logged as an error, no payload).
 - `DBPostgreSQLAdapter`: fix a deadlock with `postgres` 3.7 in a transaction
   that runs a cached prepared statement. The driver now picks a prepared
   statement's session by the current zone: run outside the `runTx`

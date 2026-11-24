@@ -2081,12 +2081,40 @@ class APIServer extends _APIServerBase {
   static const _logPreviewLength = 256;
 
   /// The start of a client's request body [s], for a log line: at most
-  /// [_logPreviewLength] characters, with `…` when cut. Used by
-  /// [_resolvePayloadFromString] to log a body that fails to decode without
-  /// writing all of it (it may be large, or hold secrets).
-  static String _logPreview(String s) => s.length <= _logPreviewLength
-      ? s
-      : '${s.substring(0, _logPreviewLength)}…';
+  /// [_logPreviewLength] characters, with `…` when cut (never in the middle
+  /// of a surrogate pair). Used by [_resolvePayloadFromString] to log a body
+  /// that fails to decode without writing all of it (it may be large, or
+  /// hold secrets).
+  static String _logPreview(String s) {
+    if (s.length <= _logPreviewLength) return s;
+    var end = _logPreviewLength;
+    // A high surrogate at the cut: keep its pair out of the preview too.
+    var last = s.codeUnitAt(end - 1);
+    if (last >= 0xD800 && last <= 0xDBFF) end--;
+    return '${s.substring(0, end)}…';
+  }
+
+  /// Whether [request] says it has a body without a `Content-Length` (a
+  /// chunked `Transfer-Encoding`): [_resolvePayload] reads it then too.
+  static bool _hasChunkedBody(Request request) {
+    var transferEncoding = request.headers[HttpHeaders.transferEncodingHeader];
+    return transferEncoding != null &&
+        transferEncoding.toLowerCase().contains('chunked');
+  }
+
+  /// Whether [request]'s body is compressed (a `Content-Encoding` other than
+  /// `identity`): with payload decompression off, [_resolvePayload] passes it
+  /// as bytes instead of decoding the compressed bytes as text.
+  static bool _isCompressedBody(Request request) {
+    var contentEncoding = request.headers[HttpHeaders.contentEncodingHeader];
+    return contentEncoding != null &&
+        contentEncoding.isNotEmpty &&
+        contentEncoding.toLowerCase() != 'identity';
+  }
+
+  static final MimeType _mimeTypeOctetStream = MimeType.parse(
+    'application/octet-stream',
+  )!;
 
   static FutureOr<_ResolvedPayload?> _resolvePayload(
     Request request, {
@@ -2105,11 +2133,29 @@ class APIServer extends _APIServerBase {
     }
 
     var contentMimeType = _resolveContentMimeType(request);
-    if (contentLength == null && contentMimeType == null) {
+    // No body: neither a length nor a type, and not chunked (a chunked body
+    // has no `Content-Length`, and may have no `Content-Type` either).
+    if (contentLength == null &&
+        contentMimeType == null &&
+        !_hasChunkedBody(request)) {
       return Future.value(null);
     }
 
     var mimeType = contentMimeType ?? _mimeTypeTextPlain;
+
+    // A compressed body that isn't decompressed: its bytes as they came (as
+    // `application/octet-stream`), not decoded as text (garbage, and a JSON
+    // decoding error).
+    if (decompressPayload != true &&
+        contentLength != 0 &&
+        _isCompressedBody(request)) {
+      return _resolvePayloadBytes(
+        _mimeTypeOctetStream,
+        request,
+        maxPayloadLength: maxPayloadLength,
+        decompressPayload: decompressPayload,
+      );
+    }
 
     if (mimeType.isStringType) {
       if (contentLength == 0) {
@@ -2189,6 +2235,7 @@ class APIServer extends _APIServerBase {
 
         Object payload = s;
         if (mimeType.isJSON) {
+          var bodyLength = s.length;
           s = s.trim();
           if (s.isEmpty) return noPayload();
           try {
@@ -2196,10 +2243,11 @@ class APIServer extends _APIServerBase {
           } catch (e, stackTrace) {
             // Not `s`: it would shadow the payload `s` logged below. Only a
             // prefix of it: the body comes from the client, so it can be
-            // large or hold credentials and personal data.
+            // large or hold credentials and personal data. The length is the
+            // body's, before trimming.
             _log.severe(
               "_resolvePayloadFromString> Error decoding JSON "
-              "(${s.length} chars): <<${_logPreview(s)}>>",
+              "($bodyLength chars): <<${_logPreview(s)}>>",
               e,
               stackTrace,
             );
@@ -2239,6 +2287,11 @@ class APIServer extends _APIServerBase {
         return (s, allBytes);
       });
 
+  /// Reads the [request] body as bytes, for a non-text [mimeType] (or a
+  /// compressed body not decompressed): used by [_resolvePayload]. The
+  /// payload and the received bytes are the same buffer (no copy of a large
+  /// upload); [APIRequest.payloadBytes] is a read-only view of it, but
+  /// changing the payload in place shows there too.
   static Future<_ResolvedPayload> _resolvePayloadBytes(
     MimeType mimeType,
     Request request, {

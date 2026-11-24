@@ -1678,8 +1678,11 @@ class PostgreSQLConnectionWrapper extends DBConnectionWrapper<Session> {
     );
   }
 
-  /// Runs a cached prepared [statement] (prepared on the connection). Here,
-  /// outside any transaction, as is: on the connection.
+  /// Runs a cached prepared [statement] (prepared on the connection): called
+  /// by [_run] for a statement of [statementsCache]. Here, outside any
+  /// transaction, as is: on the connection. A transaction's wrapper
+  /// ([PostgreSQLConnectionTransactionWrapper]) runs it in its `runTx`
+  /// callback's zone instead.
   Future<Result> _runStatement(
     Statement statement,
     Map<String, dynamic>? parameters,

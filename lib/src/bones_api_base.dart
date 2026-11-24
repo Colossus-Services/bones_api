@@ -1909,12 +1909,15 @@ class APIRequest extends APIMetricSet with APIPayload {
   /// the same bytes: a JSON object would lose its original spacing and key
   /// order, and text sent in another charset (such as `latin1`) would come
   /// back as UTF-8. It is a copy, so changing it can't change [payloadBytes]
-  /// (which a signature check reads).
+  /// (which a signature check reads). Each call makes a new copy: for a
+  /// large body, keep the result instead of calling it again, or read
+  /// [payloadBytes] (read-only) directly.
   ///
   /// A binary payload is returned as it is. For a request built in code
   /// there are no received bytes, so the payload itself is encoded: a list
-  /// of bytes is copied, a JSON payload is encoded as JSON, and any other
-  /// value becomes the UTF-8 of its `toString()`.
+  /// of bytes is copied, a JSON payload (not already a `String` of JSON
+  /// text) is encoded as JSON, and any other value becomes the UTF-8 of its
+  /// `toString()`.
   Uint8List? get payloadAsBytes {
     var payload = this.payload;
 
@@ -1947,10 +1950,15 @@ class APIRequest extends APIMetricSet with APIPayload {
     }
 
     // Built in code with a JSON MIME type: encoded as JSON (its `toString`
-    // isn't JSON). A payload that can't be encoded falls back to it.
-    if (payloadMimeType != null && payloadMimeType.isJSON) {
+    // isn't JSON), with the library's encoder (entities, `DateTime`s,
+    // `toJson` objects). A `String` is already the JSON text: encoding it
+    // again would quote it. A payload that can't be encoded falls back to
+    // its `toString`.
+    if (payload is! String &&
+        payloadMimeType != null &&
+        payloadMimeType.isJSON) {
       try {
-        return dart_convert.utf8.encode(dart_convert.json.encode(payload));
+        return dart_convert.utf8.encode(Json.encode(payload));
       } catch (_) {}
     }
 

@@ -1428,6 +1428,11 @@ void main() {
       // A large invalid body: only its start is logged (it comes from the
       // client: it may be large, or hold secrets).
       var largeInvalid = '{"secret":"${'x' * 1000}"';
+      // The cut (256 characters) falls inside a surrogate pair: `{` and 254
+      // `x`, then an emoji (2 code units) at 255..256.
+      var surrogateInvalid = '{${'x' * 254}😀${'y' * 50}';
+      // Spaces around: the logged length is the body's, before trimming.
+      const paddedInvalid = '   {pad   ';
 
       APIRequest invalid;
       try {
@@ -1439,14 +1444,16 @@ void main() {
             body: '{invalid',
           ),
         );
-        await toAPIRequest(
-          Request(
-            'POST',
-            Uri.parse('http://localhost/a'),
-            headers: {'content-type': 'application/json'},
-            body: largeInvalid,
-          ),
-        );
+        for (var body in [largeInvalid, surrogateInvalid, paddedInvalid]) {
+          await toAPIRequest(
+            Request(
+              'POST',
+              Uri.parse('http://localhost/a'),
+              headers: {'content-type': 'application/json'},
+              body: body,
+            ),
+          );
+        }
         await Future.delayed(Duration(milliseconds: 10));
       } finally {
         logging.Logger.root.level = prevLevel;
@@ -1454,7 +1461,7 @@ void main() {
       }
 
       expect(invalid.payload, isNull);
-      expect(records, hasLength(2));
+      expect(records, hasLength(4));
       expect(records.first.message, contains('<<{invalid>>'));
       expect(records.first.message, contains('(8 chars)'));
       expect(records.first.error, isA<FormatException>());
@@ -1465,6 +1472,15 @@ void main() {
       expect(largeLog, contains('…>>'));
       expect(largeLog, isNot(contains(largeInvalid)));
       expect(largeLog.length, lessThan(400));
+
+      // Cut before the pair, not in it (no lone surrogate):
+      var surrogateLog = records[2].message;
+      expect(surrogateLog, contains('${'x' * 254}…>>'));
+      expect(surrogateLog, isNot(contains('\uD83D')));
+
+      var paddedLog = records[3].message;
+      expect(paddedLog, contains('(${paddedInvalid.length} chars)'));
+      expect(paddedLog, contains('<<{pad>>'));
 
       var blank = await toAPIRequest(
         Request(
@@ -1672,6 +1688,81 @@ void main() {
         ),
         throwsStateError,
       );
+    });
+
+    test('payload: chunked body without Content-Type', () async {
+      // A stream body: no `Content-Length`. Read because it's chunked (it
+      // used to be ignored: no payload, no bytes).
+      var body = utf8.encode('{"a" : 1}');
+      var req = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'transfer-encoding': 'chunked'},
+          body: Stream.fromIterable([body.sublist(0, 4), body.sublist(4)]),
+        ),
+      );
+      expect(req.payloadBytes, equals(body));
+      expect(req.payload, equals('{"a" : 1}'));
+
+      // Neither a length, a type nor chunked: no body read (as before).
+      var none = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          body: Stream<List<int>>.empty(),
+        ),
+      );
+      expect(none.payload, isNull);
+      expect(none.payloadBytes, isNull);
+    });
+
+    test('payload: compressed and not decompressed: bytes', () async {
+      var json = utf8.encode('{"a":1}');
+      var compressed = gzip.encode(json);
+
+      var records = <logging.LogRecord>[];
+      var sub = logging.Logger.root.onRecord.listen((r) {
+        if (r.message.contains('Error decoding JSON')) records.add(r);
+      });
+
+      APIRequest req;
+      try {
+        req = await toAPIRequest(
+          Request(
+            'POST',
+            Uri.parse('http://localhost/a'),
+            headers: {
+              'content-type': 'application/json',
+              'content-encoding': 'gzip',
+            },
+            body: compressed,
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 10));
+      } finally {
+        await sub.cancel();
+      }
+
+      // As they came, as bytes: not decoded as (garbage) text nor JSON.
+      expect(req.payloadMimeType?.isJSON, isFalse);
+      expect(req.payload, equals(compressed));
+      expect(req.payloadBytes, equals(compressed));
+      expect(records, isEmpty);
+
+      // `identity` is not a compression: decoded as usual.
+      var identity = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'identity',
+          },
+          body: json,
+        ),
+      );
+      expect(identity.payload, equals({'a': 1}));
     });
 
     test('payload: decompress', () async {
