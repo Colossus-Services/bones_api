@@ -2071,6 +2071,12 @@ class APIServer extends _APIServerBase {
     MimeType.textPlain,
   )!;
 
+  /// The bytes of an empty body (`Content-Length: 0`), shared by every such
+  /// request in [_resolvePayload] instead of a new `Uint8List(0)` each time.
+  /// Safe to share: a 0-length list has no element to change, and its length
+  /// is fixed.
+  static final Uint8List _emptyPayloadBytes = Uint8List(0);
+
   static FutureOr<_ResolvedPayload?> _resolvePayload(
     Request request, {
     int? maxPayloadLength,
@@ -2096,7 +2102,7 @@ class APIServer extends _APIServerBase {
 
     if (mimeType.isStringType) {
       if (contentLength == 0) {
-        return (mimeType: mimeType, payload: '', bytes: Uint8List(0));
+        return (mimeType: mimeType, payload: '', bytes: _emptyPayloadBytes);
       }
 
       return _resolvePayloadFromString(
@@ -2107,8 +2113,11 @@ class APIServer extends _APIServerBase {
       );
     } else {
       if (contentLength == 0) {
-        var empty = Uint8List(0);
-        return (mimeType: mimeType, payload: empty, bytes: empty);
+        return (
+          mimeType: mimeType,
+          payload: _emptyPayloadBytes,
+          bytes: _emptyPayloadBytes,
+        );
       }
 
       return _resolvePayloadBytes(
