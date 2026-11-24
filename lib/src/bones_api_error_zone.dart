@@ -186,7 +186,11 @@ class ZoneField<T extends Object> {
   /// See [set].
   T? remove({Zone? contextZone}) => set(null, contextZone: contextZone);
 
-  final Queue<Zone> _zones = Queue<Zone>();
+  /// The context zones created by this field (by identity: a [Zone] doesn't
+  /// override `==`), for [contextZone] to find the one the current zone is
+  /// inside. A set, not a list: [contextZone] looks up every ancestor of the
+  /// current zone.
+  final Set<Zone> _zones = HashSet<Zone>.identity();
 
   /// Creates a new [contextZone] to store values.
   Zone createContextZone({Map<Object?, Object?>? zoneValues}) {
@@ -195,7 +199,7 @@ class ZoneField<T extends Object> {
       zoneValues: zoneValues,
     );
 
-    _zones.addLast(zone);
+    _zones.add(zone);
     return zone;
   }
 
@@ -224,33 +228,32 @@ class ZoneField<T extends Object> {
       zoneValues: zoneValues,
     );
 
-    _zones.addLast(zone);
+    _zones.add(zone);
     return zone;
   }
 
   /// Disposes the [contextZone] and any related value.
   void disposeContextZone(Zone contextZone) {
     if (_zones.isNotEmpty) {
-      if (identical(_zones.last, contextZone)) {
-        var rmObj = _zones.removeLast();
-        assert(identical(rmObj, contextZone));
-      } else {
-        var rm = _zones.remove(contextZone);
-        assert(rm);
-      }
+      var rm = _zones.remove(contextZone);
+      assert(rm);
     }
 
     _values[contextZone] = null;
   }
 
-  /// Returns the current context zone.
+  /// Returns the current context zone: the one of this field the current
+  /// zone is, or is inside of (a zone forked from it, at any depth: e.g. a
+  /// `runZoned` or `runZonedGuarded` inside a [Transaction]'s block), as
+  /// `zoneValues` are inherited. Otherwise the current zone itself.
+  ///
+  /// A zone forked from a context zone sees its value: code run there
+  /// (another error zone, a driver's callback zone) is still inside it.
   Zone get contextZone {
     var currentZone = Zone.current;
 
-    for (var e in _zones) {
-      if (identical(e, currentZone)) {
-        return e;
-      }
+    for (Zone? zone = currentZone; zone != null; zone = zone.parent) {
+      if (_zones.contains(zone)) return zone;
     }
 
     return currentZone;

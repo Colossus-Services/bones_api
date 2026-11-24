@@ -39,7 +39,33 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   to end (it used to fail). The transaction's operations may run from
   another zone, so the statement waited for its own transaction.
   `PostgreSQLConnectionTransactionWrapper` now runs cached statements in the
-  `runTx` callback's zone, so they run in the transaction.
+  `runTx` callback's zone, so they run in the transaction. When the caller
+  is in another error zone (each API call has its own), the outcome is
+  forwarded to the caller's zone: Dart doesn't deliver a `Future`'s error
+  across error zones, so a failing statement (stale, a constraint) would
+  have left the caller waiting forever.
+- **Behavior change**, `ZoneField` (and so `Transaction.executingTransaction`
+  and `APIRoot.currentAPIRequest`): a zone forked from a context zone, at
+  any depth, is inside it and sees its value, as `zoneValues` are inherited.
+  It used to see it only in the context zone itself, so code run in a zone
+  forked inside a transaction (`runZoned`, `runZonedGuarded`, another error
+  zone) didn't see the transaction:
+  - its repository operations ran outside it, each committed apart and
+    kept when the transaction aborted;
+  - its `Transaction.executeBlock` opened a new transaction instead of
+    joining the executing one.
+
+  Now they join it. A `Transaction().execute` there is refused ("Already
+  executing a Transaction"), as in the transaction's own zone, instead of
+  running a separate transaction.
+- `DBSQLMemoryAdapter`: a rolled back transaction reverts only its own
+  writes (an undo log per context), instead of rolling the tables back to
+  their versions when it began, which also reverted what concurrent
+  transactions committed meanwhile.
+- Tests: transactions across zones and error zones, nested blocks, sub-
+  transactions (another executor) and stress cases (concurrent transactions
+  half aborted, deep nesting, interleaved and failing concurrent operations,
+  concurrent sub-transactions), for every adapter.
 - Dependencies:
   - `postgres: ^3.7.0` (the deadlock fix above).
   - `sqlite3: ^3.9.2`, `archive: ^4.7.1`, `googleapis_auth: ^2.3.7`,

@@ -35,6 +35,17 @@ class DBSQLMemoryAdapterContext
     : tablesVersions = sqlAdapter.tablesVersions,
       tablesIndexesVersions = sqlAdapter.tablesIndexesVersions;
 
+  /// The entries this context's writes replaced, by table and ID: each
+  /// entry as it was before this context first wrote it (`null`: absent).
+  ///
+  /// A rollback ([DBSQLMemoryAdapter.cancelTransaction]) restores only these:
+  /// rolling the tables back to their versions when this context began
+  /// ([tablesVersions]) would also revert what other transactions committed
+  /// meanwhile (concurrent transactions). Filled by
+  /// [DBSQLMemoryAdapter._recordUndo]; cleared when the context is
+  /// consolidated, rolled back, or opens a new transaction.
+  final Map<String, Map<Object, Map<String, dynamic>?>> _undoEntries = {};
+
   bool _closed = false;
 
   bool get isClosed => _closed;
@@ -281,6 +292,61 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
   bool _tableExists(String table) =>
       _hasTableScheme(table) || getEntityHandler(tableName: table) != null;
+
+  /// Records in [connection]'s undo log the entry [id] of [table] as it is
+  /// before [connection] first writes it (see
+  /// [DBSQLMemoryAdapterContext._undoEntries]). Called by every write: the
+  /// inserts, the update and the delete. A later write of the same entry by
+  /// the same context keeps the first recorded value.
+  void _recordUndo(
+    DBSQLMemoryAdapterContext? connection,
+    String table,
+    Object id,
+    Map<String, dynamic>? previous,
+  ) {
+    if (connection == null) return;
+    var tableUndo = connection._undoEntries[table] ??= {};
+    if (!tableUndo.containsKey(id)) {
+      // The entries are replaced, never changed in place (an update stores a
+      // copy), so the previous one is kept as is.
+      tableUndo[id] = previous;
+    }
+  }
+
+  /// Reverts [connection]'s writes ([DBSQLMemoryAdapterContext._undoEntries]):
+  /// each entry it wrote back to what it was before (removed when it was
+  /// absent), leaving what other contexts wrote meanwhile. The indexes of
+  /// the reverted tables are rebuilt, and their next-ID counters reset.
+  void _undoConnectionWrites(DBSQLMemoryAdapterContext connection) {
+    var undo = connection._undoEntries;
+    if (undo.isEmpty) return;
+
+    for (var e in undo.entries) {
+      var table = e.key;
+      var map = _tables[table];
+      if (map == null) continue;
+
+      for (var e2 in e.value.entries) {
+        var previous = e2.value;
+        if (previous == null) {
+          map.remove(e2.key);
+        } else {
+          map[e2.key] = previous;
+        }
+      }
+
+      _disposeNextIDCounter(table);
+    }
+
+    // An index entry is a `Set` of IDs changed in place: the indexes of the
+    // reverted tables are rebuilt from them.
+    for (var table in undo.keys) {
+      _rebuildTableIndexes(table);
+    }
+
+    undo.clear();
+    _onTablesModification();
+  }
 
   Map<String, dynamic>? _getByID(String table, Object id) {
     var map = _getTableMap(table, false);
@@ -563,6 +629,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     }
 
     var id = nextID(table);
+    _recordUndo(connection, table, id, map[id]);
     map[id] = entry;
 
     for (var e in entry.entries) {
@@ -698,6 +765,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var idField = tablesScheme?.idFieldName ?? 'id';
     entry[idField] = id;
 
+    _recordUndo(connection, table, id, map[id]);
     map[id] = entry;
 
     _onTablesModification();
@@ -846,6 +914,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var map = _getTableMap(table, true)!;
 
     var prevEntry = map[id];
+    _recordUndo(connection, table, id, prevEntry);
 
     var entry = _normalizeEntityJSON(
       sql.parametersByPlaceholder,
@@ -1156,7 +1225,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
               ),
       ];
 
-      return _deleteMatchedEntries(table, entries, map, sql);
+      return _deleteMatchedEntries(table, entries, map, sql, connection);
     }
 
     // A relationship delete (e.g. the roles a user no longer has) only needs
@@ -1189,7 +1258,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         );
       }).toList();
 
-      return _deleteMatchedEntries(table, entries, map, sql);
+      return _deleteMatchedEntries(table, entries, map, sql, connection);
     }
 
     var entries = candidates
@@ -1208,7 +1277,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
         .nonNulls
         .toList(growable: false);
 
-    return _deleteMatchedEntries(table, entries, map, sql);
+    return _deleteMatchedEntries(table, entries, map, sql, connection);
   }
 
   /// If [tableScheme] has no references (to-one fields referencing other
@@ -1229,9 +1298,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     List<MapEntry<Object, Map<String, dynamic>>> entries,
     Map<Object, Map<String, dynamic>> tableMap,
     SQL sql,
+    DBSQLMemoryAdapterContext connection,
   ) {
     _checkNotReferencedEntities(entries, table, sql);
-    return _removeEntries(table, entries, tableMap);
+    return _removeEntries(table, entries, tableMap, connection);
   }
 
   void _checkNotReferencedEntities(
@@ -1261,6 +1331,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     String table,
     List<MapEntry<Object, Map<String, dynamic>>> entries,
     Map<Object, Map<String, dynamic>> tableMap,
+    DBSQLMemoryAdapterContext? connection,
   ) {
     if (entries.isEmpty) return <Map<String, dynamic>>[];
 
@@ -1268,6 +1339,8 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
     for (var e in entries) {
       var id = e.key;
+      // The stored entry (the matched one may be a resolved copy):
+      _recordUndo(connection, table, id, tableMap[id]);
       tableMap.remove(id);
     }
 
@@ -1726,6 +1799,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   @override
   DBSQLMemoryAdapterContext openTransaction(Transaction transaction) {
     var conn = catchFromPool();
+    // A pooled context may carry a previous use's log: this transaction's
+    // rollback reverts only its own writes.
+    conn._undoEntries.clear();
 
     _openTransactionsContexts[conn] = DateTime.now();
 
@@ -1783,10 +1859,10 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     if (connection == null) return true;
     _openTransactionsContexts.remove(connection);
 
-    _rollbackTables(
-      connection.tablesVersions,
-      connection.tablesIndexesVersions,
-    );
+    // Only this transaction's writes are reverted: rolling the tables back to
+    // their versions when it began would also revert the transactions that
+    // committed meanwhile (concurrent ones).
+    _undoConnectionWrites(connection);
 
     // ignore: discarded_futures
     disposePoolElement(connection);
@@ -1812,6 +1888,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   bool? _consolidateTransactionContext(DBSQLMemoryAdapterContext context) {
     var open = _openTransactionsContexts.remove(context);
     if (open == null) return null;
+
+    // Committed: its writes are no longer to revert.
+    context._undoEntries.clear();
 
     if (_openTransactionsContexts.isNotEmpty) {
       _consolidateContextQueue.add(context);
@@ -1869,30 +1948,6 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
       index?.consolidate(targetVersion);
     }
 
-    _onTablesModification();
-  }
-
-  void _rollbackTables(
-    Map<String, int> tablesVersions,
-    Map<String, Map<String, int>> tablesIndexesVersions,
-  ) {
-    for (var e in tablesVersions.entries) {
-      var table = e.key;
-      var version = e.value;
-      _rollbackTable(table, version);
-    }
-
-    // An index entry is a `Set` of IDs, changed in place, which a `MapHistory`
-    // rollback can't revert: the indexes are rebuilt from the rolled back
-    // tables instead.
-    for (var table in {...tablesVersions.keys, ...tablesIndexesVersions.keys}) {
-      _rebuildTableIndexes(table);
-    }
-  }
-
-  void _rollbackTable(String table, int targetVersion) {
-    var tableMap = _tables[table];
-    tableMap?.rollback(targetVersion);
     _onTablesModification();
   }
 

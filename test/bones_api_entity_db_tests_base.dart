@@ -267,6 +267,27 @@ Future<void> _checkFixedBySuggestedSQLs(
   expect(await sqlAdapter.checkDBTables(force: true), isTrue);
 }
 
+/// Runs [f] in a new error zone (as each API call has its own, see
+/// `APIRoot`) and returns its outcome to the caller's zone: listened to
+/// inside the new zone, so its error is received there and forwarded (Dart
+/// doesn't deliver a `Future`'s error across error zones). An uncaught error
+/// of the new zone fails the returned future too.
+///
+/// Used by the "transaction: ... from another error zone" tests of
+/// [runAdapterTests].
+Future<T> _inAnotherErrorZone<T>(FutureOr<T> Function() f) {
+  final completer = Completer<T>();
+  runZonedGuarded(
+    () =>
+        Future<T>.sync(f)
+            .then(completer.complete, onError: completer.completeError),
+    (e, s) {
+      if (!completer.isCompleted) completer.completeError(e, s);
+    },
+  );
+  return completer.future;
+}
+
 Future<bool> runAdapterTests(
   String dbName,
   APITestConfigDB testConfigDB,
@@ -1052,6 +1073,574 @@ Future<bool> runAdapterTests(
           // The other tests count the stores.
           await storeAPIRepository.deleteByID(id);
           if (id2 != null) await storeAPIRepository.deleteByID(id2);
+        }
+      });
+
+      // Transactions whose operations run from other zones than the one that
+      // opened them, as an API call does (each call has its own error zone).
+      // A driver may tie a transaction to the zone of its callback
+      // (PostgreSQL's `runTx`), and Dart never delivers a `Future`'s error
+      // across error zones: each case must complete, with its result or its
+      // error, instead of hanging.
+
+      /// The tables, created if not yet (independent of the other tests).
+      Future<void> ensureStoreTable() async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        sqlAdapter.disposeTableSchemeCache('store');
+        if (await sqlAdapter.getTableScheme('store') == null) {
+          await sqlAdapter.populateTables(
+            await sqlAdapter.generateFullCreateTableSQLs(withDate: false),
+          );
+        }
+      }
+
+      /// The stores named [name] (to check what a transaction left).
+      Future<List<Store>> storesNamed(String name) async =>
+          (await entityRepositoryProvider.storeAPIRepository.selectByQuery(
+            ' name == ? ',
+            parameters: {'name': name},
+          )).toList();
+
+      const zonesTimeout = Duration(seconds: 30);
+
+      /// Executes [block] in a new [Transaction], within [zonesTimeout] (a
+      /// hang fails the test instead of blocking it), rethrowing the error
+      /// that aborted it: `execute` returns `null` instead, which would also
+      /// hide a failed `expect` inside [block].
+      Future<void> executeTransaction(Future<void> Function() block) async {
+        Object? error;
+        StackTrace? stackTrace;
+        var ok = await Future<bool>.sync(
+          () => Transaction().executeOrError<bool>(
+            () async {
+              await block();
+              return true;
+            },
+            onError: (transaction, e, s) {
+              error = e;
+              stackTrace = s;
+              return false;
+            },
+          ),
+        ).timeout(zonesTimeout);
+        if (!ok) Error.throwWithStackTrace(error!, stackTrace!);
+      }
+
+      test('transaction: operations from other error zones (sequential, '
+          'concurrent and nested zones)', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        var ids = <Object?>[];
+
+        try {
+          await executeTransaction(() async {
+            // A write, then repeated reads (a cached prepared statement
+            // where supported), each from another error zone:
+            var id = await _inAnotherErrorZone(
+              () => storeRepo.store(Store('tz-1', 1)),
+            );
+            ids.add(id);
+            for (var i = 0; i < 3; ++i) {
+              var s = await _inAnotherErrorZone(() => storeRepo.selectByID(id));
+              expect(s?.name, equals('tz-1'));
+            }
+
+            // Concurrent, each from its own error zone:
+            var all = await Future.wait([
+              for (var i = 0; i < 4; ++i)
+                _inAnotherErrorZone(() => storeRepo.selectByID(id)),
+            ]);
+            expect(all.map((s) => s?.name), everyElement('tz-1'));
+
+            // An error zone inside another:
+            ids.add(
+              await _inAnotherErrorZone(
+                () => _inAnotherErrorZone(
+                  () => storeRepo.store(Store('tz-2', 2)),
+                ),
+              ),
+            );
+          });
+
+          expect(await storesNamed('tz-1'), hasLength(1));
+          expect(await storesNamed('tz-2'), hasLength(1));
+        } finally {
+          // The other tests count the stores.
+          for (var id in ids) {
+            if (id != null) await storeRepo.deleteByID(id);
+          }
+        }
+      });
+
+      test('transaction: an error from another error zone aborts it', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        try {
+          await expectLater(
+            executeTransaction(() async {
+              await storeRepo.store(Store('tz-abort', 3));
+              await _inAnotherErrorZone<void>(
+                () async => throw StateError('tz-abort error'),
+              );
+            }),
+            throwsA(predicate((e) => '$e'.contains('tz-abort error'))),
+          );
+
+          // Rolled back: nothing of it was stored.
+          expect(await storesNamed('tz-abort'), isEmpty);
+        } finally {
+          for (var s in await storesNamed('tz-abort')) {
+            await storeRepo.deleteByID(s.id);
+          }
+        }
+      });
+
+      test(
+        'transaction: a nested block from another error zone joins it',
+        () async {
+          await ensureStoreTable();
+          final storeRepo = entityRepositoryProvider.storeAPIRepository;
+          var ids = <Object?>[];
+
+          try {
+            // Committed together:
+            await executeTransaction(() async {
+              var outer = Transaction.executingTransaction;
+              expect(outer, isNotNull);
+
+              ids.add(await storeRepo.store(Store('tz-outer', 4)));
+
+              ids.add(
+                await _inAnotherErrorZone(
+                  () => Transaction.executeBlock((transaction) {
+                    // The executing transaction, not a new one:
+                    expect(transaction, same(outer));
+                    return storeRepo.store(Store('tz-nested', 5));
+                  }),
+                ),
+              );
+
+              // A block nested in a nested block, from yet another zone:
+              ids.add(
+                await _inAnotherErrorZone(
+                  () => Transaction.executeBlock(
+                    (transaction) => _inAnotherErrorZone(
+                      () => Transaction.executeBlock((transaction2) {
+                        expect(transaction2, same(outer));
+                        return storeRepo.store(Store('tz-nested2', 6));
+                      }),
+                    ),
+                  ),
+                ),
+              );
+            });
+
+            expect(await storesNamed('tz-outer'), hasLength(1));
+            expect(await storesNamed('tz-nested'), hasLength(1));
+            expect(await storesNamed('tz-nested2'), hasLength(1));
+
+            // Rolled back together: an error in the nested block aborts the
+            // whole transaction.
+            await expectLater(
+              executeTransaction(() async {
+                await storeRepo.store(Store('tz-outer-abort', 7));
+                await _inAnotherErrorZone(
+                  () => Transaction.executeBlock((transaction) async {
+                    await storeRepo.store(Store('tz-nested-abort', 8));
+                    throw StateError('tz-nested abort');
+                  }),
+                );
+              }),
+              throwsA(predicate((e) => '$e'.contains('tz-nested abort'))),
+            );
+
+            expect(await storesNamed('tz-outer-abort'), isEmpty);
+            expect(await storesNamed('tz-nested-abort'), isEmpty);
+          } finally {
+            for (var id in ids) {
+              if (id != null) await storeRepo.deleteByID(id);
+            }
+            for (var name in ['tz-outer-abort', 'tz-nested-abort']) {
+              for (var s in await storesNamed(name)) {
+                await storeRepo.deleteByID(s.id);
+              }
+            }
+          }
+        },
+      );
+
+      test('transaction: a sub-transaction (another executor) from another '
+          'error zone', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        final photoRepo = entityRepositoryProvider2.photoAPIRepository;
+        Object? storeId;
+        var photoIds = <String>[];
+
+        try {
+          // The SQL store, then a photo of the object adapter (another
+          // executor: a sub-transaction of this one), each from another
+          // error zone, and both again from nested zones:
+          await executeTransaction(() async {
+            storeId = await _inAnotherErrorZone(
+              () => storeRepo.store(Store('tz-sub', 9)),
+            );
+
+            var photo = Photo.fromData(
+              base64.decode(png1PixelBase64),
+              id: 'TZ-SUB-1',
+            );
+            photoIds.add(
+              '${await _inAnotherErrorZone(() => photoRepo.store(photo))}',
+            );
+
+            var photo2 = Photo.fromData(
+              base64.decode(png1PixelBase64),
+              id: 'TZ-SUB-2',
+            );
+            photoIds.add(
+              '${await _inAnotherErrorZone(() => _inAnotherErrorZone(() => photoRepo.store(photo2)))}',
+            );
+
+            var s = await _inAnotherErrorZone(
+              () => storeRepo.selectByID(storeId),
+            );
+            expect(s?.name, equals('tz-sub'));
+          });
+
+          expect(photoIds, equals(['TZ-SUB-1', 'TZ-SUB-2']));
+          expect(await storesNamed('tz-sub'), hasLength(1));
+          expect(await photoRepo.existsID('TZ-SUB-1'), isTrue);
+          expect(await photoRepo.existsID('TZ-SUB-2'), isTrue);
+        } finally {
+          // The other tests count the stores and photos.
+          if (storeId != null) await storeRepo.deleteByID(storeId);
+          for (var id in ['TZ-SUB-1', 'TZ-SUB-2']) {
+            await photoRepo.deleteByID(id);
+          }
+        }
+      });
+
+      // Stress: many transactions, operations and nesting levels at once,
+      // across zones, committing and aborting. Each case must complete
+      // (within [zonesTimeout]) and leave exactly what was committed.
+
+      /// Runs [f] in the zone kind [i] picks: a new error zone (even), or a
+      /// plain forked zone of the same error zone (odd), so the cases
+      /// alternate both.
+      Future<T> inZone<T>(int i, FutureOr<T> Function() f) =>
+          i.isEven ? _inAnotherErrorZone(f) : runZoned(() => Future<T>.sync(f));
+
+      /// Deletes the stores whose names start with [prefix] (the other tests
+      /// count the stores).
+      Future<void> deleteStoresWithPrefix(String prefix) async {
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        for (var s in await storeRepo.selectAll()) {
+          if (s.name.startsWith(prefix)) await storeRepo.deleteByID(s.id);
+        }
+      }
+
+      /// The names of the stores starting with [prefix], sorted.
+      Future<List<String>> storeNamesWithPrefix(String prefix) async =>
+          (await entityRepositoryProvider.storeAPIRepository.selectAll())
+              .map((s) => s.name)
+              .where((n) => n.startsWith(prefix))
+              .toList()
+            ..sort();
+
+      test('stress: concurrent transactions, each from its own zone, half '
+          'aborted', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        const transactions = 12;
+        const storesPerTransaction = 3;
+
+        try {
+          var outcomes = await Future.wait([
+            for (var t = 0; t < transactions; ++t)
+              inZone(t, () async {
+                try {
+                  await executeTransaction(() async {
+                    for (var i = 0; i < storesPerTransaction; ++i) {
+                      var id = await inZone(
+                        t + i,
+                        () => storeRepo.store(Store('st-c$t-$i', t * 10 + i)),
+                      );
+                      // Read back in the same transaction (its own write):
+                      var s = await inZone(
+                        t + i + 1,
+                        () => storeRepo.selectByID(id),
+                      );
+                      expect(s?.name, equals('st-c$t-$i'));
+                    }
+                    if (t.isOdd) throw StateError('st-abort-$t');
+                  });
+                  return 'committed';
+                } catch (e) {
+                  expect('$e', contains('st-abort-$t'));
+                  return 'aborted';
+                }
+              }),
+          ]).timeout(zonesTimeout);
+
+          for (var t = 0; t < transactions; ++t) {
+            expect(outcomes[t], equals(t.isEven ? 'committed' : 'aborted'));
+          }
+
+          var names = await storeNamesWithPrefix('st-c');
+          expect(
+            names,
+            [
+              for (var t = 0; t < transactions; t += 2)
+                for (var i = 0; i < storesPerTransaction; ++i) 'st-c$t-$i',
+            ]..sort(),
+          );
+        } finally {
+          await deleteStoresWithPrefix('st-c');
+        }
+      });
+
+      test('stress: deeply nested blocks, alternating zones, all joining '
+          'the transaction', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        const depth = 6;
+
+        /// A store at [level], then the next level nested inside, each from
+        /// another zone kind; [abortAtDeepest]: the deepest one throws.
+        Future<void> nested(
+          Transaction outer,
+          String prefix,
+          int level, {
+          required bool abortAtDeepest,
+        }) => inZone(
+          level,
+          () => Transaction.executeBlock((transaction) async {
+            expect(transaction, same(outer), reason: 'level $level');
+            await storeRepo.store(Store('$prefix-$level', level));
+            if (level + 1 < depth) {
+              await nested(
+                outer,
+                prefix,
+                level + 1,
+                abortAtDeepest: abortAtDeepest,
+              );
+            } else if (abortAtDeepest) {
+              throw StateError('$prefix deepest');
+            }
+          }),
+        );
+
+        try {
+          // Committed: one store per level.
+          await executeTransaction(() async {
+            var outer = Transaction.executingTransaction!;
+            await nested(outer, 'st-n', 0, abortAtDeepest: false);
+          });
+          expect(await storeNamesWithPrefix('st-n-'), [
+            for (var l = 0; l < depth; ++l) 'st-n-$l',
+          ]);
+
+          // Aborted at the deepest level: every level rolled back.
+          await expectLater(
+            executeTransaction(() async {
+              var outer = Transaction.executingTransaction!;
+              await nested(outer, 'st-na', 0, abortAtDeepest: true);
+            }),
+            throwsA(predicate((e) => '$e'.contains('st-na deepest'))),
+          );
+          expect(await storeNamesWithPrefix('st-na-'), isEmpty);
+        } finally {
+          await deleteStoresWithPrefix('st-n');
+        }
+      });
+
+      test('stress: many interleaved operations in one transaction, from '
+          'different zones', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        const operations = 20;
+
+        try {
+          var ids = <Object?>[];
+          await executeTransaction(() async {
+            // Concurrent writes, each from a zone:
+            ids = await Future.wait([
+              for (var i = 0; i < operations; ++i)
+                inZone(i, () => storeRepo.store(Store('st-i-$i', i))),
+            ]);
+            expect(ids.toSet(), hasLength(operations));
+
+            // Concurrent repeated reads of each (a cached statement where
+            // supported), mixed with a count:
+            var reads = await Future.wait([
+              for (var r = 0; r < 3; ++r)
+                for (var i = 0; i < operations; ++i)
+                  inZone(r + i, () => storeRepo.selectByID(ids[i])),
+            ]);
+            for (var r = 0; r < 3; ++r) {
+              for (var i = 0; i < operations; ++i) {
+                expect(reads[r * operations + i]?.name, equals('st-i-$i'));
+              }
+            }
+
+            // And an update of each, then read again:
+            await Future.wait([
+              for (var i = 0; i < operations; ++i)
+                inZone(i + 1, () async {
+                  var s = (await storeRepo.selectByID(ids[i]))!;
+                  s.number = 1000 + i;
+                  return storeRepo.store(s);
+                }),
+            ]);
+            for (var i = 0; i < operations; ++i) {
+              var s = await inZone(i, () => storeRepo.selectByID(ids[i]));
+              expect(s?.number, equals(1000 + i));
+            }
+          });
+
+          var names = await storeNamesWithPrefix('st-i-');
+          expect(names, hasLength(operations));
+          for (var i = 0; i < operations; ++i) {
+            var s = await storeRepo.selectByID(ids[i]);
+            expect(s?.number, equals(1000 + i));
+          }
+        } finally {
+          await deleteStoresWithPrefix('st-i-');
+        }
+      });
+
+      test('stress: a failing branch among concurrent operations aborts the '
+          'transaction', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        try {
+          await expectLater(
+            executeTransaction(() async {
+              await Future.wait([
+                for (var i = 0; i < 8; ++i)
+                  inZone(i, () async {
+                    await storeRepo.store(Store('st-f-$i', i));
+                    if (i == 5) throw StateError('st-f branch');
+                    // The others keep going after the failure:
+                    return storeRepo.store(Store('st-f-$i-b', i));
+                  }),
+              ]);
+            }),
+            throwsA(predicate((e) => '$e'.contains('st-f branch'))),
+          );
+
+          // Nothing of it committed, including what the other branches did
+          // after the failure:
+          expect(await storeNamesWithPrefix('st-f-'), isEmpty);
+
+          // The repository is usable right after:
+          var id = await storeRepo.store(Store('st-f-after', 1));
+          expect((await storeRepo.selectByID(id))?.name, equals('st-f-after'));
+        } finally {
+          await deleteStoresWithPrefix('st-f-');
+        }
+      });
+
+      test('stress: concurrent sub-transactions (another executor) from '
+          'different zones', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+        final photoRepo = entityRepositoryProvider2.photoAPIRepository;
+        const n = 4;
+        var photoIDs = [for (var i = 0; i < n; ++i) 'ST-SUB-$i'];
+
+        try {
+          // SQL stores and object-adapter photos (sub-transactions), all
+          // concurrent and from different zones, committed together:
+          await executeTransaction(() async {
+            await Future.wait([
+              for (var i = 0; i < n; ++i) ...[
+                inZone(i, () => storeRepo.store(Store('st-s-$i', i))),
+                inZone(
+                  i + 1,
+                  () => photoRepo.store(
+                    Photo.fromData(
+                      base64.decode(png1PixelBase64),
+                      id: photoIDs[i],
+                    ),
+                  ),
+                ),
+              ],
+            ]);
+          });
+
+          expect(await storeNamesWithPrefix('st-s-'), [
+            for (var i = 0; i < n; ++i) 'st-s-$i',
+          ]);
+          for (var id in photoIDs) {
+            expect(await photoRepo.existsID(id), isTrue, reason: id);
+          }
+
+          // Aborted after its sub-transactions: the SQL stores rolled back,
+          // and it completes (no hang across the executors and zones).
+          await expectLater(
+            executeTransaction(() async {
+              await Future.wait([
+                for (var i = 0; i < n; ++i) ...[
+                  inZone(i, () => storeRepo.store(Store('st-sa-$i', i))),
+                  inZone(
+                    i + 1,
+                    () => photoRepo.store(
+                      Photo.fromData(
+                        base64.decode(png1PixelBase64),
+                        id: 'ST-SUBA-$i',
+                      ),
+                    ),
+                  ),
+                ],
+              ]);
+              throw StateError('st-sub abort');
+            }),
+            throwsA(predicate((e) => '$e'.contains('st-sub abort'))),
+          );
+          expect(await storeNamesWithPrefix('st-sa-'), isEmpty);
+        } finally {
+          await deleteStoresWithPrefix('st-s');
+          for (var id in [
+            ...photoIDs,
+            for (var i = 0; i < n; ++i) 'ST-SUBA-$i',
+          ]) {
+            await photoRepo.deleteByID(id);
+          }
+        }
+      });
+
+      test('stress: a new transaction inside another one\'s zone is '
+          'refused, not run apart', () async {
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        try {
+          await executeTransaction(() async {
+            await storeRepo.store(Store('st-x-outer', 1));
+
+            // From a zone forked inside the transaction (also another error
+            // zone): still inside it, so a new one is refused (as in the
+            // transaction's own zone), instead of silently committing apart.
+            for (var i = 0; i < 2; ++i) {
+              await expectLater(
+                inZone(
+                  i,
+                  () => Transaction().execute(
+                    () => storeRepo.store(Store('st-x-apart', 2)),
+                  ),
+                ),
+                throwsA(isA<StateError>()),
+              );
+            }
+          });
+
+          expect(await storeNamesWithPrefix('st-x-'), equals(['st-x-outer']));
+        } finally {
+          await deleteStoresWithPrefix('st-x-');
         }
       });
 
