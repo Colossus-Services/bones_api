@@ -1425,6 +1425,10 @@ void main() {
       var prevLevel = logging.Logger.root.level;
       logging.Logger.root.level = logging.Level.ALL;
 
+      // A large invalid body: only its start is logged (it comes from the
+      // client: it may be large, or hold secrets).
+      var largeInvalid = '{"secret":"${'x' * 1000}"';
+
       APIRequest invalid;
       try {
         invalid = await toAPIRequest(
@@ -1435,6 +1439,14 @@ void main() {
             body: '{invalid',
           ),
         );
+        await toAPIRequest(
+          Request(
+            'POST',
+            Uri.parse('http://localhost/a'),
+            headers: {'content-type': 'application/json'},
+            body: largeInvalid,
+          ),
+        );
         await Future.delayed(Duration(milliseconds: 10));
       } finally {
         logging.Logger.root.level = prevLevel;
@@ -1442,10 +1454,17 @@ void main() {
       }
 
       expect(invalid.payload, isNull);
-      expect(records, hasLength(1));
+      expect(records, hasLength(2));
       expect(records.first.message, contains('<<{invalid>>'));
+      expect(records.first.message, contains('(8 chars)'));
       expect(records.first.error, isA<FormatException>());
       expect(records.first.stackTrace, isNotNull);
+
+      var largeLog = records[1].message;
+      expect(largeLog, contains('(${largeInvalid.length} chars)'));
+      expect(largeLog, contains('…>>'));
+      expect(largeLog, isNot(contains(largeInvalid)));
+      expect(largeLog.length, lessThan(400));
 
       var blank = await toAPIRequest(
         Request(

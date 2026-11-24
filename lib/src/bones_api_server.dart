@@ -2077,6 +2077,17 @@ class APIServer extends _APIServerBase {
   /// is fixed.
   static final Uint8List _emptyPayloadBytes = Uint8List(0);
 
+  /// How much of a request body [_logPreview] shows.
+  static const _logPreviewLength = 256;
+
+  /// The start of a client's request body [s], for a log line: at most
+  /// [_logPreviewLength] characters, with `…` when cut. Used by
+  /// [_resolvePayloadFromString] to log a body that fails to decode without
+  /// writing all of it (it may be large, or hold secrets).
+  static String _logPreview(String s) => s.length <= _logPreviewLength
+      ? s
+      : '${s.substring(0, _logPreviewLength)}…';
+
   static FutureOr<_ResolvedPayload?> _resolvePayload(
     Request request, {
     int? maxPayloadLength,
@@ -2183,9 +2194,12 @@ class APIServer extends _APIServerBase {
           try {
             payload = json.decode(s);
           } catch (e, stackTrace) {
-            // Not `s`: it would shadow the payload `s` logged below.
+            // Not `s`: it would shadow the payload `s` logged below. Only a
+            // prefix of it: the body comes from the client, so it can be
+            // large or hold credentials and personal data.
             _log.severe(
-              "_resolvePayloadFromString> Error decoding JSON: <<$s>>",
+              "_resolvePayloadFromString> Error decoding JSON "
+              "(${s.length} chars): <<${_logPreview(s)}>>",
               e,
               stackTrace,
             );
