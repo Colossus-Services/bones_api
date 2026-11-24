@@ -1458,6 +1458,76 @@ void main() {
       expect(blank.payload, isNull);
     });
 
+    test('payloadBytes: the body exactly as received', () async {
+      // Spacing, key order and number format that a `json.encode` of the
+      // decoded payload would not reproduce (needed for a webhook HMAC):
+      var body = '{ "b":1.50,\n  "a" : "x" }';
+
+      var jsonReq = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/json'},
+          body: body,
+        ),
+      );
+      expect(jsonReq.payload, equals({'b': 1.5, 'a': 'x'}));
+      expect(jsonReq.payloadBytes, equals(utf8.encode(body)));
+      expect(jsonReq.payloadAsBytes, isNot(equals(utf8.encode(body))));
+
+      // Kept even when the JSON fails to decode (no payload):
+      var invalid = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/json'},
+          body: '{invalid',
+        ),
+      );
+      expect(invalid.payload, isNull);
+      expect(invalid.payloadMimeType, isNull);
+      expect(invalid.payloadBytes, equals(utf8.encode('{invalid')));
+
+      var text = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'text/plain'},
+          body: 'olá',
+        ),
+      );
+      expect(text.payload, equals('olá'));
+      expect(text.payloadBytes, equals(utf8.encode('olá')));
+
+      var binary = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/octet-stream'},
+          body: [1, 2, 3],
+        ),
+      );
+      expect(binary.payloadBytes, equals([1, 2, 3]));
+
+      var empty = await toAPIRequest(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/a'),
+          headers: {'content-type': 'application/json', 'content-length': '0'},
+        ),
+      );
+      expect(empty.payloadBytes, isEmpty);
+
+      // A shelf `Request` without a body has `contentLength == 0`:
+      var noBody = await toAPIRequest(
+        Request('GET', Uri.parse('http://localhost/a')),
+      );
+      expect(noBody.payloadBytes, isEmpty);
+
+      // Built in code, not from an HTTP request: no bytes.
+      expect(APIRequest.post('/a', payload: {'a': 1}).payloadBytes, isNull);
+    });
+
     test('payload: by extension, empty, latin1 fallback', () async {
       var byPath = await toAPIRequest(
         Request('POST', Uri.parse('http://localhost/file.json'), body: '[1]'),

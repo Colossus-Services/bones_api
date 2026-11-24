@@ -52,7 +52,7 @@ typedef APILogger = void Function(
 /// Bones API Library class.
 class BonesAPI {
   // ignore: constant_identifier_names
-  static const String VERSION = '1.35.2';
+  static const String VERSION = '1.35.3';
 
   static bool _boot = false;
 
@@ -1923,6 +1923,17 @@ class APIRequest extends APIMetricSet with APIPayload {
     return Uint8List.fromList(bs);
   }
 
+  /// The body bytes exactly as received (after any `Content-Encoding`
+  /// decompression), when this request was built from an HTTP request by the
+  /// [APIServer]; otherwise `null`.
+  ///
+  /// Unlike [payloadAsBytes], which re-encodes the decoded [payload] (a JSON
+  /// body is already a `Map` at this point), these are the original bytes:
+  /// needed to verify a signature computed over the raw body, such as a
+  /// webhook HMAC, since re-encoding changes whitespace, key order and
+  /// number formats. It is kept even when the JSON body fails to decode.
+  final Uint8List? payloadBytes;
+
   MimeType? _payloadMimeType;
 
   /// The payload/body MIME Type.
@@ -1983,6 +1994,7 @@ class APIRequest extends APIMetricSet with APIPayload {
     this.payload,
     Object? payloadMimeType,
     this.payloadFileExtension,
+    this.payloadBytes,
     this.sessionID,
     this.newSession = false,
     this.credential,

@@ -1,3 +1,14 @@
+## 1.35.3
+
+- `APIRequest.payloadBytes`: the request body bytes exactly as received
+  (after any `Content-Encoding` decompression), set by `APIServer` for
+  every HTTP request. Unlike `payloadAsBytes`, which re-encodes the decoded
+  `payload`, these are the original bytes, needed to verify a signature
+  computed over the raw body (e.g. a webhook HMAC). Kept even when a JSON
+  body fails to decode; `null` for an `APIRequest` built in code.
+- `APIServer`: the payload helpers pass the body bytes along with the
+  decoded payload (a named record), instead of discarding them.
+
 ## 1.35.2
 
 - `DBSQLMemoryAdapter`: single-field unique constraints
