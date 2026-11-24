@@ -1613,6 +1613,72 @@ Future<bool> runAdapterTests(
         }
       });
 
+      // As 'concurrent writes to the same entity' (below), for the object
+      // memory adapter (the photos of `entityRepositoryProvider2`): a
+      // canceled transaction reverts only its own writes.
+      test('stress: concurrent writes to the same object, one aborted '
+          '(object memory adapter)', () async {
+        var objectAdapter = await entityRepositoryProvider2.adapter;
+        if (objectAdapter is! DBObjectMemoryAdapter) {
+          markTestSkipped('Not a `DBObjectMemoryAdapter`: $objectAdapter');
+          return;
+        }
+
+        final photoRepo = entityRepositoryProvider2.photoAPIRepository;
+        const photoID = 'ST-OBJ-LU';
+
+        Photo photo(int b) =>
+            Photo.fromData(Uint8List.fromList([b, b, b]), id: photoID);
+
+        Future<int?> storedByte() async =>
+            (await photoRepo.selectByID(photoID))?.data?.first;
+
+        /// Transactions A and B both write the photo (A: 1, B: 2), in
+        /// [aFirst] order; B commits, then A aborts.
+        Future<void> runPair({required bool aFirst}) async {
+          var aWrote = Completer<void>();
+          var bWrote = Completer<void>();
+          var bEnded = Completer<void>();
+
+          var a = executeTransaction(() async {
+            if (!aFirst) await bWrote.future;
+            await photoRepo.store(photo(1));
+            aWrote.complete();
+            await bEnded.future;
+            throw StateError('A aborts');
+          });
+
+          var b = executeTransaction(() async {
+            if (aFirst) await aWrote.future;
+            await photoRepo.store(photo(2));
+            bWrote.complete();
+            if (!aFirst) await aWrote.future;
+          });
+
+          try {
+            await b;
+          } finally {
+            bEnded.complete();
+          }
+          await expectLater(a, throwsA(isA<StateError>()));
+        }
+
+        try {
+          await photoRepo.store(photo(0));
+          expect(await storedByte(), equals(0));
+
+          // B's committed write stays, whichever wrote first:
+          await runPair(aFirst: true);
+          expect(await storedByte(), equals(2));
+
+          await photoRepo.store(photo(0));
+          await runPair(aFirst: false);
+          expect(await storedByte(), equals(2));
+        } finally {
+          await photoRepo.deleteByID(photoID);
+        }
+      });
+
       test('stress: a new transaction inside another one\'s zone is '
           'refused, not run apart', () async {
         await ensureStoreTable();
@@ -1641,6 +1707,113 @@ Future<bool> runAdapterTests(
           expect(await storeNamesWithPrefix('st-x-'), equals(['st-x-outer']));
         } finally {
           await deleteStoresWithPrefix('st-x-');
+        }
+      });
+
+      // Two concurrent transactions writing the same entity, one of them
+      // aborted: the other one's write must survive the rollback (no lost
+      // update), whichever wrote first. Only for the memory adapters: a real
+      // database locks the row on the first write, so the second transaction
+      // waits for the first one to end (the interleaving below can't happen).
+      test('stress: concurrent writes to the same entity, one aborted '
+          '(memory adapters)', () async {
+        var sqlAdapter = await entityRepositoryProvider.adapter;
+        if (sqlAdapter is! DBSQLMemoryAdapter) {
+          markTestSkipped('A database locks the row: no such interleaving.');
+          return;
+        }
+
+        await ensureStoreTable();
+        final storeRepo = entityRepositoryProvider.storeAPIRepository;
+
+        /// Runs transactions A and B over the store [id]: each updates its
+        /// `number` (A: 1, B: 2), in [aFirst] order, then B ends (commits,
+        /// or aborts if [bAborts]), then A aborts. Each also inserts a store
+        /// of its own. Returns the `number` left, and checks the inserts.
+        Future<int?> runPair(
+          Object id, {
+          required bool aFirst,
+          required bool bAborts,
+          String tag = '',
+        }) async {
+          // Its own insert names ([tag]): the memory adapters have no
+          // isolation, so concurrent pairs see each other's inserts.
+          var nameA = 'st-lu-a$tag';
+          var nameB = 'st-lu-b$tag';
+          var aWrote = Completer<void>();
+          var bWrote = Completer<void>();
+          var bEnded = Completer<void>();
+
+          var a = executeTransaction(() async {
+            if (!aFirst) await bWrote.future;
+            await storeRepo.store(Store('st-lu', 1, id: id as int));
+            await storeRepo.store(Store(nameA, 1));
+            aWrote.complete();
+            await bEnded.future;
+            throw StateError('A aborts');
+          });
+
+          var b = executeTransaction(() async {
+            if (aFirst) await aWrote.future;
+            await storeRepo.store(Store('st-lu', 2, id: id as int));
+            await storeRepo.store(Store(nameB, 2));
+            bWrote.complete();
+            if (!aFirst) await aWrote.future;
+            if (bAborts) throw StateError('B aborts');
+          });
+
+          try {
+            await b;
+          } on StateError {
+            expect(bAborts, isTrue);
+          } finally {
+            bEnded.complete();
+          }
+          await expectLater(a, throwsA(isA<StateError>()));
+
+          expect(await storesNamed(nameA), isEmpty);
+          expect(await storesNamed(nameB), hasLength(bAborts ? 0 : 1));
+
+          return (await storeRepo.selectByID(id))?.number;
+        }
+
+        try {
+          var id = await storeRepo.store(Store('st-lu', 0));
+
+          // A wrote first, B later (and commits): B's value stays (restoring
+          // the value from before A's write would lose it).
+          expect(await runPair(id, aFirst: true, bAborts: false), equals(2));
+          await deleteStoresWithPrefix('st-lu-');
+
+          await storeRepo.store(Store('st-lu', 0, id: id as int));
+          // B wrote first, A over it: B's value stays.
+          expect(await runPair(id, aFirst: false, bAborts: false), equals(2));
+          await deleteStoresWithPrefix('st-lu-');
+
+          // Both abort, in either order: the value from before both.
+          await storeRepo.store(Store('st-lu', 0, id: id));
+          expect(await runPair(id, aFirst: true, bAborts: true), equals(0));
+          expect(await runPair(id, aFirst: false, bAborts: true), equals(0));
+
+          // Many rounds of the same, concurrently over several entities:
+          var ids = [
+            for (var i = 0; i < 6; ++i)
+              await storeRepo.store(Store('st-lu-m$i', 0)),
+          ];
+          for (var round = 0; round < 4; ++round) {
+            var results = await Future.wait([
+              for (var i = 0; i < ids.length; ++i)
+                runPair(
+                  ids[i],
+                  aFirst: (i + round).isEven,
+                  bAborts: false,
+                  tag: '-r$round-$i',
+                ),
+            ]);
+            expect(results, everyElement(equals(2)));
+          }
+        } finally {
+          await deleteStoresWithPrefix('st-lu');
         }
       });
 

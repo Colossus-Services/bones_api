@@ -75,14 +75,26 @@ A minor version: `APIRequest.payloadAsBytes` changes behavior (see below).
   executing a Transaction"), as in the transaction's own zone, instead of
   running a separate transaction.
 - `DBSQLMemoryAdapter`: a rolled back transaction reverts only its own
-  writes (an undo log per context), instead of rolling the tables back to
-  their versions when it began, which also reverted what concurrent
-  transactions committed meanwhile.
+  writes. It used to roll the tables back to their versions when it began,
+  which also reverted what concurrent transactions committed meanwhile.
+  - Each context records the versions its writes create in the tables
+    (`MapHistory`), and a rollback reverts only those
+    (`MapHistory.revertVersions`).
+  - A later write by another transaction to the same entry is kept: no
+    lost update, whichever wrote first.
+- `DBObjectMemoryAdapter`: the same for a canceled transaction. It used to
+  roll the tables back to their versions when it began, reverting what
+  concurrent transactions committed meanwhile. It now reverts only its own
+  writes (`MapHistory.revertVersions`).
 - Tests: transactions across zones and error zones, nested blocks, sub-
   transactions (another executor) and stress cases (concurrent transactions
   half aborted, deep nesting, interleaved and failing concurrent operations,
   concurrent sub-transactions), for every adapter.
+  - For the memory adapters (SQL and object), also concurrent writes to the
+    same entity with one transaction aborted.
 - Dependencies:
+  - `map_history: ^1.0.8` (`revertVersions`, and fixes to `consolidate`
+    and `rollback`).
   - `postgres: ^3.7.0` (the deadlock fix above).
   - `sqlite3: ^3.9.2`, `archive: ^4.7.1`, `googleapis_auth: ^2.3.7`,
     `dart_spawner: ^1.3.1`, `coverage: ^1.16.2`.

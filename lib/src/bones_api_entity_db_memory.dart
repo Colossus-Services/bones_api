@@ -35,16 +35,19 @@ class DBSQLMemoryAdapterContext
     : tablesVersions = sqlAdapter.tablesVersions,
       tablesIndexesVersions = sqlAdapter.tablesIndexesVersions;
 
-  /// The entries this context's writes replaced, by table and ID: each
-  /// entry as it was before this context first wrote it (`null`: absent).
+  /// This context's writes, by table: the [MapHistory] versions they created
+  /// and the IDs they changed.
   ///
-  /// A rollback ([DBSQLMemoryAdapter.cancelTransaction]) restores only these:
-  /// rolling the tables back to their versions when this context began
-  /// ([tablesVersions]) would also revert what other transactions committed
-  /// meanwhile (concurrent transactions). Filled by
-  /// [DBSQLMemoryAdapter._recordUndo]; cleared when the context is
+  /// A rollback ([DBSQLMemoryAdapter.cancelTransaction]) reverts only these
+  /// versions ([MapHistory.revertVersions]). Rolling the tables back to
+  /// their versions when this context began ([tablesVersions]) would also
+  /// revert what other transactions committed meanwhile, and restoring each
+  /// entry's value from before this context wrote it would lose a later
+  /// write of another transaction to the same entry. Filled by
+  /// [DBSQLMemoryAdapter._putTableEntry] and
+  /// [DBSQLMemoryAdapter._removeTableEntry]; cleared when the context is
   /// consolidated, rolled back, or opens a new transaction.
-  final Map<String, Map<Object, Map<String, dynamic>?>> _undoEntries = {};
+  final Map<String, ({Set<int> versions, Set<Object> ids})> _tablesWrites = {};
 
   bool _closed = false;
 
@@ -293,58 +296,98 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   bool _tableExists(String table) =>
       _hasTableScheme(table) || getEntityHandler(tableName: table) != null;
 
-  /// Records in [connection]'s undo log the entry [id] of [table] as it is
-  /// before [connection] first writes it (see
-  /// [DBSQLMemoryAdapterContext._undoEntries]). Called by every write: the
-  /// inserts, the update and the delete. A later write of the same entry by
-  /// the same context keeps the first recorded value.
-  void _recordUndo(
+  /// Stores [entry] as [id] of [table] (its [map]), recording the write for
+  /// [connection] (see [_recordTableWrite]). Every insert and update of a
+  /// table entry goes through here: the entries are replaced, never changed
+  /// in place (an update stores a copy), so each write is a [MapHistory]
+  /// version that a rollback can revert.
+  void _putTableEntry(
     DBSQLMemoryAdapterContext? connection,
     String table,
+    Map<Object, Map<String, dynamic>> map,
     Object id,
-    Map<String, dynamic>? previous,
+    Map<String, dynamic> entry,
   ) {
-    if (connection == null) return;
-    var tableUndo = connection._undoEntries[table] ??= {};
-    if (!tableUndo.containsKey(id)) {
-      // The entries are replaced, never changed in place (an update stores a
-      // copy), so the previous one is kept as is.
-      tableUndo[id] = previous;
-    }
+    var versionBefore = _mapVersion(map);
+    map[id] = entry;
+    _recordTableWrite(connection, table, map, id, versionBefore);
   }
 
-  /// Reverts [connection]'s writes ([DBSQLMemoryAdapterContext._undoEntries]):
-  /// each entry it wrote back to what it was before (removed when it was
-  /// absent), leaving what other contexts wrote meanwhile. The indexes of
-  /// the reverted tables are rebuilt, and their next-ID counters reset.
-  void _undoConnectionWrites(DBSQLMemoryAdapterContext connection) {
-    var undo = connection._undoEntries;
-    if (undo.isEmpty) return;
+  /// Removes [id] from [table] (its [map]), recording the write for
+  /// [connection] (see [_recordTableWrite]). Every delete of a table entry
+  /// goes through here.
+  void _removeTableEntry(
+    DBSQLMemoryAdapterContext? connection,
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Object id,
+  ) {
+    var versionBefore = _mapVersion(map);
+    map.remove(id);
+    _recordTableWrite(connection, table, map, id, versionBefore);
+  }
 
-    for (var e in undo.entries) {
+  /// The [MapHistory.version] of a table [map] (`null` if not a
+  /// [MapHistory]: not a table of [_tables]).
+  static int? _mapVersion(Map<Object, Map<String, dynamic>> map) =>
+      map is MapHistory<Object, Map<String, dynamic>> ? map.version : null;
+
+  /// Records for [connection] ([DBSQLMemoryAdapterContext._tablesWrites])
+  /// the versions a write of [id] created in [table]'s [map]: the ones after
+  /// [versionBefore]. Used by [_putTableEntry] and [_removeTableEntry].
+  ///
+  /// None when the version didn't change (a remove of an absent [id]):
+  /// reading the current version then would record another write's
+  /// version, maybe another transaction's, and a rollback would revert it.
+  void _recordTableWrite(
+    DBSQLMemoryAdapterContext? connection,
+    String table,
+    Map<Object, Map<String, dynamic>> map,
+    Object id,
+    int? versionBefore,
+  ) {
+    if (connection == null || versionBefore == null) return;
+    var versionAfter = _mapVersion(map)!;
+    if (versionAfter == versionBefore) return;
+
+    var writes = connection._tablesWrites[table] ??= (
+      versions: <int>{},
+      ids: <Object>{},
+    );
+    for (var v = versionBefore + 1; v <= versionAfter; ++v) {
+      writes.versions.add(v);
+    }
+    writes.ids.add(id);
+  }
+
+  /// Reverts [connection]'s writes ([DBSQLMemoryAdapterContext._tablesWrites])
+  /// with [MapHistory.revertVersions]: only its versions, so what other
+  /// contexts wrote meanwhile stays, even to the same entries (each entry
+  /// gets back its previous value, or a later write not reverted). The
+  /// indexes of the reverted tables are rebuilt, and their next-ID counters
+  /// reset.
+  void _revertConnectionWrites(DBSQLMemoryAdapterContext connection) {
+    var tablesWrites = connection._tablesWrites;
+    if (tablesWrites.isEmpty) return;
+
+    for (var e in tablesWrites.entries) {
       var table = e.key;
       var map = _tables[table];
       if (map == null) continue;
 
-      for (var e2 in e.value.entries) {
-        var previous = e2.value;
-        if (previous == null) {
-          map.remove(e2.key);
-        } else {
-          map[e2.key] = previous;
-        }
-      }
+      var writes = e.value;
+      map.revertVersions(writes.versions, keys: writes.ids);
 
       _disposeNextIDCounter(table);
     }
 
-    // An index entry is a `Set` of IDs changed in place: the indexes of the
-    // reverted tables are rebuilt from them.
-    for (var table in undo.keys) {
+    // An index entry is a `Set` of IDs changed in place, which a revert can't
+    // undo: the indexes of the reverted tables are rebuilt from them.
+    for (var table in tablesWrites.keys) {
       _rebuildTableIndexes(table);
     }
 
-    undo.clear();
+    tablesWrites.clear();
     _onTablesModification();
   }
 
@@ -629,8 +672,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     }
 
     var id = nextID(table);
-    _recordUndo(connection, table, id, map[id]);
-    map[id] = entry;
+    _putTableEntry(connection, table, map, id, entry);
 
     for (var e in entry.entries) {
       var field = e.key;
@@ -765,8 +807,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var idField = tablesScheme?.idFieldName ?? 'id';
     entry[idField] = id;
 
-    _recordUndo(connection, table, id, map[id]);
-    map[id] = entry;
+    _putTableEntry(connection, table, map, id, entry);
 
     _onTablesModification();
 
@@ -914,7 +955,6 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var map = _getTableMap(table, true)!;
 
     var prevEntry = map[id];
-    _recordUndo(connection, table, id, prevEntry);
 
     var entry = _normalizeEntityJSON(
       sql.parametersByPlaceholder,
@@ -934,14 +974,14 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
 
       entry[idField] ??= id;
 
-      map[id] = entry;
+      _putTableEntry(connection, table, map, id, entry);
 
       _disposeNextIDCounter(table);
     } else {
       var updated = deepCopyMap(prevEntry)!;
       updated.addAll(entry);
 
-      map[id] = updated;
+      _putTableEntry(connection, table, map, id, updated);
     }
 
     _onTablesModification();
@@ -1338,10 +1378,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     var del = entries.map((e) => e.value).toList();
 
     for (var e in entries) {
-      var id = e.key;
-      // The stored entry (the matched one may be a resolved copy):
-      _recordUndo(connection, table, id, tableMap[id]);
-      tableMap.remove(id);
+      _removeTableEntry(connection, table, tableMap, e.key);
     }
 
     var tableIndexes = _tablesIndexes[table];
@@ -1799,9 +1836,9 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
   @override
   DBSQLMemoryAdapterContext openTransaction(Transaction transaction) {
     var conn = catchFromPool();
-    // A pooled context may carry a previous use's log: this transaction's
-    // rollback reverts only its own writes.
-    conn._undoEntries.clear();
+    // A pooled context may carry a previous use's writes: this transaction's
+    // rollback reverts only its own.
+    conn._tablesWrites.clear();
 
     _openTransactionsContexts[conn] = DateTime.now();
 
@@ -1862,7 +1899,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     // Only this transaction's writes are reverted: rolling the tables back to
     // their versions when it began would also revert the transactions that
     // committed meanwhile (concurrent ones).
-    _undoConnectionWrites(connection);
+    _revertConnectionWrites(connection);
 
     // ignore: discarded_futures
     disposePoolElement(connection);
@@ -1890,7 +1927,7 @@ class DBSQLMemoryAdapter extends DBSQLAdapter<DBSQLMemoryAdapterContext>
     if (open == null) return null;
 
     // Committed: its writes are no longer to revert.
-    context._undoEntries.clear();
+    context._tablesWrites.clear();
 
     if (_openTransactionsContexts.isNotEmpty) {
       _consolidateContextQueue.add(context);
